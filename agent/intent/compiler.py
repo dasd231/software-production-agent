@@ -51,10 +51,8 @@ def _workflow_from_tags(goal: str, tags: list[str]) -> dict[str, Any]:
         nodes.append({"id": "train", "chain": "training"})
         edges.append([previous, "train"])
         previous = "train"
-    if "product" in tags or "frontend-backend" in tags or "auth" in tags or "asset-publish" in tags:
-        nodes.append({"id": "publish", "chain": "solution_publish"})
-        edges.append([previous, "publish"])
-        previous = "publish"
+    # Publishing is a user-acceptance action in the product UI, not an automatic workflow step.
+    # Keep the generated workflow auditable, but do not silently promote unfinished runs into assets.
     if previous != "context" or "evidence" in tags:
         nodes.append({"id": "ledger", "chain": "evidence_ledger"})
         edges.append([previous, "ledger"])
@@ -104,6 +102,8 @@ def _risk_notes(tags: list[str], validation: dict[str, Any]) -> list[str]:
         risks.append("training_governance_required: license/privacy/secret review remains mandatory")
     if "auth" in tags:
         risks.append("auth_security_required: password/session/RBAC paths need explicit tests")
+    if "asset-publish" in tags:
+        risks.append("user_acceptance_required: only explicitly satisfied deliveries enter the solution library")
     return risks
 
 

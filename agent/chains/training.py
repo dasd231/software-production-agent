@@ -17,6 +17,7 @@ from agent.evaluation.aggregate import aggregate_metric_reports
 from agent.evaluation.governance import evaluate_dataset_governance
 from agent.evaluation.sample_quality import review_training_examples
 from agent.evaluation.training import evaluate_training_dataset, training_quality_summary
+from agent.solution_library.manifest import is_solution_library_ready, normalise_solution_manifest
 from agent.runtime.manifest import build_run_manifest, write_run_manifest
 from agent.training.datasets import create_dataset_snapshot
 from agent.training.protocol_examples import build_protocol_examples
@@ -185,6 +186,9 @@ def _solution_examples(solution_dirs: tuple[Path, ...]) -> list[dict[str, Any]]:
             continue
         if not isinstance(raw, dict):
             continue
+        if not is_solution_library_ready(raw):
+            continue
+        raw = normalise_solution_manifest(raw)
         run_dir = manifest_path.parent
         backup_path = run_dir / "docs" / "SOLUTION_BACKUP.md"
         backup = _safe_read(backup_path, max_chars=5000)

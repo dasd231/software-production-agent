@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -121,6 +122,8 @@ def publish_solution_from_run(
     output_dir: Path | None = None,
     title: str = "",
     source_type: str = "product_run",
+    accepted_by: str = "",
+    acceptance_note: str = "",
 ) -> dict[str, Any]:
     root = workspace.resolve()
     existing = _load_existing_manifest(root)
@@ -130,6 +133,7 @@ def publish_solution_from_run(
     docs = dest / "docs"
     docs.mkdir(parents=True, exist_ok=True)
     backup = _backup_text(root, solution_title)
+    accepted_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     manifest = normalise_solution_manifest(
         {
             **existing,
@@ -141,6 +145,10 @@ def publish_solution_from_run(
             "retrieval_tags": existing.get("retrieval_tags") or _infer_tags(root, solution_title),
             "artifact_hints": existing.get("artifact_hints") or _artifact_hints(root),
             "source_run": str(root),
+            "acceptance_status": "accepted",
+            "accepted_at": accepted_at,
+            "accepted_by": accepted_by.strip() or "operator",
+            "acceptance_note": acceptance_note.strip(),
             "reuse_boundary": existing.get("reuse_boundary") or "reuse plan, architecture and delivery pattern; inspect source before code reuse",
             "training_eligible": bool(existing.get("training_eligible", False)),
         }
@@ -157,7 +165,13 @@ def publish_solution_from_run(
     }
     run_manifest = build_run_manifest(
         kind="solution_publish",
-        input_summary={"workspace": str(root), "title": solution_title, "source_type": source_type},
+        input_summary={
+            "workspace": str(root),
+            "title": solution_title,
+            "source_type": source_type,
+            "acceptance_status": "accepted",
+            "accepted_by": accepted_by.strip() or "operator",
+        },
         files=files,
         evaluation=manifest.get("evaluation") if isinstance(manifest.get("evaluation"), dict) else {},
         artifacts=[str(dest)],

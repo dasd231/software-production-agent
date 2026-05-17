@@ -1798,6 +1798,8 @@ def _solution_manifest(goal: str, *, stack: str, template: str) -> str:
     return json.dumps(
         {
             "schema": "solution_manifest.v1",
+            "source_type": "product_run_candidate",
+            "acceptance_status": "candidate",
             "template": template,
             "stack": stack,
             "goal": _safe_title(goal),

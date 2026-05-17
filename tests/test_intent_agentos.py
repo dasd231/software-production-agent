@@ -20,7 +20,7 @@ def test_intent_compile_builds_asset_workflow(tmp_path: Path) -> None:
 
     assert out["schema"] == "intent_compilation.v1"
     assert out["validation"]["ok"] is True
-    assert chains == ["context", "github_crawler", "research", "training", "solution_publish", "evidence_ledger"]
+    assert chains == ["context", "github_crawler", "research", "training", "evidence_ledger"]
     assert out["dry_run"]["approval_required"] is True
     assert "training" in out["intent_tags"]
     assert any(item["type"] == "chain" for item in out["resource_suggestions"])
@@ -99,6 +99,8 @@ def test_solution_publish_infers_stack_and_writes_asset(tmp_path: Path) -> None:
     assert Path(out["files"]["run_manifest"]).exists()
     assert out["manifest"]["schema_version"] == "solution_manifest.v2"
     assert out["manifest"]["stack"] == "Spring Boot + Vue"
+    assert out["manifest"]["acceptance_status"] == "accepted"
+    assert out["manifest"]["accepted_by"] == "operator"
     assert "auth" in out["manifest"]["retrieval_tags"]
     assert "workflow" in out["manifest"]["retrieval_tags"]
 
@@ -111,6 +113,7 @@ def test_new_agentos_actions_dispatch(tmp_path: Path) -> None:
     compiled = run_action(ws, {"type": "action", "action": "intent_compile", "args": {"goal": "构建登录权限系统并沉淀方案"}})
     assert compiled["ok"] is True
     assert compiled["compilation"]["workflow"]["nodes"][-1]["chain"] == "evidence_ledger"
+    assert "user_acceptance_required" in " ".join(compiled["compilation"]["risk_notes"])
 
     dry = run_action(
         ws,

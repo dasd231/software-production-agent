@@ -17,6 +17,7 @@ def test_resource_registry_discovers_chains_models_and_local_artifacts(tmp_path:
         json.dumps(
             {
                 "schema_version": "solution_manifest.v2",
+                "acceptance_status": "accepted",
                 "template": "spring-vue",
                 "goal": "employee management",
                 "stack": "Spring + Vue",

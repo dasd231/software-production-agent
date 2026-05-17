@@ -6,7 +6,7 @@
 4. 需要仓库上下文时可使用 workspace_index / git_status / git_init（无参）；仍优先用 read_file、list_files 理解代码。
 5. 若输入包含 priority_guidance，必须优先考虑其中建议动作，再决定是否扩展探索。
 6. 若需要统一工具能力，可使用 mcp_call（如 workspace.search/workspace.read/workspace.list/workspace.verify/git.status），但仍优先最小动作原则。
-7. 需要“本地方案库 + RAG + 可选 Web + 可选 LLM 综合”时，优先使用 research_synthesize；只有单纯查外部链接时才直接用 web_search。
+7. 需要“已验收正式方案库 + RAG + 可选 Web + 可选 LLM 综合”时，优先使用 research_synthesize；只有单纯查外部链接时才直接用 web_search。普通 run 产物只有在用户显式满意后才算正式方案资产。
 8. web_search 可用于查询外部知识、API 文档、最新技术方案；避免在可用 mcp_call、RAG 或 research_synthesize 时冗余调用。
 9. 需要爬取/画像常规 GitHub 前后端项目时使用 github_crawl_profile；它会打架构标签、质量分、推荐路由并把高质量项目导出为本地方案备份。需要设计 GitHub 长期语料系统时优先使用 github_corpus_program_plan；需要把 WebSearch 结果扩成 GitHub 查询计划、做候选分流或生成语料反馈时使用 github_query_plan_build / github_candidate_rank / corpus_feedback_plan。
 10. 需要准备模型微调/SFT数据时使用 training_prepare；它只生成可审计数据集和训练计划，不会启动实际训练。

@@ -189,7 +189,7 @@ pip install -r requirements-serving.txt
 | **Planner 双模** | `plan_heuristic` / `plan_with_openai` + LLM 失败回退；高失败场景会注入 `priority_guidance` 约束阶段选择 |
 | **Skill 路由** | 每轮根据 `goal+stage+state` 产出 `skill_hints`（本地规则路由，最小可用） |
 | **统一 RAG** | 每轮默认从工作区做轻量行级检索；配置 `AGENT_LEARNING_RAG_DIRS` 后会融合离线学习库 `vector_index.jsonl/knowledge_cards.json`，产出带来源、路径、行号、命中 token、置信度、文件大小与截断标记的 `rag_hints` |
-| **研究综合分链** | `agent/chains/research.py`：本地 `solution_manifest.json` / `docs/SOLUTION_BACKUP.md` 方案库优先，融合工作区/学习库 RAG，可选 Web Search 补充和 LLM 生成带引用方案 |
+| **研究综合分链** | `agent/chains/research.py`：已验收正式方案库优先，融合工作区/学习库 RAG，可选 Web Search 补充和 LLM 生成带引用方案 |
 | **微调训练分链** | `agent/chains/training.py`：从学习库 `training_examples.jsonl`、方案备份和内置 `action_protocol_sft` 协议样本生成 SFT 数据集，完成去重、样本质量复审、train/eval 切分、messages/alpaca 导出和 DeepSeek LoRA/QLoRA 训练计划 |
 | **备用模型训练任务** | `agent/chains/model_training.py`：在数据质量、治理和环境门禁通过后生成备用本地模型训练 spec、标准 `training_job_spec`、job 生命周期清单、版本清单、启动命令和可审计 manifest |
 | **训练工作室** | `agent/training/studio.py`：把研究者可读的 `training_recipe`、可解释旋钮和 `ablation_plan` 放在执行 spec 之上，让“怎么训、为什么这样训、只改了什么”可以被直接查看和比较 |
@@ -471,7 +471,7 @@ python -m agent.learning.cli `
 微调数据准备分链：
 
 ```json
-{"type":"action","action":"training_prepare","args":{"output_dir":"./training_runs/demo","learning_dirs":["./learning_runs/demo"],"solution_dirs":["./product_runs"],"dataset_format":"messages","eval_ratio":0.15,"model_hint":"deepseek-coder","include_protocol_examples":true}}
+{"type":"action","action":"training_prepare","args":{"output_dir":"./training_runs/demo","learning_dirs":["./learning_runs/demo"],"solution_dirs":["./product_runs/solution_library"],"dataset_format":"messages","eval_ratio":0.15,"model_hint":"deepseek-coder","include_protocol_examples":true}}
 ```
 
 GitHub / 本地前后端爬取画像：
@@ -553,7 +553,7 @@ python scripts/update_research_workbench.py
 - `training.dataset_prepare`：样本量、引用率、任务多样性、平均输出长度、拒绝率、切分质量、格式合法性。
 - `training.dataset_governance`：密钥扫描、引用要求、重复率和人工复核门禁。
 
-研究分链还会输出 `trace.evidence_policy`，按“方案库 > 本地/RAG > Web”的顺序做证据仲裁；Web 只作为补充，来源冲突会进入 `conflicts`，不静默覆盖本地证据。
+研究分链还会输出 `trace.evidence_policy`，按“已验收方案库 > 本地/RAG > Web”的顺序做证据仲裁；Web 只作为补充，来源冲突会进入 `conflicts`，不静默覆盖本地证据。正式方案库只收用户在前端显式点击“满意并沉淀”后的资产，普通 run 产物默认不进入检索和训练来源。
 
 ### Model Plane / 本地大模型
 
@@ -623,7 +623,7 @@ python -m agent.main --llm --goal "先用 research_synthesize 查本地方案库
 Action 示例：
 
 ```json
-{"type":"action","action":"research_synthesize","args":{"query":"员工审批管理系统 Spring Vue CRUD","top_k":4,"solution_dirs":["./product_runs"],"learning_dirs":["./learning_runs/demo"],"use_web":true,"use_llm":true,"llm_provider":"deepseek"}}
+{"type":"action","action":"research_synthesize","args":{"query":"员工审批管理系统 Spring Vue CRUD","top_k":4,"solution_dirs":["./product_runs/solution_library"],"learning_dirs":["./learning_runs/demo"],"use_web":true,"use_llm":true,"llm_provider":"deepseek"}}
 ```
 
 ### CLI 补充

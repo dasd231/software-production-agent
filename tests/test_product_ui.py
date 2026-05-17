@@ -204,6 +204,7 @@ def test_product_ui_local_production_run_outputs_workspace_files(tmp_path: Path)
     assert resp.status_code == 200
     assert "finished:" in text
     assert "项目成熟度" in text
+    assert "满意并沉淀到方案库" in text
     assert "result-dashboard" in text
     assert ".agent_state.json" not in text
     assert ".agent_events.jsonl" not in text
@@ -227,6 +228,10 @@ def test_product_ui_local_production_run_outputs_workspace_files(tmp_path: Path)
     )
     assert publish_resp.status_code == 200
     assert publish_resp.get_json()["schema"] == "solution_publish_result.v1"
+    assert publish_resp.get_json()["manifest"]["acceptance_status"] == "accepted"
+
+    accepted_page = client.get(f"/runs/{workspace.name}")
+    assert "确认满意，并沉淀到正式方案库" in accepted_page.get_data(as_text=True)
 
 
 def test_product_ui_local_production_can_scaffold_management_system(tmp_path: Path) -> None:

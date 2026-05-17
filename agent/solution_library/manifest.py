@@ -6,6 +6,7 @@ from typing import Any
 
 
 SOLUTION_SCHEMA_VERSION = "solution_manifest.v2"
+LIBRARY_READY_ACCEPTANCE_STATUSES = frozenset({"accepted", "curated", "accepted_legacy"})
 
 
 def normalise_solution_manifest(raw: dict[str, Any]) -> dict[str, Any]:
@@ -18,6 +19,19 @@ def normalise_solution_manifest(raw: dict[str, Any]) -> dict[str, Any]:
     out.setdefault("schema", "solution_manifest.v1")
     out["schema_version"] = str(out.get("schema_version") or SOLUTION_SCHEMA_VERSION)
     out["source_type"] = str(out.get("source_type") or "unknown")
+    explicit_acceptance = str(out.get("acceptance_status") or "").strip()
+    if explicit_acceptance:
+        acceptance_status = explicit_acceptance
+    elif out["source_type"] == "github_profile":
+        acceptance_status = "curated"
+    elif out["source_type"] in {"product_run", "product_run_candidate"}:
+        acceptance_status = "candidate"
+    else:
+        acceptance_status = "accepted_legacy"
+    out["acceptance_status"] = acceptance_status
+    out["accepted_at"] = str(out.get("accepted_at") or "")
+    out["accepted_by"] = str(out.get("accepted_by") or "")
+    out["source_run"] = str(out.get("source_run") or "")
     out["architecture_tags"] = architecture_tags
     out["retrieval_tags"] = retrieval_tags
     out["quality_score"] = float(out.get("quality_score") or quality.get("score") or 0.0)
@@ -27,6 +41,11 @@ def normalise_solution_manifest(raw: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def is_solution_library_ready(raw: dict[str, Any]) -> bool:
+    manifest = normalise_solution_manifest(raw)
+    return str(manifest.get("acceptance_status", "")) in LIBRARY_READY_ACCEPTANCE_STATUSES
+
+
 def build_github_solution_manifest(profile: dict[str, Any]) -> dict[str, Any]:
     arch = profile["architecture"]
     quality = profile["quality"]
@@ -34,6 +53,8 @@ def build_github_solution_manifest(profile: dict[str, Any]) -> dict[str, Any]:
         "schema": "solution_manifest.v1",
         "schema_version": SOLUTION_SCHEMA_VERSION,
         "source_type": "github_profile",
+        "acceptance_status": "curated",
+        "accepted_by": "github_crawler",
         "template": "-".join(arch.get("matched_rule_names", [])[:3]) or "github-profile",
         "stack": " + ".join(arch.get("tags", [])[:5]) or "unknown",
         "goal": f"GitHub profile reusable solution: {profile['repo'].get('full_name')}",

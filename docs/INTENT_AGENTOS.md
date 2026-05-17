@@ -71,13 +71,13 @@ Coze Studio、Dify、AutoGen Studio 这类平台的强点，是把 Prompt、RAG�
 
 作用：
 
-- 把任意成功 run 发布为本地方案资产。
+- 只在用户显式验收满意后，把 run 发布为本地方案资产。
 - 写入 `solution_manifest.v2`。
 - 写入 `docs/SOLUTION_BACKUP.md`。
 - 写入发布链路的 `run_manifest.json`。
 - 推断技术栈和检索标签。
 
-这让项目开始形成软件工厂飞轮：产物 -> 方案库 -> RAG -> 训练数据 -> 更强产物。
+这让项目开始形成更干净的软件工厂飞轮：交付候选 -> 用户验收 -> 正式方案库 -> RAG -> 训练数据 -> 更强产物。
 
 ## 创新点
 

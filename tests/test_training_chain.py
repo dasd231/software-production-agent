@@ -40,13 +40,15 @@ def _make_learning_run(root: Path) -> Path:
     return learning
 
 
-def _make_solution_run(root: Path) -> Path:
+def _make_solution_run(root: Path, *, acceptance_status: str = "accepted") -> Path:
     run = root / "run_demo"
     (run / "docs").mkdir(parents=True)
     (run / "solution_manifest.json").write_text(
         json.dumps(
             {
                 "schema": "solution_manifest.v1",
+                "source_type": "product_run",
+                "acceptance_status": acceptance_status,
                 "template": "spring-vue-management",
                 "stack": "Spring Boot + Vue",
                 "goal": "员工管理系统",
@@ -62,6 +64,22 @@ def _make_solution_run(root: Path) -> Path:
         encoding="utf-8",
     )
     return run
+
+
+def test_training_prepare_skips_unaccepted_solution_assets(tmp_path: Path) -> None:
+    _make_solution_run(tmp_path, acceptance_status="candidate")
+
+    result = prepare_fine_tuning_dataset(
+        TrainingPrepareInput(
+            output_dir=tmp_path / "training",
+            solution_dirs=(tmp_path,),
+            eval_ratio=0.0,
+            min_chars=20,
+            include_protocol_examples=False,
+        )
+    )
+
+    assert result.total_examples == 0
 
 
 def test_prepare_fine_tuning_dataset_from_learning_and_solutions(tmp_path: Path) -> None:

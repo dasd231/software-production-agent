@@ -87,6 +87,7 @@ from agent.resources.registry import discover_resources
 from agent.scheduler.admission import PoolAdmissionController
 from agent.scheduler.routing import build_model_route_plan, list_model_pools
 from agent.solution_library.publish import publish_solution_from_run
+from agent.solution_library.manifest import is_solution_library_ready, normalise_solution_manifest
 from agent.ui.auth import LocalAuthStore, can_access_run, current_user, login_required, require_permission, sign_in, sign_out
 from agent.ui.maturity import build_maturity_report
 from agent.ui.offline_product import OfflineProductBrain
@@ -1680,6 +1681,22 @@ RESULT_TEMPLATE = """
             </div>
           </div>
         </div>
+        <div class="surface acceptance-panel">
+          <h2>方案验收</h2>
+          {% if accepted_solution %}
+            <p>
+              已由 <strong>{{ accepted_solution.accepted_by or "用户" }}</strong>
+              在 <strong>{{ accepted_solution.accepted_at or "未知时间" }}</strong>
+              确认满意，并沉淀到正式方案库。
+            </p>
+          {% else %}
+            <p>只有你确认满意后，这次交付才会进入正式方案库，后续才会被检索和复用。</p>
+            <form method="post" action="{{ url_for('publish_run_solution', run_id=run_id) }}">
+              <input type="hidden" name="title" value="{{ run_id }}">
+              <button type="submit">满意并沉淀到方案库</button>
+            </form>
+          {% endif %}
+        </div>
         <div class="surface improve-panel">
           <h2>基于此方案继续改进</h2>
           <form class="improve-form" method="post" action="{{ url_for('improve_run', run_id=run_id) }}">
@@ -2316,6 +2333,38 @@ def _display_text(value: str) -> str:
     return text[:220]
 
 
+def _safe_json(path: Path) -> dict[str, Any]:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _accepted_solution_for_run(runs_root: Path, workspace: Path) -> dict[str, Any]:
+    library_root = runs_root / "solution_library"
+    if not library_root.exists():
+        return {}
+    target = str(workspace.resolve())
+    for manifest_path in sorted(library_root.glob("*/solution_manifest.json")):
+        raw = _safe_json(manifest_path)
+        if not raw or not is_solution_library_ready(raw):
+            continue
+        manifest = normalise_solution_manifest(raw)
+        source_run = str(manifest.get("source_run", "") or "")
+        try:
+            same_run = bool(source_run) and str(Path(source_run).resolve()) == target
+        except OSError:
+            same_run = False
+        if same_run:
+            return {
+                "manifest_path": str(manifest_path),
+                "accepted_at": str(manifest.get("accepted_at", "")),
+                "accepted_by": str(manifest.get("accepted_by", "")),
+            }
+    return {}
+
+
 def _render_run_page(
     *,
     runs_root: Path,
@@ -2349,6 +2398,7 @@ def _render_run_page(
         {"path": path, "url": url_for("run_file", run_id=run_id, file_path=path)}
         for path in files
     ]
+    accepted_solution = _accepted_solution_for_run(runs_root, workspace)
     html = render_template_string(
         RESULT_TEMPLATE,
         css=CSS,
@@ -2371,6 +2421,7 @@ def _render_run_page(
         source_run=meta.get("source_run", ""),
         improvement_goal=meta.get("improvement_goal", ""),
         display_improvement_goal=_display_text(meta.get("improvement_goal", "")),
+        accepted_solution=accepted_solution,
         current_user=user,
     )
     return html, status_code
@@ -2739,8 +2790,12 @@ def create_app(
             output_dir=_payload_path(payload, "output_dir", base=root) or (root / "solution_library"),
             title=str(payload.get("title", "") or ""),
             source_type=str(payload.get("source_type", "product_run") or "product_run"),
+            accepted_by=user.username if user else "",
+            acceptance_note=str(payload.get("acceptance_note", "") or ""),
         )
-        return jsonify(result)
+        if request.is_json:
+            return jsonify(result)
+        return redirect(url_for("show_run", run_id=run_id))
 
     @app.post("/run")
     @login_required(_auth_store)

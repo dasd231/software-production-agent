@@ -40,9 +40,9 @@ _TEMPLATES: tuple[tuple[str, str, dict[str, Any]], ...] = (
     ("为了先了解当前工作区，请调用 workspace_index。只输出一行 JSON。", "workspace_index", {}),
     ("先做工作区索引，不要解释，直接返回可执行动作。", "workspace_index", {}),
     (
-        "查看当前工作区下的方案资源，roots=['./product_runs']，type='solution'。只输出动作 JSON。",
+        "查看当前工作区下的已验收方案资源，roots=['./product_runs/solution_library']，type='solution'。只输出动作 JSON。",
         "resource_registry",
-        {"type": "solution", "roots": ["./product_runs"]},
+        {"type": "solution", "roots": ["./product_runs/solution_library"]},
     ),
     (
         "我要查看训练数据资源，roots=['./training_runs']，type='training_dataset'。只输出一行 JSON。",
@@ -50,13 +50,13 @@ _TEMPLATES: tuple[tuple[str, str, dict[str, Any]], ...] = (
         {"type": "training_dataset", "roots": ["./training_runs"]},
     ),
     (
-        "根据需求先做研究综合：query='怎样设计员工管理系统权限升级'，top_k=4，solution_dirs=['./product_runs']，use_web=false。"
+        "根据需求先做研究综合：query='怎样设计员工管理系统权限升级'，top_k=4，solution_dirs=['./product_runs/solution_library']，use_web=false。"
         " 只输出动作 JSON。",
         "research_synthesize",
         {
             "query": "怎样设计员工管理系统权限升级",
             "top_k": 4,
-            "solution_dirs": ["./product_runs"],
+            "solution_dirs": ["./product_runs/solution_library"],
             "use_web": False,
         },
     ),
@@ -73,12 +73,12 @@ _TEMPLATES: tuple[tuple[str, str, dict[str, Any]], ...] = (
     ),
     (
         "准备 SFT 数据集：output_dir='./training_runs/protocol-demo'，learning_dirs=['./learning_runs/demo']，"
-        "solution_dirs=['./product_runs']，dataset_format='messages'。只返回一行 JSON。",
+        "solution_dirs=['./product_runs/solution_library']，dataset_format='messages'。只返回一行 JSON。",
         "training_prepare",
         {
             "output_dir": "./training_runs/protocol-demo",
             "learning_dirs": ["./learning_runs/demo"],
-            "solution_dirs": ["./product_runs"],
+            "solution_dirs": ["./product_runs/solution_library"],
             "dataset_format": "messages",
         },
     ),
@@ -203,9 +203,9 @@ _TEMPLATES: tuple[tuple[str, str, dict[str, Any]], ...] = (
     ),
     (
         "查询方案资源时必须保留外层 action 包装。请输出 resource_registry，"
-        " type='solution'，roots=['./product_runs']。",
+        " type='solution'，roots=['./product_runs/solution_library']。",
         "resource_registry",
-        {"type": "solution", "roots": ["./product_runs"]},
+        {"type": "solution", "roots": ["./product_runs/solution_library"]},
     ),
     (
         "现在不是准备数据集，而是基于现有训练集生成备用模型训练任务。"
@@ -252,11 +252,11 @@ _TEMPLATES: tuple[tuple[str, str, dict[str, Any]], ...] = (
     ),
     (
         "这里的目标是 preparation，不是 model training。请输出 training_prepare："
-        " output_dir='./training_runs/v5'，solution_dirs=['./product_runs']。",
+        " output_dir='./training_runs/v5'，solution_dirs=['./product_runs/solution_library']。",
         "training_prepare",
         {
             "output_dir": "./training_runs/v5",
-            "solution_dirs": ["./product_runs"],
+            "solution_dirs": ["./product_runs/solution_library"],
         },
     ),
     (

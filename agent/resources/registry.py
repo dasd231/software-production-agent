@@ -16,6 +16,7 @@ from agent.integrations.embedding import list_integration_catalog
 from agent.llm.providers import PROVIDER_SPECS, resolve_llm_provider
 from agent.llm.runtime import model_runtime_status
 from agent.scheduler.routing import list_model_pools
+from agent.solution_library.manifest import is_solution_library_ready, normalise_solution_manifest
 
 
 @dataclass(frozen=True)
@@ -279,6 +280,9 @@ def _solution_resources(roots: list[Path]) -> list[ResourceRecord]:
     out: list[ResourceRecord] = []
     for path in _iter_named_files(roots, "solution_manifest.json"):
         raw = _safe_json(path)
+        if not is_solution_library_ready(raw):
+            continue
+        raw = normalise_solution_manifest(raw)
         tags = raw.get("retrieval_tags") if isinstance(raw.get("retrieval_tags"), list) else []
         out.append(
             ResourceRecord(
@@ -293,6 +297,8 @@ def _solution_resources(roots: list[Path]) -> list[ResourceRecord]:
                     "schema_version": raw.get("schema_version") or raw.get("schema"),
                     "quality_score": raw.get("quality_score") or (raw.get("quality", {}) or {}).get("score") if isinstance(raw.get("quality"), dict) else raw.get("quality_score"),
                     "training_eligible": raw.get("training_eligible"),
+                    "acceptance_status": raw.get("acceptance_status"),
+                    "accepted_by": raw.get("accepted_by"),
                 },
             )
         )

@@ -44,12 +44,12 @@ WebSearch 功能已集成到软件生产 Agent 的默认生产环境中。Agent 
 
 **协议**:
 ```json
-{"type":"action","action":"research_synthesize","args":{"query":"员工审批管理系统 Spring Vue CRUD","top_k":4,"solution_dirs":["./product_runs"],"learning_dirs":["./learning_runs/demo"],"use_web":true,"use_llm":true,"llm_provider":"deepseek"}}
+{"type":"action","action":"research_synthesize","args":{"query":"员工审批管理系统 Spring Vue CRUD","top_k":4,"solution_dirs":["./product_runs/solution_library"],"learning_dirs":["./learning_runs/demo"],"use_web":true,"use_llm":true,"llm_provider":"deepseek"}}
 ```
 
 **证据优先级**:
 
-1. `[S]` 本地方案库：`solution_manifest.json` + `docs/SOLUTION_BACKUP.md`
+1. `[S]` 已验收正式方案库：`solution_manifest.json` + `docs/SOLUTION_BACKUP.md`
 2. `[R]` 本地工作区与学习库 RAG：代码、文档、知识卡索引
 3. `[W]` Web Search：外部文档、最新 API、开源示例链接
 4. LLM 综合：只根据上述证据输出方案，证据不足时明确说明
@@ -61,7 +61,7 @@ WebSearch 功能已集成到软件生产 Agent 的默认生产环境中。Agent 
 ### 1. 本地方案库 + Web + LLM 综合
 
 ```json
-{"type":"action","action":"research_synthesize","args":{"query":"基于历史方案设计员工审批管理系统","solution_dirs":["./product_runs"],"use_web":true,"use_llm":true,"llm_provider":"deepseek"}}
+{"type":"action","action":"research_synthesize","args":{"query":"基于历史方案设计员工审批管理系统","solution_dirs":["./product_runs/solution_library"],"use_web":true,"use_llm":true,"llm_provider":"deepseek"}}
 ```
 
 ### 2. 查询最新的技术文档

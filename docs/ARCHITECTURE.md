@@ -100,7 +100,7 @@ agent.main / agent.ui.app
 | Session | `agent/memory/session.py` | `.agent_session.jsonl` 会话审计与 prompt transcript 裁剪 |
 | Context | `agent/context/*` | digest 与旧兼容入口；新增上下文来源优先接入 `agent/chains/context.py` |
 | RAG | `agent/rag/local_index.py`, `agent/rag/unified.py` | 本地轻量检索与可选学习库融合检索 |
-| Research | `agent/chains/research.py` | 本地 `solution_manifest.json` / `SOLUTION_BACKUP.md` 方案库优先，融合 RAG、可选 Web 和可选 LLM 综合 |
+| Research | `agent/chains/research.py` | 已验收正式方案库优先，融合 RAG、可选 Web 和可选 LLM 综合 |
 | Evidence | `agent/evidence/arbiter.py`, `agent/evidence/ledger.py` | 按 solution library -> local RAG -> Web 做证据仲裁；证据账本汇总 manifest、评价、治理和 agent events |
 | Training | `agent/chains/training.py`, `agent/chains/model_training.py` | 从 learning run 与方案库准备微调/SFT 数据集，输出 train/eval、质量报告、治理报告和训练计划；在门禁通过后生成备用本地模型训练 spec、版本清单和启动命令 |
 | GitHub Crawler | `agent/chains/github_crawler.py` | GitHub/本地 repo 爬取画像，按可扩展架构规则打标签、质量评分，并将高质量项目导出为本地方案库 |
@@ -109,7 +109,7 @@ agent.main / agent.ui.app
 | MCP-like | `agent/mcp/adapter.py` | 本地 MCP-like 工具目录与统一调用入口 |
 | Tools | `agent/tools/*` | 文件、shell、git、workspace index 的低层能力 |
 | Runtime | `agent/runtime/*` | shell runner、production check、chain run manifest |
-| Solution Library | `agent/solution_library/manifest.py`, `agent/solution_library/publish.py` | `solution_manifest.v2` 标准化与发布，把成功 run 沉淀为可复用方案资产 |
+| Solution Library | `agent/solution_library/manifest.py`, `agent/solution_library/publish.py` | `solution_manifest.v2` 标准化与发布；只有用户显式验收满意后的 run 才进入正式可复用方案资产 |
 | Quality | `agent/pipeline/*` | 动态阶段枚举、review/health/wtf 启发式评分 |
 | Observability | `agent/recorder.py`, `agent/observability.py` | 结构化事件、run_id/event_id、logger |
 | Analytics | `agent/analytics/events_report.py` | 事件报告、baseline 对比、CI gate、history 趋势 |
