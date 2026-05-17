@@ -7,8 +7,5 @@ pydantic>=2.6.0
 openai>=1.0.0
 # RAG enhancements
 rank-bm25>=0.2.0
-# DeepSeek deployment
-vllm>=0.4.0
-huggingface-hub>=0.20.0
 # Dev
 pytest>=8.0.0

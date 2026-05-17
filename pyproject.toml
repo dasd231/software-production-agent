@@ -17,6 +17,7 @@ dependencies = [
 dev = ["pytest>=8.0.0"]
 prod = ["gunicorn>=21.2.0"]
 research = ["sentence-transformers>=3.0.0", "faiss-cpu>=1.7.4"]
+serving = ["vllm>=0.4.0", "huggingface-hub>=0.20.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

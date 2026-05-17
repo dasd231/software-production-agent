@@ -165,6 +165,15 @@ python -m agent.ui.app --host 127.0.0.1 --port 7860
 python -m agent.learning.cli --query "Flask agent RAG" --local-repo ./workspace_demo --output ./learning_runs/demo
 ```
 
+`requirements.txt` 只安装基础控制面依赖。  
+如果你需要在当前机器上部署模型服务，再显式安装：
+
+```bash
+pip install -r requirements-serving.txt
+```
+
+训练依赖继续单独使用 `requirements-training.txt`，不要和基础环境混装。
+
 打开 `http://127.0.0.1:7860` 后，输入需求，只需要在两个产品模式中选择：`本地生产` 或 `LLM 生成`。本地生产不消耗 API Key，使用 Codex 代理的本地完整链路，仍会经过 Planner、Context、Decision Policy、Brain、Protocol、Executor、Feedback、State/Events，并直接产出软件；管理系统类需求会生成 backend/frontend/preview/docs/README、员工增删改查 Controller、参考数据接口、Vue CRUD 页面、前端 API 封装、后端 CRUD 测试、产品规格、API 契约、数据库设计、交付清单、静态可交互预览，以及 `docs/SOLUTION_BACKUP.md` / `solution_manifest.json` 方案备份。LLM 生成使用 OPENAI/GROQ/DEEPSEEK API，Planner 和 Brain 都走大模型链路；`OPENAI` 需要 `OPENAI_API_KEY`，`GROQ` 需要 `GROQ_API_KEY`，`DEEPSEEK` 需要 `DEEPSEEK_API_KEY`。结果页会展示项目成熟度、结构缺口、下一步建议、隔离预览和产物 ZIP 下载，也可以直接输入“基于此方案继续改进”，系统会复制上一版用户产物到新 run、写入 `docs/IMPROVEMENT_REQUEST.md` 并保留版本来源；结果页默认隐藏并排除 `.agent_*` 内部状态文件。
 
 ## 质量与旋钮（不计 token 的控质版本）

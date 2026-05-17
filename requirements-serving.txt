@@ -1,0 +1,5 @@
+# Optional model-serving stack.
+# Keep separate from the base app environment so ordinary development and
+# control-plane installs do not pull heavyweight GPU serving dependencies.
+vllm>=0.4.0
+huggingface-hub>=0.20.0
