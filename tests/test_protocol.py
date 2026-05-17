@@ -189,8 +189,10 @@ def test_distillation_execution_actions_valid() -> None:
     samples = [
         '{"type":"action","action":"teacher_prompt_batch_build","args":{"distillation_plan":{},"source_examples":[],"max_prompts":0}}',
         '{"type":"action","action":"teacher_execution_plan_build","args":{"distillation_plan":{},"prompt_batch":{},"mode":"dry_run","allow_remote":false,"max_prompts":0,"max_output_tokens":1024,"temperature":0.0}}',
+        '{"type":"action","action":"teacher_execution_run","args":{"execution_plan":{},"timeout":90,"max_retries":1}}',
         '{"type":"action","action":"teacher_output_review_build","args":{"distillation_plan":{},"prompt_batch":{},"teacher_outputs":[]}}',
         '{"type":"action","action":"distillation_export_build","args":{"output_dir":"./distill","distillation_plan":{},"teacher_output_review":{}}}',
+        '{"type":"action","action":"first_training_round_plan","args":{"name":"first","learning_dirs":["./project_task_runs/demo"],"training_output_dir":"./training_runs/first","model_output_dir":"./model_runs/first"}}',
     ]
     for line in samples:
         assert parse_and_validate_action_line(line)["type"] == "action"

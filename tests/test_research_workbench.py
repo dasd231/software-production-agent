@@ -346,5 +346,5 @@ def test_distillation_overview_exposes_teacher_catalog() -> None:
     assert overview["schema"] == "research_distillation_overview.v1"
     assert overview["summary"]["teachers"] >= 3
     assert overview["summary"]["teacher_tasks"] >= 5
-    assert overview["summary"]["pipeline_stages"] == 4
+    assert overview["summary"]["pipeline_stages"] == 5
     assert overview["pipeline"][1]["id"] == "teacher_execution_plan"

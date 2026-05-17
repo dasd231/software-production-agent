@@ -10,6 +10,7 @@ from agent.distillation.export import export_distillation_training_examples
 from agent.distillation.plans import build_distillation_plan, build_teacher_task_suite
 from agent.distillation.prompts import build_teacher_prompt_batch
 from agent.distillation.review import review_teacher_outputs
+from agent.distillation.runtime import run_teacher_execution
 
 
 def _distillation_plan() -> dict:
@@ -67,6 +68,46 @@ def test_teacher_execution_plan_is_dry_run_by_default_and_blocks_implicit_live_m
     assert dry_run["validation"]["ok"] is True
     assert blocked_live["validation"]["ok"] is False
     assert "live_mode_requires_allow_remote" in blocked_live["validation"]["blockers"]
+
+
+def test_teacher_runtime_keeps_dry_run_side_effect_free() -> None:
+    plan = _distillation_plan()
+    batch = build_teacher_prompt_batch(distillation_plan=plan, source_examples=[_source_example()])
+    execution_plan = build_teacher_execution_plan(distillation_plan=plan, prompt_batch=batch)
+    result = run_teacher_execution(execution_plan=execution_plan)
+
+    assert result["mode"] == "dry_run"
+    assert result["counts"]["teacher_outputs"] == 0
+    assert result["request_results"][0]["status"] == "skipped_dry_run"
+
+
+def test_teacher_runtime_executes_explicit_live_plan_with_injected_completion() -> None:
+    plan = _distillation_plan()
+    batch = build_teacher_prompt_batch(distillation_plan=plan, source_examples=[_source_example()])
+    execution_plan = build_teacher_execution_plan(
+        distillation_plan=plan,
+        prompt_batch=batch,
+        mode="live",
+        allow_remote=True,
+    )
+    result = run_teacher_execution(
+        execution_plan=execution_plan,
+        completion_fn=lambda request: {
+            "content": json.dumps(
+                {
+                    "output": "项目包含入口、测试和依赖配置。",
+                    "citations": [{"path": "project_map.json"}],
+                },
+                ensure_ascii=False,
+            ),
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        },
+    )
+
+    assert result["validation"]["ok"] is True
+    assert result["counts"]["completed_requests"] == 1
+    assert result["teacher_outputs"][0]["output"].startswith("项目包含")
+    assert result["usage"]["total_tokens"] == 15
 
 
 def test_teacher_output_review_rejects_citations_outside_prompt_evidence() -> None:
@@ -161,6 +202,14 @@ def test_distillation_execution_actions_cover_prompt_review_and_export(tmp_path:
             "args": {"distillation_plan": plan, "prompt_batch": batch_out["batch"]},
         },
     )
+    dry_run_out = run_action(
+        tmp_path,
+        {
+            "type": "action",
+            "action": "teacher_execution_run",
+            "args": {"execution_plan": execution_out["plan"]},
+        },
+    )
     prompt_id = batch_out["batch"]["prompts"][0]["prompt_id"]
     review_out = run_action(
         tmp_path,
@@ -198,6 +247,8 @@ def test_distillation_execution_actions_cover_prompt_review_and_export(tmp_path:
     assert batch_out["ok"] is True
     assert execution_out["ok"] is True
     assert execution_out["plan"]["mode"] == "dry_run"
+    assert dry_run_out["ok"] is True
+    assert dry_run_out["result"]["counts"]["teacher_outputs"] == 0
     assert review_out["ok"] is True
     assert export_out["ok"] is True
     assert Path(export_out["files"]["training_examples"]).exists()

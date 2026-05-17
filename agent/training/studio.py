@@ -179,8 +179,8 @@ def build_training_platform_blueprint() -> dict[str, Any]:
             "next_builds": [
                 "teacher_prompt_batch",
                 "teacher_execution_plan",
-                "teacher_output_review",
-                "distillation_export",
+                "teacher_execution_run",
+                "first_training_round_plan",
             ],
         },
     }

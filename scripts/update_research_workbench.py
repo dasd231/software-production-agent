@@ -643,7 +643,7 @@ def _distillation_overview() -> dict[str, Any]:
         "summary": {
             "teachers": len(teachers),
             "teacher_tasks": len(tasks),
-            "pipeline_stages": 4,
+            "pipeline_stages": 5,
         },
         "teachers": teachers,
         "tasks": tasks,
@@ -659,6 +659,11 @@ def _distillation_overview() -> dict[str, Any]:
                 "default_mode": "dry_run",
             },
             {
+                "id": "teacher_execution_run",
+                "purpose": "execute teachers only after explicit live authorization",
+                "default_mode": "requires_live_authorization",
+            },
+            {
                 "id": "teacher_output_review",
                 "purpose": "reject missing, mismatched or unsupported teacher outputs",
                 "default_mode": "evidence_gate",
@@ -671,7 +676,8 @@ def _distillation_overview() -> dict[str, Any]:
         ],
         "notes": [
             "当前默认路径仍然不会触发真实教师调用；execution plan 的默认 mode 是 dry_run。",
-            "prompt -> review -> export 已经接通，下一步再接真实 teacher runtime adapter 与多教师 consensus。",
+            "真实 teacher runtime 已经接上，但只有 mode=live 且 allow_remote=true 时才会远端调用。",
+            "下一步再做多教师 consensus 与论文级对照。",
         ],
     }
 

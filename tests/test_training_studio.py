@@ -36,8 +36,8 @@ def test_training_platform_blueprint_remembers_route_and_planes() -> None:
     assert blueprint["current_priority"]["next_builds"] == [
         "teacher_prompt_batch",
         "teacher_execution_plan",
-        "teacher_output_review",
-        "distillation_export",
+        "teacher_execution_run",
+        "first_training_round_plan",
     ]
     assert blueprint["route_memory"] == [
         "A: build the platform top level first",

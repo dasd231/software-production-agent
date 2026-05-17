@@ -1,10 +1,10 @@
 # 蒸馏控制面
 
-生成时间：`2026-05-17T11:01:00+00:00`
+生成时间：`2026-05-17T15:41:05+00:00`
 
 - 教师模型：`3`
 - 教师任务：`5`
-- 中段阶段：`4`
+- 中段阶段：`5`
 
 ## Teachers
 
@@ -30,10 +30,12 @@
 | --- | --- | --- |
 | `teacher_prompt_batch` | turn governed source examples into evidence-bound teacher prompts | `safe_build_only` |
 | `teacher_execution_plan` | preview provider/model calls before any expensive execution | `dry_run` |
+| `teacher_execution_run` | execute teachers only after explicit live authorization | `requires_live_authorization` |
 | `teacher_output_review` | reject missing, mismatched or unsupported teacher outputs | `evidence_gate` |
 | `distillation_export` | emit training_prepare-compatible examples | `write_learning_dir` |
 
 ## 说明
 
 - 当前默认路径仍然不会触发真实教师调用；execution plan 的默认 mode 是 dry_run。
-- prompt -> review -> export 已经接通，下一步再接真实 teacher runtime adapter 与多教师 consensus。
+- 真实 teacher runtime 已经接上，但只有 mode=live 且 allow_remote=true 时才会远端调用。
+- 下一步再做多教师 consensus 与论文级对照。

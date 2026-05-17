@@ -1,6 +1,6 @@
 {
   "schema": "research_training_platform_blueprint.v1",
-  "generated_at": "2026-05-17T11:01:00+00:00",
+  "generated_at": "2026-05-17T15:41:05+00:00",
   "north_star": "Transparent, adjustable and research-comparable training for project-level models.",
   "route_memory": [
     "A: build the platform top level first",
@@ -202,8 +202,8 @@
     "next_builds": [
       "teacher_prompt_batch",
       "teacher_execution_plan",
-      "teacher_output_review",
-      "distillation_export"
+      "teacher_execution_run",
+      "first_training_round_plan"
     ]
   }
 }

@@ -78,8 +78,10 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "distillation_dataset_manifest_build",
         "teacher_prompt_batch_build",
         "teacher_execution_plan_build",
+        "teacher_execution_run",
         "teacher_output_review_build",
         "distillation_export_build",
+        "first_training_round_plan",
         "industrial_maturity_plan",
         "enterprise_readiness_check",
         "workflow_validate",
@@ -362,6 +364,15 @@ class ActionDTO(BaseModel):
                     raise ValueError("teacher_execution_plan_build max_output_tokens must be positive integer")
             if "temperature" in ar and (isinstance(ar.get("temperature"), bool) or not isinstance(ar.get("temperature"), (int, float))):
                 raise ValueError("teacher_execution_plan_build temperature must be number")
+        elif a == "teacher_execution_run":
+            if not isinstance(ar.get("execution_plan"), dict):
+                raise ValueError("teacher_execution_run requires object execution_plan")
+            if "timeout" in ar:
+                _validate_timeout(ar["timeout"], label="teacher_execution_run timeout")
+            if "max_retries" in ar:
+                value = ar.get("max_retries")
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise ValueError("teacher_execution_run max_retries must be non-negative integer")
         elif a == "teacher_output_review_build":
             if not isinstance(ar.get("distillation_plan"), dict):
                 raise ValueError("teacher_output_review_build requires object distillation_plan")
@@ -377,6 +388,30 @@ class ActionDTO(BaseModel):
                 raise ValueError("distillation_export_build requires object distillation_plan")
             if not isinstance(ar.get("teacher_output_review"), dict):
                 raise ValueError("distillation_export_build requires object teacher_output_review")
+        elif a == "first_training_round_plan":
+            for key in ("name", "training_output_dir", "model_output_dir"):
+                if key not in ar or not isinstance(ar.get(key), str):
+                    raise ValueError(f"first_training_round_plan requires string {key}")
+            for key in ("learning_dirs", "solution_dirs"):
+                if key in ar:
+                    value = ar.get(key)
+                    if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                        raise ValueError(f"first_training_round_plan {key} must be string array")
+            for key in ("base_model", "dataset_format", "notes"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"first_training_round_plan {key} must be string")
+            if "include_protocol_examples" in ar and not isinstance(ar.get("include_protocol_examples"), bool):
+                raise ValueError("first_training_round_plan include_protocol_examples must be boolean")
+            for key in ("eval_ratio",):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, (int, float)):
+                        raise ValueError(f"first_training_round_plan {key} must be number")
+            for key in ("min_chars", "max_examples", "protocol_example_limit", "min_train_examples"):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                        raise ValueError(f"first_training_round_plan {key} must be non-negative integer")
         elif a == "industrial_maturity_plan":
             if "goal" not in ar or not isinstance(ar.get("goal"), str):
                 raise ValueError("industrial_maturity_plan requires string goal")

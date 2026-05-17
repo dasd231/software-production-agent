@@ -73,6 +73,20 @@ ACTION_GOVERNANCE: dict[str, ActionGovernanceSpec] = {
         "high",
         requires_confirmation=True,
     ),
+    "teacher_prompt_batch_build": ActionGovernanceSpec(("dataset:read",), "low"),
+    "teacher_execution_plan_build": ActionGovernanceSpec(("model:read",), "low"),
+    "teacher_execution_run": ActionGovernanceSpec(
+        ("model:call",),
+        "high",
+        requires_confirmation=True,
+    ),
+    "teacher_output_review_build": ActionGovernanceSpec(("dataset:read",), "low"),
+    "distillation_export_build": ActionGovernanceSpec(
+        ("dataset:write",),
+        "high",
+        requires_confirmation=True,
+    ),
+    "first_training_round_plan": ActionGovernanceSpec(("dataset:read",), "low"),
     "backup_model_train": ActionGovernanceSpec(
         ("dataset:read", "model:write"),
         "high",

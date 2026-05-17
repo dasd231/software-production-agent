@@ -11,6 +11,7 @@
 | `distillation_plan.v1` | 描述学生、教师配比、共识策略和接收门槛 |
 | `teacher_prompt_batch.v1` | 把受治理源样本转成带证据的教师 prompt 批次 |
 | `teacher_execution_plan.v1` | 描述将要调用哪些教师、默认是否只 dry-run |
+| `teacher_execution_result.v1` | 记录真实或 dry-run 教师执行结果、请求状态与 token 用量 |
 | `teacher_output_review.v1` | 依据 prompt 证据审查教师输出是否可接受 |
 | `distillation_dataset_manifest.v1` | 汇总教师输出质量与数据集状态 |
 | `distillation_export_manifest.v1` | 把通过审查的教师输出导成可训练样本目录 |
@@ -55,14 +56,14 @@ teacher registry
 
 1. 从项目级源样本构造带证据的教师 prompt；
 2. 在默认不发请求的前提下预览教师执行计划；
-3. 检查教师输出是否引用了 prompt 内允许的证据；
-4. 把通过审查的输出导成 `training_prepare` 可直接读取的 `training_examples.jsonl`。
+3. 在 `mode=live` 且 `allow_remote=true` 被显式设置后执行真实教师；
+4. 检查教师输出是否引用了 prompt 内允许的证据；
+5. 把通过审查的输出导成 `training_prepare` 可直接读取的 `training_examples.jsonl`。
 
 ## 6. 与下一阶段的关系
 
 下一步最自然的是：
 
-1. 接入真实 teacher runtime adapter；
-2. 增加多教师 consensus 与 disagreement review；
-3. 把导出后的样本自动串到 ablation / benchmark；
-4. 做“无蒸馏 vs 单教师 vs 多教师”的论文级比较。
+1. 增加多教师 consensus 与 disagreement review；
+2. 把导出后的样本自动串到 ablation / benchmark；
+3. 做“无蒸馏 vs 单教师 vs 多教师”的论文级比较。

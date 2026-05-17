@@ -69,6 +69,8 @@ def build_teacher_execution_plan(
             "prompt_id": str(prompt.get("prompt_id", "") or ""),
             "teacher_id": teacher_id,
             "teacher_task_id": task_id,
+            "instruction": str(prompt.get("instruction", "") or ""),
+            "input": str(prompt.get("input", "") or ""),
             "provider": str(teacher.get("provider", "") or ""),
             "model": str(teacher.get("model", "") or ""),
             "messages": prompt.get("messages") if isinstance(prompt.get("messages"), list) else [],

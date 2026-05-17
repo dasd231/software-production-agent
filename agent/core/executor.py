@@ -70,6 +70,7 @@ from agent.distillation.export import export_distillation_training_examples
 from agent.distillation.plans import build_distillation_plan, build_teacher_task_suite
 from agent.distillation.prompts import build_teacher_prompt_batch
 from agent.distillation.review import review_teacher_outputs
+from agent.distillation.runtime import run_teacher_execution
 from agent.distributed.plans import build_distributed_platform_plan
 from agent.distributed.dispatch import build_distributed_job_plan
 from agent.distributed.workloads import list_distributed_workloads
@@ -90,6 +91,7 @@ from agent.training.studio import (
     build_training_platform_blueprint,
     build_training_recipe,
 )
+from agent.training.rounds import build_first_training_round_plan
 from agent.resources.registry import discover_resources
 from agent.runtime.production_check import run_production_checks
 from agent.scheduler.admission import get_global_admission_controller
@@ -651,6 +653,14 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
         )
         return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
 
+    if name == "teacher_execution_run":
+        result = run_teacher_execution(
+            execution_plan=dict(_require(args, "execution_plan")),
+            timeout=float(args.get("timeout", 90.0)),
+            max_retries=int(args.get("max_retries", 1)),
+        )
+        return {"ok": bool(result.get("validation", {}).get("ok")), "action": name, "result": result}
+
     if name == "teacher_output_review_build":
         review = review_teacher_outputs(
             distillation_plan=dict(_require(args, "distillation_plan")),
@@ -672,6 +682,25 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             "action": name,
             **result,
         }
+
+    if name == "first_training_round_plan":
+        plan = build_first_training_round_plan(
+            name=str(_require(args, "name")),
+            learning_dirs=_string_tuple_arg(args, "learning_dirs"),
+            solution_dirs=_string_tuple_arg(args, "solution_dirs"),
+            training_output_dir=str(_require(args, "training_output_dir")),
+            model_output_dir=str(_require(args, "model_output_dir")),
+            base_model=str(args.get("base_model", "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B") or ""),
+            dataset_format=str(args.get("dataset_format", "messages") or "messages"),
+            eval_ratio=float(args.get("eval_ratio", 0.15)),
+            min_chars=int(args.get("min_chars", 20)),
+            max_examples=int(args.get("max_examples", 2000)),
+            include_protocol_examples=bool(args.get("include_protocol_examples", True)),
+            protocol_example_limit=int(args.get("protocol_example_limit", 0)),
+            min_train_examples=int(args.get("min_train_examples", 20)),
+            notes=str(args.get("notes", "") or ""),
+        )
+        return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
 
     if name == "industrial_maturity_plan":
         plan = build_industrial_maturity_plan(
