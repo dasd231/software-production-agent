@@ -75,6 +75,9 @@ from agent.llm.runtime import model_runtime_status
 from agent.learning.web_search import search_web
 from agent.mcp.adapter import default_mcp_capabilities, invoke_mcp_tool
 from agent.policies.loader import CommandPolicyError, assert_command_policy
+from agent.project_model.program import build_project_model_program
+from agent.project_model.repo_memory import RepoMemoryBuildInput, build_repo_memory
+from agent.project_model.task_synthesis import ProjectTaskSynthesisInput, synthesize_project_tasks
 from agent.resources.registry import discover_resources
 from agent.runtime.production_check import run_production_checks
 from agent.scheduler.admission import get_global_admission_controller
@@ -506,6 +509,44 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             resources=args.get("resources") if isinstance(args.get("resources"), dict) else None,
         )
         return {"ok": True, "action": name, "plan": plan}
+
+    if name == "project_model_program_plan":
+        plan = build_project_model_program(
+            ambition=str(args.get("ambition", "internet_scale") or "internet_scale"),
+            target_context_tokens=int(args.get("target_context_tokens", 32768)),
+        )
+        return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
+
+    if name == "project_repo_memory_build":
+        repo_path_raw = Path(str(_require(args, "repo_path")))
+        output_dir_raw = Path(str(_require(args, "output_dir")))
+        repo_path = repo_path_raw if repo_path_raw.is_absolute() else (workspace / repo_path_raw)
+        output_dir = output_dir_raw if output_dir_raw.is_absolute() else (workspace / output_dir_raw)
+        result = build_repo_memory(
+            RepoMemoryBuildInput(
+                repo_path=repo_path,
+                output_dir=output_dir,
+                max_files=int(args.get("max_files", 500)),
+                max_slices=int(args.get("max_slices", 800)),
+            )
+        )
+        return {"ok": True, "action": name, **result.to_dict()}
+
+    if name == "project_task_synthesis_build":
+        output_dir_raw = Path(str(_require(args, "output_dir")))
+        output_dir = output_dir_raw if output_dir_raw.is_absolute() else (workspace / output_dir_raw)
+        memory_dirs = tuple(
+            path if path.is_absolute() else (workspace / path)
+            for path in _path_tuple_arg(args, "memory_dirs")
+        )
+        result = synthesize_project_tasks(
+            ProjectTaskSynthesisInput(
+                memory_dirs=memory_dirs,
+                output_dir=output_dir,
+                max_symbol_examples_per_repo=int(args.get("max_symbol_examples_per_repo", 64)),
+            )
+        )
+        return {"ok": True, "action": name, **result.to_dict()}
 
     if name == "industrial_maturity_plan":
         plan = build_industrial_maturity_plan(

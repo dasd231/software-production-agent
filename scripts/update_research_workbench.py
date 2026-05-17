@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
 
 from agent.distributed.plans import build_distributed_platform_plan
 from agent.distributed.workloads import list_distributed_workloads
+from agent.project_model.program import build_project_model_program
 
 
 def _now() -> str:
@@ -602,6 +603,21 @@ def _distributed_dispatch_candidates(experiment_queue: dict[str, Any]) -> dict[s
     }
 
 
+def _project_model_program_overview() -> dict[str, Any]:
+    program = build_project_model_program()
+    return {
+        "schema": "research_project_model_program.v1",
+        "generated_at": _now(),
+        "north_star": program.get("north_star", ""),
+        "summary": program.get("summary", {}),
+        "recommended_first_build": program.get("recommended_first_build", {}),
+        "sources": program.get("sources", []),
+        "stages": program.get("stages", []),
+        "benchmarks": program.get("benchmarks", []),
+        "validation": program.get("validation", {}),
+    }
+
+
 def _training_remediation(
     training_runs: list[dict[str, Any]],
     model_runs: list[dict[str, Any]],
@@ -1170,6 +1186,86 @@ def _distributed_dispatch_candidates_to_markdown(payload: dict[str, Any]) -> str
     return "\n".join(lines)
 
 
+def _project_model_program_overview_to_markdown(payload: dict[str, Any]) -> str:
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    first_build = (
+        payload.get("recommended_first_build")
+        if isinstance(payload.get("recommended_first_build"), dict)
+        else {}
+    )
+    lines = [
+        "# 项目大模型路线",
+        "",
+        f"生成时间：`{payload['generated_at']}`",
+        "",
+        f"- 北极星：{payload.get('north_star', '')}",
+        f"- 数据源：`{summary.get('sources', 0)}`",
+        f"- 训练任务：`{summary.get('tasks', 0)}`",
+        f"- Benchmark：`{summary.get('benchmarks', 0)}`",
+        f"- 阶段：`{summary.get('stages', 0)}`",
+        "",
+        "## 推荐首建",
+        "",
+        f"- ID：`{first_build.get('id', '')}`",
+        f"- 目标：{first_build.get('goal', '')}",
+        f"- 成功指标：{', '.join(first_build.get('success_metrics', []))}",
+        "",
+        "## 数据源",
+        "",
+        "| Source | Tier | Modalities | Weight | Governance |",
+        "| --- | --- | --- | ---: | --- |",
+    ]
+    for row in payload.get("sources", []):
+        lines.append(
+            f"| `{row.get('id', '')}` | {row.get('tier', '')} | "
+            f"{', '.join(row.get('modalities', []))} | {row.get('sampling_weight', '')} | "
+            f"{row.get('license_policy', '')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 训练阶段",
+            "",
+            "| Stage | Kind | Objective | Task Mix |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for row in payload.get("stages", []):
+        task_mix = ", ".join(
+            f"{item.get('task_id', '')}:{item.get('weight', '')}"
+            for item in row.get("task_mix", [])
+            if isinstance(item, dict)
+        )
+        lines.append(
+            f"| `{row.get('id', '')}` | {row.get('kind', '')} | {row.get('objective', '')} | {task_mix} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Benchmark",
+            "",
+            "| Benchmark | Capability | Metrics | Gate |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for row in payload.get("benchmarks", []):
+        lines.append(
+            f"| `{row.get('id', '')}` | {row.get('capability_slice', '')} | "
+            f"{', '.join(row.get('primary_metrics', []))} | {row.get('stage_gate', '')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 读法",
+            "",
+            "- 这不是一次 GPU 任务，而是项目级模型的控制面蓝图。",
+            "- 当前最值得先做的是 `repo_memory_v1`：先把项目表示、证据检索和 holdout 评测跑通，再决定何时扩大到互联网级继续预训练。",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _training_remediation_to_markdown(payload: dict[str, Any]) -> str:
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
     lines = [
@@ -1333,6 +1429,7 @@ def main() -> int:
     platform_evolution = _platform_evolution()
     distributed_execution = _distributed_execution_overview()
     distributed_dispatch = _distributed_dispatch_candidates(experiment_queue)
+    project_model_program = _project_model_program_overview()
     remediation = _training_remediation(
         payload["training_runs"],
         payload["model_runs"],
@@ -1366,6 +1463,8 @@ def main() -> int:
         "distributed_execution.md": _distributed_execution_overview_to_markdown(distributed_execution),
         "distributed_dispatch_candidates.json": json.dumps(distributed_dispatch, ensure_ascii=False, indent=2),
         "distributed_dispatch_candidates.md": _distributed_dispatch_candidates_to_markdown(distributed_dispatch),
+        "project_model_program.json": json.dumps(project_model_program, ensure_ascii=False, indent=2),
+        "project_model_program.md": _project_model_program_overview_to_markdown(project_model_program),
         "training_remediation.json": json.dumps(remediation, ensure_ascii=False, indent=2),
         "training_remediation.md": _training_remediation_to_markdown(remediation),
         "training_lineage.json": json.dumps(lineage, ensure_ascii=False, indent=2),

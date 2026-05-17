@@ -18,6 +18,7 @@
 | [`docs/BACKUP_MODEL_TRAINING.md`](docs/BACKUP_MODEL_TRAINING.md) | 高质量样本到备用本地模型训练任务的链路说明 |
 | [`docs/TRAINING_ARCHITECTURE.md`](docs/TRAINING_ARCHITECTURE.md) | 本地控制面、Linux 执行面、数据快照和分布式扩展训练架构 |
 | [`docs/DISTRIBUTED_PLATFORM_ARCHITECTURE.md`](docs/DISTRIBUTED_PLATFORM_ARCHITECTURE.md) | Ray-first 执行面、Spark/Flink 数据面与企业化演进路线 |
+| [`docs/PROJECT_MODEL_ARCHITECTURE.md`](docs/PROJECT_MODEL_ARCHITECTURE.md) | 项目大模型的数据源、任务、训练阶段和评测路线 |
 | [`docs/MODEL_EVALUATION.md`](docs/MODEL_EVALUATION.md) | 备用模型基座/adapter 对照评测 |
 | [`research_workbench/README.md`](research_workbench/README.md) | 独立研究训练工作台：训练层级、指标、实验登记和论文阅读记录 |
 | [`docs/THIRD_PARTY_EMBEDDING.md`](docs/THIRD_PARTY_EMBEDDING.md) | 第三方夸张嵌入能力：Figma/GitHub/Notion 等面板、资源选择器、动作桥和事件回流 |
@@ -196,6 +197,7 @@ pip install -r requirements-serving.txt
 | **模型池路由** | `agent/scheduler/routing.py`：估算 prompt/output tokens，识别短请求、长上下文 RAG、Agent 工具调用和训练批处理，并输出 short/long/agent/training pool 准入计划，避免长上下文被短请求抢占 |
 | **高并发准入** | `agent/scheduler/admission.py`：按模型池发放 lease、统计活动请求、池满返回 backpressure/429，调用结束释放或 TTL 自动回收 |
 | **分布式平台路线** | `agent/distributed/`：先落 Ray contract-first 执行面，再按真实规模引入 Spark 批处理与 Flink 流处理；不在元数据检查路径上启动集群 |
+| **项目大模型路线** | `agent/project_model/`：把代码、文档、依赖、测试和演化轨迹统一成项目级训练对象，固定 internet-scale 语料、repo-level 任务、阶段路线和 benchmark 契约 |
 | **学习/RAG Pipeline** | `agent/learning/` 覆盖 GitHub 搜索、repo 下载、license/star/update 过滤、README/结构解析、源码切片、向量化、知识卡、RAG QA、WebSearch 补充、沙箱测试和最终编排 |
 | **生产验证** | `production_check` 自动执行 Python 编译检查和 pytest 目标检测，减少模型临场拼命令 |
 | **算法策略层** | `agent/decision/` 将 context/state/plan 转成特征与候选动作分数，执行后生成 `RewardSignal` 和 `DecisionTrace`，并用 UCB bandit 对候选动作做探索/利用重排 |
@@ -275,6 +277,9 @@ OPENAI_PLANNER_MODEL=gpt-4o-mini
 - **`model_admission_status` / `model_admission_acquire` / `model_admission_release` / `model_admission_renew`**：模型池高并发租约；请求拿到 lease 才能进入模型网关，池满返回 backpressure。
 - **`enterprise_stack_plan`**：面向上市企业/私有化场景输出技术选型、热迭代、vLLM/SGLang 模型服务、多 Agent 工程治理、100+ 终端弹性和灰度方案。
 - **`distributed_platform_plan` / `distributed_workload_catalog` / `distributed_job_plan`**：查看 Ray-first / Spark-later / Flink-when-needed 平台路线、标准 workload 目录，并在不派发任务的前提下预览分布式 job manifest 与 Ray submission contract。
+- **`project_model_program_plan`**：查看“项目大模型”路线，返回 internet-scale 数据源、repo-level 任务、训练阶段、benchmark 和当前推荐的 `repo_memory_v1` 首建目标。
+- **`project_repo_memory_build`**：把一个仓库快照压成 `project_map.json`、`symbol_index.jsonl`、`evidence_index.jsonl` 与 `repo_memory_manifest.json`，作为后续 retriever / reader 训练的最小项目对象。
+- **`project_task_synthesis_build`**：从一个或多个 repo-memory 产物合成项目级 `training_examples.jsonl` 与 `retrieval_pairs.jsonl`，把“项目对象”正式转成可训练样本。
 - **`industrial_maturity_plan`**：面向安全关键/工业级 CTO 审查输出成熟度评分、证据包、非协商门禁和 30/90/180/365 天路线。
 - **`enterprise_readiness_check`**：运行企业上线静态门禁，检查 FastAPI/ASGI、vLLM/SGLang、非 Flask/Ollama、K8s、HPA、PDB、NetworkPolicy、CI 和文档基线。
 - **`workflow_validate`**：校验轻量 `workflow.v1` JSON 的节点、边、未知分链、环路、权限和是否联网/写文件；只校验，不执行。

@@ -1,6 +1,6 @@
 {
   "schema": "research_experiment_comparison.v1",
-  "generated_at": "2026-05-17T04:57:59+00:00",
+  "generated_at": "2026-05-17T10:06:52+00:00",
   "groups": [
     {
       "benchmark": "backup_model_eval.v1.json",

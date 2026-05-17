@@ -102,6 +102,9 @@ Flink 很适合：
 | `benchmark_evaluation` | 模型评测 |
 | `promotion_gate` | 晋级门禁 |
 | `github_crawl_profile` | 采集画像 |
+| `repo_corpus_ingestion` | 项目级语料采集与治理 |
+| `repo_task_synthesis` | 仓库级任务样本合成 |
+| `repo_benchmark_refresh` | 项目级 benchmark 刷新 |
 | `training_dispatch` | 训练派发 |
 | `agent_workflow` | 未来 workflow 执行包络 |
 

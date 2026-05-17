@@ -1,20 +1,21 @@
 # 分布式执行目录
 
-生成时间：`2026-05-17T04:57:59+00:00`
+生成时间：`2026-05-17T10:06:52+00:00`
 
 ## 汇总
 
-- 标准 workload：`6`
+- 标准 workload：`9`
 - 需要 GPU 的 workload：`2`
-- 逻辑队列：`6`
+- 逻辑队列：`7`
 
 ## 队列分布
 
 | Queue | Count |
 | --- | ---: |
-| `evaluation` | 1 |
+| `dataset` | 1 |
+| `evaluation` | 2 |
 | `governance` | 1 |
-| `ingestion` | 1 |
+| `ingestion` | 2 |
 | `learning` | 1 |
 | `training` | 1 |
 | `workflow` | 1 |
@@ -27,6 +28,9 @@
 | `benchmark_evaluation` | evaluation | high | 2 | 1 | 12 | model_evaluation_report.json |
 | `promotion_gate` | governance | high | 1 | 0 | 2 | model_promotion_decision.json, promotion_report.md |
 | `github_crawl_profile` | ingestion | normal | 2 | 0 | 4 | crawl_report.json, solutions/ |
+| `repo_corpus_ingestion` | ingestion | high | 4 | 0 | 16 | repo_corpus_manifest.json, repo_shards/, provenance_index.parquet |
+| `repo_task_synthesis` | dataset | high | 4 | 0 | 16 | project_task_manifest.json, task_shards/ |
+| `repo_benchmark_refresh` | evaluation | high | 2 | 0 | 8 | project_benchmark_manifest.json, benchmark_report.json |
 | `training_dispatch` | training | high | 4 | 1 | 16 | adapter/, training_result.json, training_job_manifest.json |
 | `agent_workflow` | workflow | normal | 1 | 0 | 2 | run_manifest.json, .agent_events.jsonl |
 

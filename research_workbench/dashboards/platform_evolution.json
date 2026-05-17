@@ -1,6 +1,6 @@
 {
   "schema": "research_platform_evolution.v1",
-  "generated_at": "2026-05-17T04:57:59+00:00",
+  "generated_at": "2026-05-17T10:06:52+00:00",
   "north_star": "control-plane owned evidence, Ray-first execution, data-plane by workload",
   "adoption_order": [
     "1. Ray execution contracts and manifests",

@@ -15,6 +15,11 @@ EVIDENCE_REQUIRED_TASKS = {
     "code_explanation",
     "rag_grounded_answer",
     "solution_reuse_sft",
+    "repo_structure_mapping",
+    "symbol_grounding",
+    "evidence_retrieval",
+    "repo_grounded_qa",
+    "architecture_summary",
 }
 
 REJECTION_PRIORITY = (

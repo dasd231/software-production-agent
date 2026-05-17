@@ -66,6 +66,9 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "distributed_platform_plan",
         "distributed_workload_catalog",
         "distributed_job_plan",
+        "project_model_program_plan",
+        "project_repo_memory_build",
+        "project_task_synthesis_build",
         "industrial_maturity_plan",
         "enterprise_readiness_check",
         "workflow_validate",
@@ -233,6 +236,32 @@ class ActionDTO(BaseModel):
                     raise ValueError(f"distributed_job_plan {key} must be string")
             if "resources" in ar and not isinstance(ar.get("resources"), dict):
                 raise ValueError("distributed_job_plan resources must be object")
+        elif a == "project_model_program_plan":
+            if "ambition" in ar and not isinstance(ar.get("ambition"), str):
+                raise ValueError("project_model_program_plan ambition must be string")
+            if "target_context_tokens" in ar:
+                value = ar.get("target_context_tokens")
+                if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                    raise ValueError("project_model_program_plan target_context_tokens must be positive integer")
+        elif a == "project_repo_memory_build":
+            for key in ("repo_path", "output_dir"):
+                if key not in ar or not isinstance(ar.get(key), str):
+                    raise ValueError(f"project_repo_memory_build requires string {key}")
+            for key in ("max_files", "max_slices"):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                        raise ValueError(f"project_repo_memory_build {key} must be positive integer")
+        elif a == "project_task_synthesis_build":
+            if "output_dir" not in ar or not isinstance(ar.get("output_dir"), str):
+                raise ValueError("project_task_synthesis_build requires string output_dir")
+            value = ar.get("memory_dirs")
+            if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                raise ValueError("project_task_synthesis_build memory_dirs must be string array")
+            if "max_symbol_examples_per_repo" in ar:
+                limit = ar.get("max_symbol_examples_per_repo")
+                if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+                    raise ValueError("project_task_synthesis_build max_symbol_examples_per_repo must be positive integer")
         elif a == "industrial_maturity_plan":
             if "goal" not in ar or not isinstance(ar.get("goal"), str):
                 raise ValueError("industrial_maturity_plan requires string goal")

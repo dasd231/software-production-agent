@@ -1,5 +1,5 @@
 单行 JSON，必须字段：
-{"type":"action","action":"<write_file|read_file|run_command|list_files|finish|git_status|git_init|workspace_index|mcp_capabilities|mcp_call|production_check|web_search|chain_registry|resource_registry|integration_catalog|integration_embed_plan|model_runtime_status|model_admission_status|model_admission_acquire|model_admission_release|model_admission_renew|model_route_plan|enterprise_stack_plan|industrial_maturity_plan|enterprise_readiness_check|workflow_validate|innovation_radar|intent_compile|workflow_dry_run|evidence_ledger|solution_publish|research_synthesize|training_prepare|backup_model_train|github_crawl_profile>","args":{}}
+{"type":"action","action":"<write_file|read_file|run_command|list_files|finish|git_status|git_init|workspace_index|mcp_capabilities|mcp_call|production_check|web_search|chain_registry|resource_registry|integration_catalog|integration_embed_plan|model_runtime_status|model_admission_status|model_admission_acquire|model_admission_release|model_admission_renew|model_route_plan|enterprise_stack_plan|distributed_platform_plan|distributed_workload_catalog|distributed_job_plan|project_model_program_plan|project_repo_memory_build|project_task_synthesis_build|industrial_maturity_plan|enterprise_readiness_check|workflow_validate|innovation_radar|intent_compile|workflow_dry_run|evidence_ledger|solution_publish|research_synthesize|training_prepare|backup_model_train|github_crawl_profile>","args":{}}
 
 write_file: {"path":"相对工作区路径","content":"..."}
 read_file: {"path":"..."}
@@ -24,6 +24,12 @@ model_admission_release: {"lease_id":"..."}  # 模型请求完成后释放 lease
 model_admission_renew: {"lease_id":"...","lease_ttl_s":20}  # 长请求续租 lease
 model_route_plan: {"goal":"分析长上下文RAG请求如何进入vLLM/SGLang池","prompt":"可选原始prompt或上下文","business_type":"","require_json":false,"max_output_tokens":2048}  # 估算token、判断业务类型、选择short/long/agent/training模型池和准入策略
 enterprise_stack_plan: {"goal":"上市企业级软件生产平台，支持热迭代、vLLM模型服务、审计和灰度发布","scale":"listed","regulated":true,"provider":"main_deepseek"}  # 企业技术选型、热迭代、Model Plane 和治理门禁规划
+distributed_platform_plan: {}  # 查看 Ray-first / Spark-later / Flink-when-needed 平台路线
+distributed_workload_catalog: {}  # 查看未来分布式 workload 目录
+distributed_job_plan: {"job_id":"job-demo","workload":"promotion_gate"}  # 只预览 job manifest + Ray submission contract，不真正派发
+project_model_program_plan: {"ambition":"internet_scale","target_context_tokens":32768}  # 查看项目大模型的数据源、训练阶段、任务与评测路线
+project_repo_memory_build: {"repo_path":"./workspace_demo","output_dir":"./project_memory_runs/demo","max_files":500,"max_slices":800}  # 为仓库生成 project map、symbol index、evidence index 和 repo-memory manifest
+project_task_synthesis_build: {"memory_dirs":["./project_memory_runs/demo"],"output_dir":"./project_task_runs/demo","max_symbol_examples_per_repo":64}  # 从 repo-memory 生成项目级 SFT 样本和检索训练 pairs
 industrial_maturity_plan: {"goal":"军工工业级私有化AI CTO审查成熟度","scale":"listed","regulated":true,"provider":"main_deepseek"}  # 安全关键/工业级成熟度评估、CTO拷问证据包、路线图和非协商门禁
 enterprise_readiness_check: {}  # 无额外字段；运行企业上线静态门禁，检查 FastAPI/ASGI、vLLM、K8s、HPA、PDB、NetworkPolicy、CI 等
 workflow_validate: {"spec":{"schema":"workflow.v1","version":"demo","nodes":[{"id":"research","chain":"research"},{"id":"train","chain":"training"}],"edges":[["research","train"]]}}  # 校验轻量工作流 JSON，不执行

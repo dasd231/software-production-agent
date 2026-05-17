@@ -1,0 +1,373 @@
+{
+  "schema": "research_project_model_program.v1",
+  "generated_at": "2026-05-17T10:06:52+00:00",
+  "north_star": "Maximize repository understanding per token, not repository tokens per prompt.",
+  "summary": {
+    "sources": 6,
+    "source_sampling_weight_total": 1.0,
+    "tasks": 10,
+    "benchmarks": 6,
+    "stages": 4
+  },
+  "recommended_first_build": {
+    "id": "repo_memory_v1",
+    "goal": "Build retrieval-grounded project memory before attempting internet-scale continued pretraining.",
+    "inputs": [
+      "repository snapshot",
+      "docs/README/ADR",
+      "dependency manifests",
+      "tests and CI"
+    ],
+    "outputs": [
+      "project map",
+      "symbol index",
+      "evidence index",
+      "grounded QA samples",
+      "holdout evaluation report"
+    ],
+    "success_metrics": [
+      "recall_at_5",
+      "citation_precision",
+      "architecture_summary_faithfulness",
+      "tokens_per_correct_answer"
+    ]
+  },
+  "sources": [
+    {
+      "schema": "project_corpus_source.v1",
+      "id": "open_repo_snapshots",
+      "label": "Open repository snapshots",
+      "tier": "foundation",
+      "modalities": [
+        "source_code",
+        "tree",
+        "manifests"
+      ],
+      "evidence_role": "base repository corpus",
+      "acquisition_mode": "archive_snapshot",
+      "license_policy": "allowlist_or_permissive_only",
+      "refresh_cadence": "quarterly",
+      "sampling_weight": 0.34,
+      "notes": [
+        "Prefer large archived snapshots before live crawling.",
+        "Keep repository identity, commit hash and license attached to every shard."
+      ]
+    },
+    {
+      "schema": "project_corpus_source.v1",
+      "id": "repository_docs",
+      "label": "Repository docs and ADRs",
+      "tier": "semantic",
+      "modalities": [
+        "readme",
+        "docs",
+        "adr",
+        "design_notes"
+      ],
+      "evidence_role": "architecture semantics",
+      "acquisition_mode": "repo_sidecar",
+      "license_policy": "inherit_repo_license",
+      "refresh_cadence": "with_repo_snapshot",
+      "sampling_weight": 0.16,
+      "notes": [
+        "Treat docs as first-class project knowledge rather than decorative text.",
+        "Preserve path-level grounding for later citation tasks."
+      ]
+    },
+    {
+      "schema": "project_corpus_source.v1",
+      "id": "dependency_manifests",
+      "label": "Dependency and build manifests",
+      "tier": "structural",
+      "modalities": [
+        "package_manifest",
+        "lockfile",
+        "build_config"
+      ],
+      "evidence_role": "dependency graph",
+      "acquisition_mode": "repo_sidecar",
+      "license_policy": "inherit_repo_license",
+      "refresh_cadence": "with_repo_snapshot",
+      "sampling_weight": 0.1,
+      "notes": [
+        "Needed for package graph, build-system and service-boundary reasoning."
+      ]
+    },
+    {
+      "schema": "project_corpus_source.v1",
+      "id": "development_traces",
+      "label": "Issues, pull requests and commits",
+      "tier": "evolution",
+      "modalities": [
+        "issues",
+        "pull_requests",
+        "commit_messages",
+        "release_notes"
+      ],
+      "evidence_role": "project evolution and rationale",
+      "acquisition_mode": "forge_api",
+      "license_policy": "source_platform_policy_plus_repo_gate",
+      "refresh_cadence": "monthly",
+      "sampling_weight": 0.14,
+      "notes": [
+        "Use only after repository provenance and policy checks are retained.",
+        "Links natural-language intent to concrete code changes."
+      ]
+    },
+    {
+      "schema": "project_corpus_source.v1",
+      "id": "official_reference_docs",
+      "label": "Official framework and package docs",
+      "tier": "external_semantic",
+      "modalities": [
+        "api_docs",
+        "guides",
+        "specs"
+      ],
+      "evidence_role": "library semantics",
+      "acquisition_mode": "official_doc_snapshot",
+      "license_policy": "source_specific_allowlist",
+      "refresh_cadence": "monthly",
+      "sampling_weight": 0.08,
+      "notes": [
+        "Used to disambiguate external symbols, not to replace repository evidence."
+      ]
+    },
+    {
+      "schema": "project_corpus_source.v1",
+      "id": "execution_signals",
+      "label": "Tests, CI and examples",
+      "tier": "behavioral",
+      "modalities": [
+        "tests",
+        "ci_configs",
+        "examples",
+        "fixtures"
+      ],
+      "evidence_role": "runtime behavior",
+      "acquisition_mode": "repo_sidecar",
+      "license_policy": "inherit_repo_license",
+      "refresh_cadence": "with_repo_snapshot",
+      "sampling_weight": 0.18,
+      "notes": [
+        "Essential for impact analysis and test-grounded reasoning."
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "schema": "project_training_stage.v1",
+      "id": "corpus_foundation",
+      "label": "Corpus foundation",
+      "kind": "data",
+      "objective": "Build a provenance-preserving, de-duplicated repository corpus before any serious training.",
+      "source_ids": [
+        "open_repo_snapshots",
+        "repository_docs",
+        "dependency_manifests",
+        "execution_signals"
+      ],
+      "task_mix": [],
+      "exit_criteria": [
+        "license and provenance attached to every shard",
+        "near-duplicate removal completed",
+        "repository snapshots, docs, manifests and tests linked by repo_id"
+      ]
+    },
+    {
+      "schema": "project_training_stage.v1",
+      "id": "repo_representation_pretraining",
+      "label": "Repository representation pretraining",
+      "kind": "training",
+      "objective": "Teach the model to encode project structure before asking it to answer project questions.",
+      "source_ids": [
+        "open_repo_snapshots",
+        "repository_docs",
+        "dependency_manifests",
+        "execution_signals"
+      ],
+      "task_mix": [
+        {
+          "task_id": "repo_structure_mapping",
+          "weight": 0.22
+        },
+        {
+          "task_id": "symbol_grounding",
+          "weight": 0.2
+        },
+        {
+          "task_id": "cross_file_dependency",
+          "weight": 0.18
+        },
+        {
+          "task_id": "architecture_summary",
+          "weight": 0.16
+        },
+        {
+          "task_id": "cross_file_completion",
+          "weight": 0.24
+        }
+      ],
+      "exit_criteria": [
+        "symbol grounding and cross-file dependency metrics clear stage floor",
+        "long-context benchmarks stop regressing on held-out repos"
+      ]
+    },
+    {
+      "schema": "project_training_stage.v1",
+      "id": "retrieval_grounded_understanding",
+      "label": "Retrieval-grounded understanding",
+      "kind": "training",
+      "objective": "Train a retriever-reader system that finds evidence first and answers second.",
+      "source_ids": [
+        "open_repo_snapshots",
+        "repository_docs",
+        "official_reference_docs",
+        "execution_signals"
+      ],
+      "task_mix": [
+        {
+          "task_id": "evidence_retrieval",
+          "weight": 0.36
+        },
+        {
+          "task_id": "repo_grounded_qa",
+          "weight": 0.28
+        },
+        {
+          "task_id": "issue_to_code_localization",
+          "weight": 0.18
+        },
+        {
+          "task_id": "architecture_summary",
+          "weight": 0.18
+        }
+      ],
+      "exit_criteria": [
+        "retrieval recall@5 and citation precision clear promotion floor",
+        "QA gains survive token-budget reduction tests"
+      ]
+    },
+    {
+      "schema": "project_training_stage.v1",
+      "id": "engineering_reasoning_alignment",
+      "label": "Engineering reasoning alignment",
+      "kind": "training",
+      "objective": "Use project evolution traces to reason about intent, impact and repair.",
+      "source_ids": [
+        "development_traces",
+        "execution_signals",
+        "repository_docs",
+        "open_repo_snapshots"
+      ],
+      "task_mix": [
+        {
+          "task_id": "change_impact_reasoning",
+          "weight": 0.24
+        },
+        {
+          "task_id": "test_guided_fixing",
+          "weight": 0.22
+        },
+        {
+          "task_id": "issue_to_code_localization",
+          "weight": 0.18
+        },
+        {
+          "task_id": "repo_grounded_qa",
+          "weight": 0.18
+        },
+        {
+          "task_id": "cross_file_completion",
+          "weight": 0.18
+        }
+      ],
+      "exit_criteria": [
+        "issue localization and impact reasoning pass internal holdout",
+        "repair quality improves without retrieval regressions"
+      ]
+    }
+  ],
+  "benchmarks": [
+    {
+      "schema": "project_benchmark.v1",
+      "id": "coderepoqa",
+      "label": "CodeRepoQA",
+      "capability_slice": "repository QA",
+      "public_reference": "CodeRepoQA",
+      "primary_metrics": [
+        "answer_accuracy",
+        "evidence_grounding"
+      ],
+      "stage_gate": "retrieval_grounded_understanding"
+    },
+    {
+      "schema": "project_benchmark.v1",
+      "id": "coreqa",
+      "label": "CoReQA",
+      "capability_slice": "cross-file QA",
+      "public_reference": "CoReQA",
+      "primary_metrics": [
+        "answer_f1",
+        "retrieval_quality"
+      ],
+      "stage_gate": "retrieval_grounded_understanding"
+    },
+    {
+      "schema": "project_benchmark.v1",
+      "id": "longcodeu",
+      "label": "LONGCODEU",
+      "capability_slice": "long-context repository understanding",
+      "public_reference": "LONGCODEU",
+      "primary_metrics": [
+        "task_accuracy",
+        "long_context_robustness"
+      ],
+      "stage_gate": "repo_representation_pretraining"
+    },
+    {
+      "schema": "project_benchmark.v1",
+      "id": "repobench",
+      "label": "RepoBench",
+      "capability_slice": "repository-level completion",
+      "public_reference": "RepoBench",
+      "primary_metrics": [
+        "exact_match",
+        "edit_similarity"
+      ],
+      "stage_gate": "repo_representation_pretraining"
+    },
+    {
+      "schema": "project_benchmark.v1",
+      "id": "crosscodeeval",
+      "label": "CrossCodeEval",
+      "capability_slice": "cross-file code completion",
+      "public_reference": "CrossCodeEval",
+      "primary_metrics": [
+        "exact_match",
+        "retrieval_gain"
+      ],
+      "stage_gate": "repo_representation_pretraining"
+    },
+    {
+      "schema": "project_benchmark.v1",
+      "id": "internal_repo_holdout",
+      "label": "Internal repository holdout",
+      "capability_slice": "evidence retrieval and architecture QA",
+      "public_reference": "internal",
+      "primary_metrics": [
+        "recall_at_5",
+        "citation_precision",
+        "latency_ms"
+      ],
+      "stage_gate": "all"
+    }
+  ],
+  "validation": {
+    "ok": true,
+    "missing_stage_sources": {},
+    "missing_stage_tasks": {},
+    "invalid_stage_weights": {},
+    "retrieval_before_or_with_qa": true
+  }
+}

@@ -6,6 +6,7 @@ from scripts.update_research_workbench import (
     _distributed_dispatch_candidates,
     _distributed_execution_overview,
     _platform_evolution,
+    _project_model_program_overview,
     _experiment_queue,
     _promotion_overview,
     _task_balance_snapshot,
@@ -318,3 +319,12 @@ def test_distributed_dispatch_candidates_only_wrap_executable_actions() -> None:
 
     assert payload["summary"]["dispatchable"] == 2
     assert {row["workload"] for row in payload["rows"]} == {"training_dispatch", "benchmark_evaluation"}
+
+
+def test_project_model_program_overview_exposes_repo_model_blueprint() -> None:
+    overview = _project_model_program_overview()
+
+    assert overview["schema"] == "research_project_model_program.v1"
+    assert overview["validation"]["ok"] is True
+    assert overview["recommended_first_build"]["id"] == "repo_memory_v1"
+    assert any(row["id"] == "retrieval_grounded_understanding" for row in overview["stages"])

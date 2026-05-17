@@ -63,6 +63,8 @@ def test_distributed_workload_catalog_has_expected_operational_defaults(tmp_path
 
     assert workloads["benchmark_evaluation"]["queue"] == "evaluation"
     assert workloads["promotion_gate"]["priority"] == "high"
+    assert workloads["repo_corpus_ingestion"]["queue"] == "ingestion"
+    assert workloads["repo_task_synthesis"]["queue"] == "dataset"
     assert training and training["resources"]["gpu"] == 1
     assert out["ok"] is True
     assert len(out["workloads"]) >= 5
