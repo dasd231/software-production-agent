@@ -92,6 +92,7 @@ from agent.training.studio import (
     build_training_recipe,
 )
 from agent.training.rounds import build_first_training_round_plan
+from agent.training.resource_guard import build_training_resource_policy, run_server_resource_preflight
 from agent.resources.registry import discover_resources
 from agent.runtime.production_check import run_production_checks
 from agent.scheduler.admission import get_global_admission_controller
@@ -701,6 +702,15 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             notes=str(args.get("notes", "") or ""),
         )
         return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
+
+    if name == "training_server_preflight":
+        policy = args.get("policy") if isinstance(args.get("policy"), dict) else build_training_resource_policy()
+        preflight = run_server_resource_preflight(policy=policy)
+        return {
+            "ok": bool(preflight.get("admission", {}).get("admitted")),
+            "action": name,
+            "preflight": preflight,
+        }
 
     if name == "industrial_maturity_plan":
         plan = build_industrial_maturity_plan(

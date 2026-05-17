@@ -12,7 +12,7 @@ class LocalTRLRunner(TrainingRunner):
     name = "local_trl"
 
     def build_launch_command(self, spec_path: Path) -> str:
-        return f'python -m agent.training.backup_trainer --config "{spec_path}"'
+        return f'python -m agent.training.safe_launcher --config "{spec_path}"'
 
     def describe(self) -> dict[str, Any]:
         return {

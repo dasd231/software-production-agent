@@ -24,6 +24,7 @@ project_task_runs / distillation_runs
   -> first_training_round_plan
   -> training_prepare
   -> backup_model_train launch=false
+  -> training_server_preflight
   -> 把准备好的 job 放到服务器上显式启动
 ```
 
@@ -48,7 +49,21 @@ project_task_runs / distillation_runs
 - `dataset_snapshot_manifest.json` 已生成；
 - `model_runs/.../data_gate.json` 通过；
 - `model_runs/.../training_environment.json` 显示 CUDA 与依赖都可用；
+- `training_server_preflight` 通过，且没有别人正在占用 GPU；
 - `launch_command.txt` 指向的基座模型和输出目录是你想要的。
+
+共享服务器上先运行：
+
+```json
+{"type":"action","action":"training_server_preflight","args":{}}
+```
+
+默认策略是 `shared_conservative`：
+
+- 只认 1 张 GPU；
+- 如果已经看到其他 compute process，则不启动；
+- 如果 GPU 利用率、已用显存或剩余显存不满足阈值，也不启动；
+- `launch_command.txt` 会自动走 `safe_launcher`，即使你忘了手动看一次，也会在真正训练前再挡一道。
 
 ## 5. 为什么第一轮不要一开始就太大
 

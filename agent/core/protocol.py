@@ -82,6 +82,7 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "teacher_output_review_build",
         "distillation_export_build",
         "first_training_round_plan",
+        "training_server_preflight",
         "industrial_maturity_plan",
         "enterprise_readiness_check",
         "workflow_validate",
@@ -412,6 +413,9 @@ class ActionDTO(BaseModel):
                     value = ar.get(key)
                     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                         raise ValueError(f"first_training_round_plan {key} must be non-negative integer")
+        elif a == "training_server_preflight":
+            if "policy" in ar and not isinstance(ar.get("policy"), dict):
+                raise ValueError("training_server_preflight policy must be object")
         elif a == "industrial_maturity_plan":
             if "goal" not in ar or not isinstance(ar.get("goal"), str):
                 raise ValueError("industrial_maturity_plan requires string goal")

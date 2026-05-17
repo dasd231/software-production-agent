@@ -471,6 +471,25 @@ def test_backup_model_train_action(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert r["status"] == "blocked_environment"
 
 
+def test_training_server_preflight_action(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    w = tmp_path / "ws"
+    w.mkdir()
+    monkeypatch.setattr(
+        executor_mod,
+        "run_server_resource_preflight",
+        lambda policy: {
+            "schema": "training_server_preflight.v1",
+            "policy": policy,
+            "admission": {"admitted": True, "blockers": []},
+        },
+    )
+
+    r = run_action(w, {"type": "action", "action": "training_server_preflight", "args": {}})
+
+    assert r["ok"] is True
+    assert r["preflight"]["admission"]["admitted"] is True
+
+
 def test_github_crawl_profile_action(tmp_path: Path) -> None:
     lim = ExecutionLimits()
     w = tmp_path / "ws"

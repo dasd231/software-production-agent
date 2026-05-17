@@ -193,6 +193,7 @@ def test_distillation_execution_actions_valid() -> None:
         '{"type":"action","action":"teacher_output_review_build","args":{"distillation_plan":{},"prompt_batch":{},"teacher_outputs":[]}}',
         '{"type":"action","action":"distillation_export_build","args":{"output_dir":"./distill","distillation_plan":{},"teacher_output_review":{}}}',
         '{"type":"action","action":"first_training_round_plan","args":{"name":"first","learning_dirs":["./project_task_runs/demo"],"training_output_dir":"./training_runs/first","model_output_dir":"./model_runs/first"}}',
+        '{"type":"action","action":"training_server_preflight","args":{"policy":{}}}',
     ]
     for line in samples:
         assert parse_and_validate_action_line(line)["type"] == "action"

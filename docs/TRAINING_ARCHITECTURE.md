@@ -127,6 +127,7 @@ review source learning dirs
 | `sync_contract` | 描述远端执行前后必须同步的输入、输出与校验规则 |
 | `resume_policy` | 描述断点恢复策略 |
 | `retry_policy` | 描述可重试失败与重试上限 |
+| `resource_policy` | 描述共享服务器上的协作式 GPU 门禁与 job 资源上限 |
 
 `training_job_manifest.json` 采用以下生命周期：
 
@@ -171,6 +172,19 @@ TrainingRunner
 - 断点恢复时如何选择 checkpoint。
 
 这样做的意义是把“把文件拷过去再训练”提升为“可验证的数据与产物传输协议”。服务器接入后，只需要实现这个契约，而不必重新理解你的研究设计逻辑。
+
+## 4.2 共享服务器资源门禁
+
+在共享 GPU 服务器上，训练不能只凭“CUDA 可用”就直接起跑。  
+每个 `training_job_spec.json` 现在还携带 `training_resource_policy.v1`，默认策略为 `shared_conservative`：
+
+- 当前已经存在其他 compute process 时，不启动；
+- GPU 利用率过高时，不启动；
+- 已用显存过高或剩余显存不足时，不启动；
+- 启动前写出 `resource_preflight.json`，把当时的 GPU 状态固定进证据链。
+
+`launch_command.txt` 默认会进入 `agent.training.safe_launcher`，先跑资源门禁，再进入真正的 `backup_trainer`。  
+这让“避免和别人抢算力”从人为约定变成训练入口本身的一部分。
 
 ## 5. 证据闭环
 

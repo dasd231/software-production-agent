@@ -105,10 +105,13 @@ def build_first_training_round_plan(
         "server_handoff": {
             "strategy": "prepare locally, execute explicitly on the GPU server",
             "why": "keeps design transparent while avoiding accidental heavy jobs on a shared machine",
+            "resource_policy_profile": "shared_conservative",
+            "preflight_action": "training_server_preflight",
             "must_verify_before_launch": [
                 "training environment packages are installed",
                 "CUDA is visible on the server",
                 "dataset quality and governance reports passed",
+                "training_server_preflight admits the shared-conservative policy",
                 "launch_command.txt points at the intended base model and output directory",
             ],
         },

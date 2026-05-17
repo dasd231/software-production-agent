@@ -32,6 +32,7 @@ learning run
   -> backup_model_train
        -> data_gate.json
        -> training_environment.json
+       -> resource_preflight.json        # 开训时由 safe launcher 生成
        -> backup_training_spec.json
        -> training_job_spec.json
        -> training_job_manifest.json
@@ -75,6 +76,7 @@ learning run
 | `data_gate.json` | 数据质量与治理门禁结果 |
 | `model_version_manifest.json` | 候选模型版本、基座、适配器、质量摘要 |
 | `launch_command.txt` | 规范化启动命令 |
+| `resource_preflight.json` | 共享服务器资源门禁；记录 GPU 空闲状态和是否允许开训 |
 | `report.md` | 人工审查友好的摘要 |
 | `run_manifest.json` | 可追踪输入、产物、来源和风险 |
 | `protocol_examples.jsonl` | 协议跟随专项样本，来自可执行 schema，而非普通知识库 |
@@ -110,16 +112,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\setup_training_env.ps1
 - `agent.training.backup_trainer` 是真实 LoRA/SFT 训练入口，但仍然需要显式执行；
 - 真正上线前还需要补充模型评测、对照基线、人工验收和灰度策略，不能只凭“训练完成”就替换主模型。
 
+训练入口现在默认通过 `safe_launcher` 进入。它会先检查共享服务器资源，再决定是否允许进入真正训练。  
 训练入口支持先做一次干跑：
 
 ```bash
-.\.venv-train\Scripts\python.exe -m agent.training.backup_trainer --config ./model_runs/backup-demo/backup_training_spec.json --dry-run
+.\.venv-train\Scripts\python.exe -m agent.training.safe_launcher --config ./model_runs/backup-demo/backup_training_spec.json --dry-run
 ```
 
 如果环境与数据都通过，再显式启动：
 
 ```bash
-.\.venv-train\Scripts\python.exe -m agent.training.backup_trainer --config ./model_runs/backup-demo/backup_training_spec.json
+.\.venv-train\Scripts\python.exe -m agent.training.safe_launcher --config ./model_runs/backup-demo/backup_training_spec.json
 ```
 
 完成训练后，进行模型评测时建议把模型版本清单一并传入：

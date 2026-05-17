@@ -18,6 +18,7 @@ def test_first_training_round_plan_exposes_shortest_safe_path() -> None:
     assert plan["validation"]["ok"] is True
     assert [row["action"] for row in plan["actions"]] == ["training_prepare", "backup_model_train"]
     assert plan["server_handoff"]["strategy"].startswith("prepare locally")
+    assert plan["server_handoff"]["preflight_action"] == "training_server_preflight"
 
 
 def test_first_training_round_plan_action_is_available(tmp_path: Path) -> None:

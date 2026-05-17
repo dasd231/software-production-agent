@@ -80,13 +80,16 @@ def test_training_job_spec_and_manifest_capture_execution_contract(tmp_path: Pat
     assert spec["schema"] == "training_job_spec.v1"
     assert spec["dataset_snapshot"]["dataset_id"] == "dataset-demo"
     assert spec["execution_profile"]["profile_id"] == "local_default"
+    assert spec["resource_policy"]["profile"] == "shared_conservative"
     assert spec["sync_contract"]["verification"]["verify_input_hashes"] is True
     assert spec["resume_policy"]["enabled"] is True
     assert spec["retry_policy"]["max_attempts"] == 2
     assert spec["evaluation"]["required_before_promotion"] is True
     assert manifest["current_status"] == "queued"
     assert [row["status"] for row in manifest["status_history"]] == ["created", "validated", "queued"]
-    assert LocalTRLRunner().build_launch_command(Path("spec.json")).endswith('"spec.json"')
+    launch_command = LocalTRLRunner().build_launch_command(Path("spec.json"))
+    assert "safe_launcher" in launch_command
+    assert launch_command.endswith('"spec.json"')
 
 
 def test_training_job_manifest_tracks_remote_runtime_fields(tmp_path: Path) -> None:

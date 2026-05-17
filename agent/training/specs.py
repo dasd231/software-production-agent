@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from agent.training.execution_profiles import default_execution_profile
+from agent.training.resource_guard import build_training_resource_policy
 from agent.training.sync_contracts import build_artifact_sync_contract
 
 
@@ -28,6 +29,7 @@ def build_training_job_spec(
     objective: str = "sft",
     resources: dict[str, Any] | None = None,
     execution_profile: dict[str, Any] | None = None,
+    resource_policy: dict[str, Any] | None = None,
     sync_contract: dict[str, Any] | None = None,
     resume_policy: dict[str, Any] | None = None,
     retry_policy: dict[str, Any] | None = None,
@@ -63,6 +65,9 @@ def build_training_job_spec(
             gpu_count=int(merged_resources["gpu_count"]),
             strategy=str(merged_resources["strategy"]),
             precision=str(merged_resources["precision"]),
+        ),
+        "resource_policy": resource_policy or build_training_resource_policy(
+            gpu_count=int(merged_resources["gpu_count"]),
         ),
         "hyperparameters": dict(hyperparameters),
         "evaluation": {

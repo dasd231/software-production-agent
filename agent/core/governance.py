@@ -87,6 +87,7 @@ ACTION_GOVERNANCE: dict[str, ActionGovernanceSpec] = {
         requires_confirmation=True,
     ),
     "first_training_round_plan": ActionGovernanceSpec(("dataset:read",), "low"),
+    "training_server_preflight": ActionGovernanceSpec(("model:read",), "low"),
     "backup_model_train": ActionGovernanceSpec(
         ("dataset:read", "model:write"),
         "high",
