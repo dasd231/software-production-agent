@@ -14,3 +14,6 @@ workspace_demo/
 venv/
 training_runs/
 model_runs/
+model_evals/
+product_runs/
+logs/
