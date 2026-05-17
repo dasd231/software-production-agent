@@ -1,6 +1,6 @@
 # 项目大模型路线
 
-生成时间：`2026-05-17T10:06:52+00:00`
+生成时间：`2026-05-17T10:18:32+00:00`
 
 - 北极星：Maximize repository understanding per token, not repository tokens per prompt.
 - 数据源：`6`

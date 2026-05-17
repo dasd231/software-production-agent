@@ -7,6 +7,7 @@ from scripts.update_research_workbench import (
     _distributed_execution_overview,
     _platform_evolution,
     _project_model_program_overview,
+    _training_platform_blueprint_overview,
     _experiment_queue,
     _promotion_overview,
     _task_balance_snapshot,
@@ -328,3 +329,11 @@ def test_project_model_program_overview_exposes_repo_model_blueprint() -> None:
     assert overview["validation"]["ok"] is True
     assert overview["recommended_first_build"]["id"] == "repo_memory_v1"
     assert any(row["id"] == "retrieval_grounded_understanding" for row in overview["stages"])
+
+
+def test_training_platform_blueprint_overview_keeps_route_memory() -> None:
+    overview = _training_platform_blueprint_overview()
+
+    assert overview["schema"] == "research_training_platform_blueprint.v1"
+    assert overview["current_priority"]["route"] == "A"
+    assert len(overview["planes"]) == 4

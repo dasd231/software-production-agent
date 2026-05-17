@@ -1,0 +1,207 @@
+{
+  "schema": "research_training_platform_blueprint.v1",
+  "generated_at": "2026-05-17T10:18:32+00:00",
+  "north_star": "Transparent, adjustable and research-comparable training for project-level models.",
+  "route_memory": [
+    "A: build the platform top level first",
+    "B: add distillation next",
+    "C: thicken paper-grade comparison after that"
+  ],
+  "required_capabilities": [
+    {
+      "id": "distill_other_models",
+      "label": "蒸馏其他模型",
+      "plane": "distillation_plane"
+    },
+    {
+      "id": "crawl_label_train_projects",
+      "label": "爬取优质项目、打标签并训练",
+      "plane": "corpus_intelligence_plane"
+    },
+    {
+      "id": "transparent_adjustable_training",
+      "label": "模型设计与训练方法快捷透明可调",
+      "plane": "training_studio_plane"
+    },
+    {
+      "id": "market_and_paper_comparison",
+      "label": "与市场模型和同方向论文对比",
+      "plane": "benchmark_research_plane"
+    }
+  ],
+  "planes": [
+    {
+      "id": "distillation_plane",
+      "label": "Distillation Plane",
+      "purpose": "Absorb capabilities from stronger external or internal teacher models.",
+      "owns": [
+        "teacher registry",
+        "teacher task suite",
+        "distillation datasets",
+        "teacher output quality gates"
+      ],
+      "current_state": "planned_next"
+    },
+    {
+      "id": "corpus_intelligence_plane",
+      "label": "Corpus Intelligence Plane",
+      "purpose": "Turn internet repositories into governed, labeled and re-samplable project assets.",
+      "owns": [
+        "crawler",
+        "repo labels",
+        "quality taxonomy",
+        "provenance and dedup"
+      ],
+      "current_state": "foundation_exists"
+    },
+    {
+      "id": "training_studio_plane",
+      "label": "Training Studio Plane",
+      "purpose": "Expose transparent, adjustable recipes, knobs and ablations to the researcher.",
+      "owns": [
+        "training recipes",
+        "knob registry",
+        "ablation plans",
+        "experiment cards"
+      ],
+      "current_state": "active_build"
+    },
+    {
+      "id": "benchmark_research_plane",
+      "label": "Benchmark & Research Plane",
+      "purpose": "Compare against internal baselines, market models and paper claims under shared metrics.",
+      "owns": [
+        "benchmark registry",
+        "external model registry",
+        "paper claim matrix",
+        "comparison dashboards"
+      ],
+      "current_state": "skeleton_exists"
+    }
+  ],
+  "knobs": [
+    {
+      "id": "objective",
+      "label": "Training objective",
+      "meaning": "What signal the model optimizes against.",
+      "recommended_values": [
+        "sft",
+        "retrieval_contrastive",
+        "distillation_sft",
+        "continued_pretraining"
+      ],
+      "affects": [
+        "capability_target",
+        "loss",
+        "dataset_shape"
+      ]
+    },
+    {
+      "id": "base_model",
+      "label": "Base model",
+      "meaning": "The starting model before any adaptation.",
+      "recommended_values": [
+        "open-weight coder model",
+        "general reasoning model"
+      ],
+      "affects": [
+        "ceiling",
+        "cost",
+        "serving_compatibility"
+      ]
+    },
+    {
+      "id": "task_mix",
+      "label": "Task mix",
+      "meaning": "How much weight each capability slice receives.",
+      "recommended_values": [
+        "sum_to_1.0",
+        "min_task_share>=0.05"
+      ],
+      "affects": [
+        "capability_balance",
+        "regression_risk"
+      ]
+    },
+    {
+      "id": "data_mix",
+      "label": "Data-source mix",
+      "meaning": "How training examples are sourced across corpora or builders.",
+      "recommended_values": [
+        "governed_sources_only",
+        "source_refs_attached"
+      ],
+      "affects": [
+        "coverage",
+        "license_risk",
+        "generalization"
+      ]
+    },
+    {
+      "id": "teacher_mix",
+      "label": "Teacher mix",
+      "meaning": "Which teacher models contribute supervision when distillation is enabled.",
+      "recommended_values": [
+        "single_teacher",
+        "multi_teacher_consensus"
+      ],
+      "affects": [
+        "quality",
+        "cost",
+        "style_bias"
+      ]
+    },
+    {
+      "id": "context_window",
+      "label": "Context window",
+      "meaning": "Prompt budget used by the model or reader.",
+      "recommended_values": [
+        8192,
+        32768,
+        65536
+      ],
+      "affects": [
+        "latency",
+        "memory",
+        "long_context_behavior"
+      ]
+    },
+    {
+      "id": "adapter_method",
+      "label": "Adaptation method",
+      "meaning": "How parameters are updated.",
+      "recommended_values": [
+        "lora",
+        "qlora",
+        "full_finetune"
+      ],
+      "affects": [
+        "gpu_memory",
+        "trainable_parameters",
+        "merge_strategy"
+      ]
+    },
+    {
+      "id": "evaluation_suite",
+      "label": "Evaluation suite",
+      "meaning": "What benchmark set gates the experiment.",
+      "recommended_values": [
+        "internal_holdout",
+        "public_repo_benchmarks",
+        "paper_reproduction_suite"
+      ],
+      "affects": [
+        "promotion_gate",
+        "paper_comparability"
+      ]
+    }
+  ],
+  "current_priority": {
+    "route": "A",
+    "plane": "training_studio_plane",
+    "next_builds": [
+      "training_recipe",
+      "ablation_plan"
+    ]
+  }
+}

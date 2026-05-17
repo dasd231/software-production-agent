@@ -78,6 +78,11 @@ from agent.policies.loader import CommandPolicyError, assert_command_policy
 from agent.project_model.program import build_project_model_program
 from agent.project_model.repo_memory import RepoMemoryBuildInput, build_repo_memory
 from agent.project_model.task_synthesis import ProjectTaskSynthesisInput, synthesize_project_tasks
+from agent.training.studio import (
+    build_ablation_plan,
+    build_training_platform_blueprint,
+    build_training_recipe,
+)
 from agent.resources.registry import discover_resources
 from agent.runtime.production_check import run_production_checks
 from agent.scheduler.admission import get_global_admission_controller
@@ -547,6 +552,37 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             )
         )
         return {"ok": True, "action": name, **result.to_dict()}
+
+    if name == "training_platform_blueprint":
+        blueprint = build_training_platform_blueprint()
+        return {"ok": True, "action": name, "blueprint": blueprint}
+
+    if name == "training_recipe_plan":
+        recipe = build_training_recipe(
+            name=str(_require(args, "name")),
+            research_question=str(_require(args, "research_question")),
+            base_model=str(_require(args, "base_model")),
+            objective=str(_require(args, "objective")),
+            task_mix=args.get("task_mix") if isinstance(args.get("task_mix"), dict) else {},
+            data_mix=args.get("data_mix") if isinstance(args.get("data_mix"), dict) else {},
+            teacher_mix=args.get("teacher_mix") if isinstance(args.get("teacher_mix"), dict) else {},
+            method=args.get("method") if isinstance(args.get("method"), dict) else {},
+            evaluation_suite=_string_tuple_arg(args, "evaluation_suite"),
+            knobs=args.get("knobs") if isinstance(args.get("knobs"), dict) else {},
+            notes=str(args.get("notes", "") or ""),
+        )
+        return {"ok": bool(recipe.get("validation", {}).get("ok")), "action": name, "recipe": recipe}
+
+    if name == "ablation_plan_build":
+        plan = build_ablation_plan(
+            name=str(_require(args, "name")),
+            research_question=str(_require(args, "research_question")),
+            baseline_recipe=dict(_require(args, "baseline_recipe")),
+            variants=[dict(item) for item in args.get("variants", []) if isinstance(item, dict)],
+            primary_metrics=_string_tuple_arg(args, "primary_metrics"),
+            success_criteria=_string_tuple_arg(args, "success_criteria"),
+        )
+        return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
 
     if name == "industrial_maturity_plan":
         plan = build_industrial_maturity_plan(

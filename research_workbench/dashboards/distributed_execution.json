@@ -1,6 +1,6 @@
 {
   "schema": "research_distributed_execution_overview.v1",
-  "generated_at": "2026-05-17T10:06:52+00:00",
+  "generated_at": "2026-05-17T10:18:32+00:00",
   "summary": {
     "workloads": 9,
     "gpu_workloads": 2,

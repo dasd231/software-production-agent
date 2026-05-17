@@ -12,6 +12,11 @@
 
 ```text
 Training Control Plane
+├── Training Studio
+│   ├── training_recipe.v1
+│   ├── training knob registry
+│   └── ablation_plan.v1
+│
 ├── Dataset Registry
 │   ├── dataset_snapshot_manifest.json
 │   ├── task mix
@@ -69,6 +74,16 @@ Adjacent Enterprise Planes
 这一设计使训练数据从“若干 JSONL 文件”升级为“可复制、可验证、可分发的数据快照”。后续远程 Linux 训练或集群训练不需要重新理解原始学习链，只需消费该快照及其 shard manifest。
 
 ## 3. 控制面：从训练配置到标准作业
+
+在 `training_job_spec.json` 之上，系统现在显式区分两类更偏研究设计的对象：
+
+| 对象 | 作用 |
+| --- | --- |
+| `training_recipe.v1` | 面向研究者，说明这次为什么训、怎么训、哪些旋钮可调 |
+| `ablation_plan.v1` | 面向实验设计，说明各 variant 相对 baseline 改了什么、如何比较 |
+
+这两类对象不替代 `training_job_spec.json`。  
+前者回答“研究设计”，后者回答“执行契约”。这样可以避免把 teacher mix、task mix、实验假设和 runner 参数混在同一层里。
 
 `backup_model_train` 当前仍保留兼容用的 `backup_training_spec.json`，同时新增两类通用产物：
 

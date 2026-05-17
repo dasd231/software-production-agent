@@ -1,6 +1,6 @@
 {
   "schema": "research_project_model_program.v1",
-  "generated_at": "2026-05-17T10:06:52+00:00",
+  "generated_at": "2026-05-17T10:18:32+00:00",
   "north_star": "Maximize repository understanding per token, not repository tokens per prompt.",
   "summary": {
     "sources": 6,

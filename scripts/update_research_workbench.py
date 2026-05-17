@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 from agent.distributed.plans import build_distributed_platform_plan
 from agent.distributed.workloads import list_distributed_workloads
 from agent.project_model.program import build_project_model_program
+from agent.training.studio import build_training_platform_blueprint
 
 
 def _now() -> str:
@@ -615,6 +616,20 @@ def _project_model_program_overview() -> dict[str, Any]:
         "stages": program.get("stages", []),
         "benchmarks": program.get("benchmarks", []),
         "validation": program.get("validation", {}),
+    }
+
+
+def _training_platform_blueprint_overview() -> dict[str, Any]:
+    blueprint = build_training_platform_blueprint()
+    return {
+        "schema": "research_training_platform_blueprint.v1",
+        "generated_at": _now(),
+        "north_star": blueprint.get("north_star", ""),
+        "route_memory": blueprint.get("route_memory", []),
+        "required_capabilities": blueprint.get("required_capabilities", []),
+        "planes": blueprint.get("planes", []),
+        "knobs": blueprint.get("knobs", []),
+        "current_priority": blueprint.get("current_priority", {}),
     }
 
 
@@ -1266,6 +1281,62 @@ def _project_model_program_overview_to_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _training_platform_blueprint_overview_to_markdown(payload: dict[str, Any]) -> str:
+    priority = payload.get("current_priority") if isinstance(payload.get("current_priority"), dict) else {}
+    lines = [
+        "# 训练平台蓝图",
+        "",
+        f"生成时间：`{payload['generated_at']}`",
+        "",
+        f"- 北极星：{payload.get('north_star', '')}",
+        f"- 当前路线：`{priority.get('route', '')}`",
+        f"- 当前 Plane：`{priority.get('plane', '')}`",
+        f"- 下一批建设：{', '.join(priority.get('next_builds', []))}",
+        "",
+        "## 路线记忆",
+        "",
+    ]
+    lines.extend(f"- {item}" for item in payload.get("route_memory", []))
+    lines.extend(
+        [
+            "",
+            "## 四大 Plane",
+            "",
+            "| Plane | Purpose | State | Owns |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for row in payload.get("planes", []):
+        lines.append(
+            f"| `{row.get('id', '')}` | {row.get('purpose', '')} | {row.get('current_state', '')} | "
+            f"{', '.join(row.get('owns', []))} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 关键旋钮",
+            "",
+            "| Knob | Meaning | Affects |",
+            "| --- | --- | --- |",
+        ]
+    )
+    for row in payload.get("knobs", []):
+        lines.append(
+            f"| `{row.get('id', '')}` | {row.get('meaning', '')} | {', '.join(row.get('affects', []))} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 读法",
+            "",
+            "- 这个页面固定四项硬能力与 A→B→C 路线，不让后续开发漂移。",
+            "- `training_recipe` 与 `ablation_plan` 属于 Training Studio Plane；它们先于蒸馏链落地，是为了让后续实验可解释、可比较。",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _training_remediation_to_markdown(payload: dict[str, Any]) -> str:
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
     lines = [
@@ -1430,6 +1501,7 @@ def main() -> int:
     distributed_execution = _distributed_execution_overview()
     distributed_dispatch = _distributed_dispatch_candidates(experiment_queue)
     project_model_program = _project_model_program_overview()
+    training_platform_blueprint = _training_platform_blueprint_overview()
     remediation = _training_remediation(
         payload["training_runs"],
         payload["model_runs"],
@@ -1465,6 +1537,8 @@ def main() -> int:
         "distributed_dispatch_candidates.md": _distributed_dispatch_candidates_to_markdown(distributed_dispatch),
         "project_model_program.json": json.dumps(project_model_program, ensure_ascii=False, indent=2),
         "project_model_program.md": _project_model_program_overview_to_markdown(project_model_program),
+        "training_platform_blueprint.json": json.dumps(training_platform_blueprint, ensure_ascii=False, indent=2),
+        "training_platform_blueprint.md": _training_platform_blueprint_overview_to_markdown(training_platform_blueprint),
         "training_remediation.json": json.dumps(remediation, ensure_ascii=False, indent=2),
         "training_remediation.md": _training_remediation_to_markdown(remediation),
         "training_lineage.json": json.dumps(lineage, ensure_ascii=False, indent=2),

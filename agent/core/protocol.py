@@ -69,6 +69,9 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "project_model_program_plan",
         "project_repo_memory_build",
         "project_task_synthesis_build",
+        "training_platform_blueprint",
+        "training_recipe_plan",
+        "ablation_plan_build",
         "industrial_maturity_plan",
         "enterprise_readiness_check",
         "workflow_validate",
@@ -262,6 +265,36 @@ class ActionDTO(BaseModel):
                 limit = ar.get("max_symbol_examples_per_repo")
                 if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
                     raise ValueError("project_task_synthesis_build max_symbol_examples_per_repo must be positive integer")
+        elif a == "training_platform_blueprint":
+            if ar:
+                for k in ar:
+                    raise ValueError(f"training_platform_blueprint accepts no args keys; got {k!r}")
+        elif a == "training_recipe_plan":
+            for key in ("name", "research_question", "base_model", "objective"):
+                if key not in ar or not isinstance(ar.get(key), str):
+                    raise ValueError(f"training_recipe_plan requires string {key}")
+            for key in ("task_mix", "data_mix", "teacher_mix", "method", "knobs"):
+                if key in ar and not isinstance(ar.get(key), dict):
+                    raise ValueError(f"training_recipe_plan {key} must be object")
+            if "evaluation_suite" in ar:
+                value = ar.get("evaluation_suite")
+                if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                    raise ValueError("training_recipe_plan evaluation_suite must be string array")
+            if "notes" in ar and not isinstance(ar.get("notes"), str):
+                raise ValueError("training_recipe_plan notes must be string")
+        elif a == "ablation_plan_build":
+            for key in ("name", "research_question"):
+                if key not in ar or not isinstance(ar.get(key), str):
+                    raise ValueError(f"ablation_plan_build requires string {key}")
+            if not isinstance(ar.get("baseline_recipe"), dict):
+                raise ValueError("ablation_plan_build requires object baseline_recipe")
+            value = ar.get("variants")
+            if not isinstance(value, list) or not all(isinstance(x, dict) for x in value):
+                raise ValueError("ablation_plan_build variants must be object array")
+            for key in ("primary_metrics", "success_criteria"):
+                arr = ar.get(key)
+                if not isinstance(arr, list) or not all(isinstance(x, str) for x in arr):
+                    raise ValueError(f"ablation_plan_build {key} must be string array")
         elif a == "industrial_maturity_plan":
             if "goal" not in ar or not isinstance(ar.get("goal"), str):
                 raise ValueError("industrial_maturity_plan requires string goal")
