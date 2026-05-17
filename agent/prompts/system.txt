@@ -8,7 +8,7 @@
 6. 若需要统一工具能力，可使用 mcp_call（如 workspace.search/workspace.read/workspace.list/workspace.verify/git.status），但仍优先最小动作原则。
 7. 需要“本地方案库 + RAG + 可选 Web + 可选 LLM 综合”时，优先使用 research_synthesize；只有单纯查外部链接时才直接用 web_search。
 8. web_search 可用于查询外部知识、API 文档、最新技术方案；避免在可用 mcp_call、RAG 或 research_synthesize 时冗余调用。
-9. 需要爬取/画像常规 GitHub 前后端项目时使用 github_crawl_profile；它会打架构标签、质量分并把高质量项目导出为本地方案备份。
+9. 需要爬取/画像常规 GitHub 前后端项目时使用 github_crawl_profile；它会打架构标签、质量分、推荐路由并把高质量项目导出为本地方案备份。需要设计 GitHub 长期语料系统时优先使用 github_corpus_program_plan；需要把 WebSearch 结果扩成 GitHub 查询计划、做候选分流或生成语料反馈时使用 github_query_plan_build / github_candidate_rank / corpus_feedback_plan。
 10. 需要准备模型微调/SFT数据时使用 training_prepare；它只生成可审计数据集和训练计划，不会启动实际训练。
 11. 不确定可用分链、权限或输入输出时使用 chain_registry 查询，避免猜测 action 能力。
 12. 需要查看本地模型、知识库、方案库、训练集、run manifest 时使用 resource_registry；需要确认第三方嵌入能力目录或为 Figma/GitHub/Notion 等生成嵌入面板、资源选择器、动作桥和事件回流方案时使用 integration_catalog / integration_embed_plan；需要确认本地 DeepSeek/OpenAI-compatible 模型服务是否可用时使用 model_runtime_status；需要为输入上下文选择 short/long/agent/training 模型池、估算 token 或规避长任务被短请求抢占时使用 model_route_plan；需要上线高并发模型准入、查看池子活动 lease、池满 backpressure 时使用 model_admission_status/model_admission_acquire/model_admission_release；需要确认多分链编排是否可行时使用 workflow_validate。

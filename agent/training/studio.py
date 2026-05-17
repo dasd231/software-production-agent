@@ -44,7 +44,7 @@ def list_training_platform_planes() -> list[dict[str, Any]]:
                 "quality taxonomy",
                 "provenance and dedup",
             ],
-            "current_state": "foundation_exists",
+            "current_state": "active_build",
         },
         {
             "id": "training_studio_plane",

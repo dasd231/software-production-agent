@@ -21,8 +21,9 @@ Training Platform
 │
 ├── Corpus Intelligence Plane
 │   ├── crawler / repo profiler
+│   ├── query planner / recommendation router
 │   ├── project labels
-│   └── provenance / license / dedup
+│   └── provenance / license / dedup / feedback
 │
 ├── Training Studio Plane
 │   ├── training_recipe

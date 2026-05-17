@@ -19,6 +19,7 @@ from agent.distributed.workloads import list_distributed_workloads
 from agent.project_model.program import build_project_model_program
 from agent.training.studio import build_training_platform_blueprint
 from agent.distillation.catalog import list_teacher_models, list_teacher_tasks
+from agent.corpus_intelligence.program import build_github_corpus_program
 
 
 def _now() -> str:
@@ -617,6 +618,21 @@ def _project_model_program_overview() -> dict[str, Any]:
         "stages": program.get("stages", []),
         "benchmarks": program.get("benchmarks", []),
         "validation": program.get("validation", {}),
+    }
+
+
+def _corpus_intelligence_overview() -> dict[str, Any]:
+    program = build_github_corpus_program()
+    return {
+        "schema": "research_corpus_intelligence_program.v1",
+        "generated_at": _now(),
+        "north_star": program.get("north_star", ""),
+        "modules": program.get("modules", []),
+        "algorithms": program.get("algorithms", {}),
+        "student_model_policy": program.get("student_model_policy", {}),
+        "metric_taxonomy": program.get("metric_taxonomy", {}),
+        "feedback_loop": program.get("feedback_loop", {}),
+        "recommended_next_builds": program.get("recommended_next_builds", []),
     }
 
 
@@ -1330,6 +1346,53 @@ def _project_model_program_overview_to_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _corpus_intelligence_overview_to_markdown(payload: dict[str, Any]) -> str:
+    algorithms = payload.get("algorithms") if isinstance(payload.get("algorithms"), dict) else {}
+    student = payload.get("student_model_policy") if isinstance(payload.get("student_model_policy"), dict) else {}
+    metric_taxonomy = payload.get("metric_taxonomy") if isinstance(payload.get("metric_taxonomy"), dict) else {}
+    lines = [
+        "# GitHub 语料智能层",
+        "",
+        f"生成时间：`{payload['generated_at']}`",
+        "",
+        f"- 北极星：{payload.get('north_star', '')}",
+        f"- 学生模型家族：`{student.get('family', '')}`",
+        f"- 首轮基座：`{student.get('first_round_base', '')}`",
+        "",
+        "## 模块",
+        "",
+        "| Module | Owns | Algorithm |",
+        "| --- | --- | --- |",
+    ]
+    for row in payload.get("modules", []):
+        lines.append(
+            f"| `{row.get('id', '')}` | {', '.join(row.get('owns', []))} | "
+            f"{row.get('primary_algorithm', '')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 关键算法",
+            "",
+            f"- Search：{((algorithms.get('search') or {}).get('name', ''))}",
+            f"- Recommendation：{((algorithms.get('recommendation') or {}).get('name', ''))}",
+            f"- Repo Quality：{((algorithms.get('repo_quality') or {}).get('name', ''))}",
+            f"- Distillation：{((algorithms.get('distillation') or {}).get('name', ''))}",
+            "",
+            "## 指标层",
+            "",
+            "| Layer | Metrics |",
+            "| --- | --- |",
+        ]
+    )
+    for layer, metrics in metric_taxonomy.items():
+        lines.append(f"| `{layer}` | {', '.join(metrics)} |")
+    lines.extend(["", "## 下一步", ""])
+    lines.extend(f"- {item}" for item in payload.get("recommended_next_builds", []))
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _training_platform_blueprint_overview_to_markdown(payload: dict[str, Any]) -> str:
     priority = payload.get("current_priority") if isinstance(payload.get("current_priority"), dict) else {}
     lines = [
@@ -1604,6 +1667,7 @@ def main() -> int:
     distributed_execution = _distributed_execution_overview()
     distributed_dispatch = _distributed_dispatch_candidates(experiment_queue)
     project_model_program = _project_model_program_overview()
+    corpus_intelligence = _corpus_intelligence_overview()
     training_platform_blueprint = _training_platform_blueprint_overview()
     distillation_overview = _distillation_overview()
     remediation = _training_remediation(
@@ -1641,6 +1705,8 @@ def main() -> int:
         "distributed_dispatch_candidates.md": _distributed_dispatch_candidates_to_markdown(distributed_dispatch),
         "project_model_program.json": json.dumps(project_model_program, ensure_ascii=False, indent=2),
         "project_model_program.md": _project_model_program_overview_to_markdown(project_model_program),
+        "corpus_intelligence_program.json": json.dumps(corpus_intelligence, ensure_ascii=False, indent=2),
+        "corpus_intelligence_program.md": _corpus_intelligence_overview_to_markdown(corpus_intelligence),
         "training_platform_blueprint.json": json.dumps(training_platform_blueprint, ensure_ascii=False, indent=2),
         "training_platform_blueprint.md": _training_platform_blueprint_overview_to_markdown(training_platform_blueprint),
         "distillation_overview.json": json.dumps(distillation_overview, ensure_ascii=False, indent=2),

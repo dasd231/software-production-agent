@@ -14,6 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from agent.corpus_intelligence.feedback import build_corpus_feedback_report
+from agent.corpus_intelligence.ranking import rank_repo_profiles
 from agent.evaluation.crawler import evaluate_crawl_run, evaluate_repo_profile, repo_quality_summary
 from agent.learning.filters import filter_repositories
 from agent.learning.github_search import GitHubSearchClient
@@ -330,19 +332,43 @@ def crawl_frontend_backend_repos(inp: CrawlProfileInput) -> CrawlProfileResult:
             exported.append(str(exported_path))
         profiles.append(profile)
 
+    ranking = rank_repo_profiles(
+        query=inp.query,
+        profiles=profiles,
+        allowed_licenses={str(item).lower() for item in inp.allowed_licenses if str(item).strip()},
+        min_quality=float(inp.quality_threshold),
+    )
+    ranking_rows = {
+        str(row.get("repo", "")): row
+        for row in ranking.get("rows", [])
+        if isinstance(row, dict)
+    }
+    for profile in profiles:
+        repo = profile.get("repo") if isinstance(profile.get("repo"), dict) else {}
+        route = ranking_rows.get(str(repo.get("full_name", "")), {})
+        if route:
+            profile["routing"] = route
+    feedback = build_corpus_feedback_report(ranking=ranking)
+
     profiles_path = output_dir / "repo_profiles.json"
     candidates_path = output_dir / "candidates.json"
     evaluation_path = output_dir / "evaluation_report.json"
+    ranking_path = output_dir / "routing_report.json"
+    feedback_path = output_dir / "feedback_report.json"
     report_path = output_dir / "report.md"
     evaluation = evaluate_crawl_run(profiles, exported).to_dict()
     profiles_path.write_text(json.dumps(profiles, ensure_ascii=False, indent=2), encoding="utf-8")
     candidates_path.write_text(json.dumps([c.to_dict() for c in candidates], ensure_ascii=False, indent=2), encoding="utf-8")
     evaluation_path.write_text(json.dumps(evaluation, ensure_ascii=False, indent=2), encoding="utf-8")
+    ranking_path.write_text(json.dumps(ranking, ensure_ascii=False, indent=2), encoding="utf-8")
+    feedback_path.write_text(json.dumps(feedback, ensure_ascii=False, indent=2), encoding="utf-8")
     _write_report(report_path, profiles, exported, evaluation)
     files = {
         "profiles": str(profiles_path),
         "candidates": str(candidates_path),
         "evaluation_report": str(evaluation_path),
+        "routing_report": str(ranking_path),
+        "feedback_report": str(feedback_path),
         "report": str(report_path),
         "solutions_dir": str(solutions_dir),
     }

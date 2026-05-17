@@ -1,6 +1,6 @@
 {
   "schema": "research_training_platform_blueprint.v1",
-  "generated_at": "2026-05-17T15:41:05+00:00",
+  "generated_at": "2026-05-17T17:06:02+00:00",
   "north_star": "Transparent, adjustable and research-comparable training for project-level models.",
   "route_memory": [
     "A: build the platform top level first",
@@ -52,7 +52,7 @@
         "quality taxonomy",
         "provenance and dedup"
       ],
-      "current_state": "foundation_exists"
+      "current_state": "active_build"
     },
     {
       "id": "training_studio_plane",

@@ -1,6 +1,6 @@
 # 训练平台蓝图
 
-生成时间：`2026-05-17T15:41:05+00:00`
+生成时间：`2026-05-17T17:06:02+00:00`
 
 - 北极星：Transparent, adjustable and research-comparable training for project-level models.
 - 当前路线：`B`
@@ -18,7 +18,7 @@
 | Plane | Purpose | State | Owns |
 | --- | --- | --- | --- |
 | `distillation_plane` | Absorb capabilities from stronger external or internal teacher models. | active_build | teacher registry, teacher task suite, distillation datasets, teacher output quality gates |
-| `corpus_intelligence_plane` | Turn internet repositories into governed, labeled and re-samplable project assets. | foundation_exists | crawler, repo labels, quality taxonomy, provenance and dedup |
+| `corpus_intelligence_plane` | Turn internet repositories into governed, labeled and re-samplable project assets. | active_build | crawler, repo labels, quality taxonomy, provenance and dedup |
 | `training_studio_plane` | Expose transparent, adjustable recipes, knobs and ablations to the researcher. | active_build | training recipes, knob registry, ablation plans, experiment cards |
 | `benchmark_research_plane` | Compare against internal baselines, market models and paper claims under shared metrics. | skeleton_exists | benchmark registry, external model registry, paper claim matrix, comparison dashboards |
 

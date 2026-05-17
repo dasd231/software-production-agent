@@ -67,6 +67,10 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "distributed_workload_catalog",
         "distributed_job_plan",
         "project_model_program_plan",
+        "github_corpus_program_plan",
+        "github_query_plan_build",
+        "github_candidate_rank",
+        "corpus_feedback_plan",
         "project_repo_memory_build",
         "project_task_synthesis_build",
         "training_platform_blueprint",
@@ -257,6 +261,42 @@ class ActionDTO(BaseModel):
                 value = ar.get("target_context_tokens")
                 if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                     raise ValueError("project_model_program_plan target_context_tokens must be positive integer")
+        elif a == "github_corpus_program_plan":
+            if ar:
+                for k in ar:
+                    raise ValueError(f"github_corpus_program_plan accepts no args keys; got {k!r}")
+        elif a == "github_query_plan_build":
+            value = ar.get("seed_queries")
+            if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                raise ValueError("github_query_plan_build requires seed_queries string array")
+            if "web_results" in ar and not isinstance(ar.get("web_results"), list):
+                raise ValueError("github_query_plan_build web_results must be array")
+            if "max_queries" in ar:
+                value = ar.get("max_queries")
+                if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                    raise ValueError("github_query_plan_build max_queries must be positive integer")
+        elif a == "github_candidate_rank":
+            if "query" not in ar or not isinstance(ar.get("query"), str):
+                raise ValueError("github_candidate_rank requires string query")
+            if "profiles" not in ar or not isinstance(ar.get("profiles"), list):
+                raise ValueError("github_candidate_rank requires profiles array")
+            if "web_results" in ar and not isinstance(ar.get("web_results"), list):
+                raise ValueError("github_candidate_rank web_results must be array")
+            if "feedback_by_tag" in ar and not isinstance(ar.get("feedback_by_tag"), dict):
+                raise ValueError("github_candidate_rank feedback_by_tag must be object")
+            if "allowed_licenses" in ar:
+                value = ar.get("allowed_licenses")
+                if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                    raise ValueError("github_candidate_rank allowed_licenses must be string array")
+            if "min_quality" in ar and not isinstance(ar.get("min_quality"), (int, float)):
+                raise ValueError("github_candidate_rank min_quality must be number")
+        elif a == "corpus_feedback_plan":
+            if "ranking" not in ar or not isinstance(ar.get("ranking"), dict):
+                raise ValueError("corpus_feedback_plan requires object ranking")
+            if "downstream_metrics" in ar and not isinstance(ar.get("downstream_metrics"), dict):
+                raise ValueError("corpus_feedback_plan downstream_metrics must be object")
+            if "target_train_now_rate" in ar and not isinstance(ar.get("target_train_now_rate"), (int, float)):
+                raise ValueError("corpus_feedback_plan target_train_now_rate must be number")
         elif a == "project_repo_memory_build":
             for key in ("repo_path", "output_dir"):
                 if key not in ar or not isinstance(ar.get(key), str):

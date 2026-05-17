@@ -87,7 +87,7 @@ _WORKLOADS: tuple[DistributedWorkloadSpec, ...] = (
     DistributedWorkloadSpec(
         id="repo_corpus_ingestion",
         label="Repository corpus ingestion",
-        source_action="project_model_program_plan",
+        source_action="github_corpus_program_plan",
         description="Large-scale repository, docs, manifests and execution-signal ingestion with provenance gates.",
         queue="ingestion",
         priority="high",
@@ -111,7 +111,7 @@ _WORKLOADS: tuple[DistributedWorkloadSpec, ...] = (
     DistributedWorkloadSpec(
         id="repo_benchmark_refresh",
         label="Repository benchmark refresh",
-        source_action="project_model_program_plan",
+        source_action="github_corpus_program_plan",
         description="Refresh frozen repo-level holdouts and benchmark bindings before candidate promotion.",
         queue="evaluation",
         priority="high",

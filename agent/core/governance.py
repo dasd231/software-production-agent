@@ -88,6 +88,10 @@ ACTION_GOVERNANCE: dict[str, ActionGovernanceSpec] = {
     ),
     "first_training_round_plan": ActionGovernanceSpec(("dataset:read",), "low"),
     "training_server_preflight": ActionGovernanceSpec(("model:read",), "low"),
+    "github_corpus_program_plan": ActionGovernanceSpec(("workspace:read",), "low"),
+    "github_query_plan_build": ActionGovernanceSpec(("workspace:read",), "low"),
+    "github_candidate_rank": ActionGovernanceSpec(("workspace:read",), "low"),
+    "corpus_feedback_plan": ActionGovernanceSpec(("workspace:read",), "low"),
     "backup_model_train": ActionGovernanceSpec(
         ("dataset:read", "model:write"),
         "high",

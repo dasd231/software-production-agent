@@ -7,6 +7,7 @@ from scripts.update_research_workbench import (
     _distributed_execution_overview,
     _platform_evolution,
     _project_model_program_overview,
+    _corpus_intelligence_overview,
     _training_platform_blueprint_overview,
     _distillation_overview,
     _experiment_queue,
@@ -330,6 +331,14 @@ def test_project_model_program_overview_exposes_repo_model_blueprint() -> None:
     assert overview["validation"]["ok"] is True
     assert overview["recommended_first_build"]["id"] == "repo_memory_v1"
     assert any(row["id"] == "retrieval_grounded_understanding" for row in overview["stages"])
+
+
+def test_corpus_intelligence_overview_exposes_github_program() -> None:
+    overview = _corpus_intelligence_overview()
+
+    assert overview["schema"] == "research_corpus_intelligence_program.v1"
+    assert overview["student_model_policy"]["family"] == "deepseek_open_family"
+    assert any(row["id"] == "recommendation_router" for row in overview["modules"])
 
 
 def test_training_platform_blueprint_overview_keeps_route_memory() -> None:

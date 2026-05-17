@@ -282,6 +282,7 @@ OPENAI_PLANNER_MODEL=gpt-4o-mini
 - **`enterprise_stack_plan`**：面向上市企业/私有化场景输出技术选型、热迭代、vLLM/SGLang 模型服务、多 Agent 工程治理、100+ 终端弹性和灰度方案。
 - **`distributed_platform_plan` / `distributed_workload_catalog` / `distributed_job_plan`**：查看 Ray-first / Spark-later / Flink-when-needed 平台路线、标准 workload 目录，并在不派发任务的前提下预览分布式 job manifest 与 Ray submission contract。
 - **`project_model_program_plan`**：查看“项目大模型”路线，返回 internet-scale 数据源、repo-level 任务、训练阶段、benchmark 和当前推荐的 `repo_memory_v1` 首建目标。
+- **`github_corpus_program_plan` / `github_query_plan_build` / `github_candidate_rank` / `corpus_feedback_plan`**：查看 GitHub 持续语料系统，基于 seed query + WebSearch 线索生成查询计划，对候选项目做推荐分流，并把 intake / benchmark 反馈转成下一轮采样建议。
 - **`project_repo_memory_build`**：把一个仓库快照压成 `project_map.json`、`symbol_index.jsonl`、`evidence_index.jsonl` 与 `repo_memory_manifest.json`，作为后续 retriever / reader 训练的最小项目对象。
 - **`project_task_synthesis_build`**：从一个或多个 repo-memory 产物合成项目级 `training_examples.jsonl` 与 `retrieval_pairs.jsonl`，把“项目对象”正式转成可训练样本。
 - **`training_platform_blueprint`**：查看蒸馏、互联网语料、训练工作室、benchmark/论文四大 Plane，以及当前固定路线 A→B→C。
@@ -302,7 +303,7 @@ OPENAI_PLANNER_MODEL=gpt-4o-mini
 - **`research_synthesize`**：本地方案库 + 本地/学习库 RAG + 可选 Web Search + 可选 LLM 综合；返回 `evaluation`，评价方案命中、RAG 命中、Web 补充、引用覆盖和本地优先度。
 - **`training_prepare`**：准备模型微调/SFT 数据集与训练计划；默认注入动作协议专项样本，单独训练模型输出严格 action JSON；只写入数据文件和报告，不启动实际 GPU 训练；返回 `evaluation`、`governance`、`evaluation_summary` 并落盘 `run_manifest.json`。
 - **`backup_model_train`**：读取已审查训练集，复核数据门禁与训练环境，生成备用本地模型训练任务、版本清单、启动命令和 `run_manifest.json`；门禁未通过时明确阻塞而不是假装可训练。
-- **`github_crawl_profile`**：爬取或画像 GitHub/本地常规前后端项目，输出架构标签、质量分、训练标签和 `evaluation`，并将高质量项目导出为本地 `solution_manifest.json` / `SOLUTION_BACKUP.md` 与 `run_manifest.json`。
+- **`github_crawl_profile`**：爬取或画像 GitHub/本地常规前后端项目，输出架构标签、质量分、训练标签、推荐路由和 `evaluation`，并将高质量项目导出为本地 `solution_manifest.json` / `SOLUTION_BACKUP.md` 与 `run_manifest.json`。
 
 这轮开始把项目推进为“意图到生产”的 AgentOS：自然语言目标先编译为可验证 workflow，再进入证据账本和方案资产闭环。路线详见 [`docs/INTENT_AGENTOS.md`](docs/INTENT_AGENTOS.md)。
 

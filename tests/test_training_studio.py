@@ -46,6 +46,7 @@ def test_training_platform_blueprint_remembers_route_and_planes() -> None:
     ]
     assert planes["training_studio_plane"]["current_state"] == "active_build"
     assert planes["distillation_plane"]["current_state"] == "active_build"
+    assert planes["corpus_intelligence_plane"]["current_state"] == "active_build"
 
 
 def test_training_recipe_is_human_facing_and_validated() -> None:

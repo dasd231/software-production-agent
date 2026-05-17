@@ -1,6 +1,6 @@
 {
   "schema": "research_distributed_execution_overview.v1",
-  "generated_at": "2026-05-17T10:46:36+00:00",
+  "generated_at": "2026-05-17T17:06:02+00:00",
   "summary": {
     "workloads": 9,
     "gpu_workloads": 2,
@@ -126,7 +126,7 @@
       "schema": "distributed_workload_spec.v1",
       "id": "repo_corpus_ingestion",
       "label": "Repository corpus ingestion",
-      "source_action": "project_model_program_plan",
+      "source_action": "github_corpus_program_plan",
       "description": "Large-scale repository, docs, manifests and execution-signal ingestion with provenance gates.",
       "queue": "ingestion",
       "priority": "high",
@@ -180,7 +180,7 @@
       "schema": "distributed_workload_spec.v1",
       "id": "repo_benchmark_refresh",
       "label": "Repository benchmark refresh",
-      "source_action": "project_model_program_plan",
+      "source_action": "github_corpus_program_plan",
       "description": "Refresh frozen repo-level holdouts and benchmark bindings before candidate promotion.",
       "queue": "evaluation",
       "priority": "high",

@@ -61,6 +61,9 @@ from agent.chains.model_training import BackupModelTrainInput, prepare_backup_mo
 from agent.chains.registry import get_chain, list_chains
 from agent.chains.research import ResearchChainInput, run_research_chain
 from agent.chains.training import TrainingPrepareInput, prepare_fine_tuning_dataset
+from agent.corpus_intelligence.feedback import build_corpus_feedback_report
+from agent.corpus_intelligence.program import build_github_corpus_program
+from agent.corpus_intelligence.ranking import build_github_query_plan, rank_repo_profiles
 from agent.evidence.ledger import build_evidence_ledger
 from agent.enterprise.stack import build_enterprise_stack_plan
 from agent.distillation.catalog import list_teacher_models, list_teacher_tasks
@@ -531,6 +534,42 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             target_context_tokens=int(args.get("target_context_tokens", 32768)),
         )
         return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
+
+    if name == "github_corpus_program_plan":
+        return {"ok": True, "action": name, "plan": build_github_corpus_program()}
+
+    if name == "github_query_plan_build":
+        plan = build_github_query_plan(
+            seed_queries=[str(item) for item in args.get("seed_queries", []) if str(item).strip()],
+            web_results=args.get("web_results") if isinstance(args.get("web_results"), list) else [],
+            max_queries=int(args.get("max_queries", 12)),
+        )
+        return {"ok": True, "action": name, "plan": plan}
+
+    if name == "github_candidate_rank":
+        ranking = rank_repo_profiles(
+            query=str(args.get("query", "") or ""),
+            profiles=args.get("profiles") if isinstance(args.get("profiles"), list) else [],
+            web_results=args.get("web_results") if isinstance(args.get("web_results"), list) else [],
+            feedback_by_tag=args.get("feedback_by_tag") if isinstance(args.get("feedback_by_tag"), dict) else {},
+            allowed_licenses={
+                str(item).lower()
+                for item in args.get("allowed_licenses", [])
+                if str(item).strip()
+            }
+            if isinstance(args.get("allowed_licenses"), list)
+            else set(),
+            min_quality=float(args.get("min_quality", 6.5)),
+        )
+        return {"ok": True, "action": name, "ranking": ranking}
+
+    if name == "corpus_feedback_plan":
+        feedback = build_corpus_feedback_report(
+            ranking=args.get("ranking") if isinstance(args.get("ranking"), dict) else {},
+            downstream_metrics=args.get("downstream_metrics") if isinstance(args.get("downstream_metrics"), dict) else {},
+            target_train_now_rate=float(args.get("target_train_now_rate", 0.35)),
+        )
+        return {"ok": True, "action": name, "feedback": feedback}
 
     if name == "project_repo_memory_build":
         repo_path_raw = Path(str(_require(args, "repo_path")))
