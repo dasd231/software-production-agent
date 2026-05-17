@@ -1,0 +1,2907 @@
+"""极简产品 UI：一个需求输入框 + 模式选择 -> 软件产出工作区。
+
+函数流程图：
+    main()
+      -> argparse 读取 host/port/runs-root
+      -> create_app()
+      -> Flask GET /
+           -> 渲染单输入框和模式选择
+      -> Flask POST /run
+           -> _build_run_id()
+           -> resolve_llm_provider(provider, model)
+           -> _save_run_meta()
+           -> _build_config()
+           -> _build_brain()
+              -> local_production/default_production 使用主 DeepSeek，Codex/离线模板兜底
+              -> llm 使用 OpenAIBrain + LLM Planner 走 API 完整生产链路
+            -> run_agent_loop()
+            -> redirect /runs/<run_id>
+      -> Flask GET /runs/<run_id>
+           -> 读取 .agent_state.json
+           -> _list_run_files()
+           -> build_maturity_report()
+           -> 渲染状态、成熟度、产物文件、主文件预览
+      -> Flask POST /runs/<run_id>/improve
+           -> 读取上一版 meta 与用户产物
+           -> _copy_artifacts_for_improvement()
+           -> _write_improvement_context()
+           -> 使用同 mode/provider/model 继续 run_agent_loop()
+           -> redirect 新 run
+      -> Flask GET /runs/<run_id>/files/<path>
+           -> 工作区路径守卫
+           -> 拒绝 .agent_* 等内部文件
+           -> 返回文本文件内容
+      -> Flask GET /runs/<run_id>/download
+           -> _iter_downloadable_files()
+           -> 内存打包 zip
+           -> 浏览器下载产物包
+      -> Flask GET /runs/<run_id>/preview
+           -> 仅服务 manifest 允许的 frontend/index.html 或 preview/index.html
+           -> CSP + sandbox iframe 隔离交互预览
+
+你可以继续练算法/工程化的点：
+    1. 作业调度：现在 POST 同步阻塞；后续可以拆成 JobStore + worker + SSE/WebSocket。
+    2. 模式策略：用户侧只保留 默认生产/llm；后续“备份方案检索”接入 PolicyProfile。
+    3. 产物评分：现在展示 progress；后续可以把 reward、health、review 做成可视化曲线。
+    4. 需求特征：现在 goal 直接进入 loop；后续可以先抽取项目类型、验收标准和风险。
+    5. 文件预览：现在选择 app.py/首个 py；后续可以按入口点、测试覆盖和最近修改排序。
+    6. 模型路由：现在前端选择 provider/model；后续可以按额度、速度、reward 自动推荐 OPENAI/GROQ/DEEPSEEK。
+    7. 产物封装：现在是内存 ZIP；大项目可改为流式 zip、manifest、签名和过期清理。
+    8. 成熟度评估：现在是启发式 checklist；后续可接入测试结果、依赖审计和 reward。
+    9. 结果页布局：现在是 CSS dashboard grid；后续可按项目类型动态调整信息密度。
+    10. 二次改进：现在复制上一版用户产物再继续跑；后续可做 artifact diff、branch 和版本图谱。
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import secrets
+import shutil
+import zipfile
+from io import BytesIO
+from dataclasses import replace
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from flask import Flask, Response, abort, jsonify, redirect, render_template_string, request, send_file, url_for
+
+from agent.config import AppConfig
+from agent.core.agent_loop import run_agent_loop
+from agent.core.brain import AgentBrain, OpenAIBrain
+from agent.enterprise.maturity import build_industrial_maturity_plan
+from agent.enterprise.readiness import build_enterprise_readiness_report
+from agent.enterprise.stack import build_enterprise_stack_plan
+from agent.evidence.ledger import build_evidence_ledger
+from agent.innovation.radar import build_innovation_radar
+from agent.intent.compiler import compile_intent
+from agent.integrations.embedding import build_integration_embed_plan, list_integration_catalog
+from agent.llm.providers import normalise_provider, provider_choices_for_ui, resolve_llm_provider
+from agent.llm.runtime import model_runtime_status
+from agent.memory.project_state import ProjectState
+from agent.observability import configure_logging
+from agent.resources.registry import discover_resources
+from agent.scheduler.admission import PoolAdmissionController
+from agent.scheduler.routing import build_model_route_plan, list_model_pools
+from agent.solution_library.publish import publish_solution_from_run
+from agent.ui.auth import LocalAuthStore, can_access_run, current_user, login_required, require_permission, sign_in, sign_out
+from agent.ui.maturity import build_maturity_report
+from agent.ui.offline_product import OfflineProductBrain
+from agent.workflows.dry_run import dry_run_workflow
+
+DEFAULT_GOAL = "写一个成熟的人员管理系统，包含增删改查、接口契约、测试、交付文档和可预览前端"
+ALLOWED_MODES = {"local_production", "llm"}
+MODE_ALIASES = {
+    "default_production": "local_production",
+    "demo": "local_production",
+    "frontend_sandbox": "local_production",
+    "codex_handoff": "local_production",
+    "llm_planner": "llm",
+}
+ALLOWED_PROVIDERS = {"openai", "groq", "deepseek"}
+DEFAULT_PRODUCTION_PROVIDER = "main_deepseek"
+CODEX_PROVIDER = "codex_fallback"
+CODEX_MODEL = "codex-offline-template-fallback"
+
+RESOURCE_TYPE_META: dict[str, tuple[str, str]] = {
+    "chain": ("分链能力", "主链可以调用的专项任务能力"),
+    "model_provider": ("模型提供方", "可选的大模型服务来源"),
+    "model_runtime": ("模型运行时", "当前接入的本地或远程模型服务"),
+    "model_pool": ("模型池", "按业务类型隔离的模型服务池"),
+    "model_admission": ("准入控制", "模型池租约、限流与回压能力"),
+    "integration": ("外部集成", "可规划接入的第三方系统"),
+    "solution": ("方案资产", "可复用的历史方案与模板"),
+    "knowledge_store": ("知识库", "可供 RAG 检索的学习库"),
+    "training_dataset": ("训练数据集", "可用于微调的数据资产"),
+    "run_manifest": ("运行清单", "某次任务运行的摘要记录"),
+    "evidence_ledger": ("证据账本", "可追溯的证据与来源汇总"),
+}
+RESOURCE_TYPE_ORDER = (
+    "chain",
+    "model_provider",
+    "model_runtime",
+    "model_pool",
+    "model_admission",
+    "integration",
+    "solution",
+    "knowledge_store",
+    "training_dataset",
+    "run_manifest",
+    "evidence_ledger",
+)
+RESOURCE_TAG_LABELS = {
+    "low": "低成本",
+    "medium": "中等成本",
+    "local": "本地",
+    "remote": "远程",
+    "lease": "租约",
+    "backpressure": "回压",
+    "high_concurrency": "高并发",
+    "model_gateway": "模型网关",
+    "rag": "RAG",
+    "learning_run": "学习任务",
+    "sft": "SFT",
+    "dataset": "数据集",
+}
+WORKFLOW_CHAIN_LABELS = {
+    "context": "上下文增强",
+    "intent_compile": "意图编译",
+    "workflow_dry_run": "工作流预演",
+    "research": "研究综合",
+    "training": "训练数据准备",
+    "github_crawler": "项目爬取",
+    "solution_publish": "方案发布",
+    "evidence_ledger": "证据账本",
+}
+HORIZON_LABELS = {
+    "immediate": "立即处理",
+    "near": "近期推进",
+}
+
+
+class DefaultProductionBrain(AgentBrain):
+    """主 DeepSeek 优先的默认生产 Brain；不可用时切到 Codex/离线高成熟度模板。"""
+
+    def __init__(self, primary: AgentBrain, fallback: AgentBrain) -> None:
+        self.primary = primary
+        self.fallback = fallback
+        self._using_fallback = False
+        self.last_fallback_reason = ""
+
+    def decide(
+        self,
+        goal: str,
+        plan: dict[str, Any],
+        state: ProjectState,
+        last_result: dict[str, Any] | None,
+        session: Any | None = None,
+    ) -> str:
+        if self._using_fallback:
+            return self.fallback.decide(goal, plan, state, last_result, session=session)
+        try:
+            return self.primary.decide(goal, plan, state, last_result, session=session)
+        except Exception as exc:
+            self._using_fallback = True
+            self.last_fallback_reason = f"{type(exc).__name__}: {exc}"
+            state.structure["default_production_fallback"] = {
+                "primary": "main_deepseek",
+                "fallback": CODEX_PROVIDER,
+                "reason": self.last_fallback_reason[:500],
+            }
+            return self.fallback.decide(goal, plan, state, last_result, session=session)
+
+    def fix(
+        self,
+        error_text: str,
+        goal: str,
+        plan: dict[str, Any],
+        state: ProjectState,
+        session: Any | None = None,
+    ) -> str:
+        if self._using_fallback:
+            return self.fallback.fix(error_text, goal, plan, state, session=session)
+        try:
+            return self.primary.fix(error_text, goal, plan, state, session=session)
+        except Exception as exc:
+            self._using_fallback = True
+            self.last_fallback_reason = f"{type(exc).__name__}: {exc}"
+            state.structure["default_production_fallback"] = {
+                "primary": "main_deepseek",
+                "fallback": CODEX_PROVIDER,
+                "reason": self.last_fallback_reason[:500],
+            }
+            return self.fallback.fix(error_text, goal, plan, state, session=session)
+
+
+CSS = """
+:root {
+  color-scheme: light;
+  --paper: #f7f5ef;
+  --panel: #ffffff;
+  --ink: #171a1d;
+  --muted: #69706a;
+  --line: #d9ded4;
+  --accent: #1d7a57;
+  --accent-soft: #e8f5ee;
+  --warn: #b8642b;
+  --danger: #a6422a;
+  --ok: #137a4f;
+  --code: #111418;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+.topbar {
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
+}
+.topbar-inner, .main {
+  width: min(1240px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+.topbar-inner {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.brand {
+  font-size: 16px;
+  font-weight: 720;
+  letter-spacing: 0;
+}
+.status-pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.main { padding: 28px 0 48px; }
+.composer, .surface {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 14px 36px rgba(26, 30, 27, 0.08);
+}
+.composer { padding: 18px; }
+label.heading {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+textarea {
+  width: 100%;
+  min-height: 172px;
+  resize: vertical;
+  border: 1px solid #cbd1c7;
+  border-radius: 8px;
+  padding: 14px;
+  font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
+  color: var(--ink);
+  background: #fffefa;
+  outline: none;
+}
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(29, 122, 87, 0.14);
+}
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.mode-note {
+  width: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.mode-note strong { color: var(--ink); }
+.api-setting[hidden] { display: none; }
+.modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mode {
+  position: relative;
+  display: inline-flex;
+}
+.mode input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.mode span, .check span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  border: 1px solid #cbd1c7;
+  border-radius: 8px;
+  padding: 8px 11px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 680;
+  cursor: pointer;
+}
+.mode input:checked + span {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: #10533a;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+select, input[type="text"], input[type="search"] {
+  min-height: 38px;
+  border: 1px solid #cbd1c7;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 8px 10px;
+  font: 13px/1.3 ui-sans-serif, system-ui, sans-serif;
+}
+.model-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+.provider-label {
+  display: block;
+  margin: 14px 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+button, .button {
+  border: 0;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 0 15px;
+  background: var(--code);
+  color: white;
+  font-weight: 760;
+  font-size: 14px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.button.secondary {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.auth-card {
+  width: min(420px, 100%);
+  margin: 54px auto 0;
+}
+.auth-card input {
+  width: 100%;
+  min-height: 42px;
+  margin-bottom: 10px;
+}
+.auth-card .button, .auth-card button {
+  width: 100%;
+}
+.auth-error {
+  border: 1px solid rgba(166, 66, 42, 0.28);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fff4ef;
+  color: var(--danger);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.auth-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.auth-links a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 720;
+}
+.result-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+.page-hero {
+  display: grid;
+  gap: 14px;
+}
+.page-hero h1 {
+  margin: 4px 0 8px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 780;
+  letter-spacing: 0.02em;
+}
+.helper-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.metric-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  background: #fbfcf8;
+}
+.metric-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.metric-card strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 24px;
+  line-height: 1;
+}
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.section-heading h2 {
+  margin-bottom: 4px;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.search-box {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.search-box input {
+  min-width: min(320px, 70vw);
+}
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.filter-chip {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 720;
+}
+.filter-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: #10533a;
+}
+.resource-toolbar-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.mini-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mini-actions button {
+  min-height: 32px;
+  padding: 0 11px;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  font-size: 12px;
+}
+.interactive-card {
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.interactive-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(29, 122, 87, 0.35);
+  box-shadow: 0 10px 24px rgba(26, 30, 27, 0.08);
+}
+.interactive-card summary {
+  cursor: pointer;
+  list-style: none;
+}
+.interactive-card summary::-webkit-details-marker {
+  display: none;
+}
+.interactive-card summary::after {
+  content: "展开";
+  display: inline-flex;
+  margin-top: 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: 3px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  background: #fff;
+}
+.interactive-card[open] summary::after {
+  content: "收起";
+}
+.detail-body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.detail-lead {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.detail-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.detail-list div {
+  display: grid;
+  gap: 3px;
+}
+.detail-list dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.detail-list dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.empty-state {
+  margin: 10px 0 0;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  color: var(--muted);
+  text-align: center;
+  background: #fbfcf8;
+}
+.resource-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffefa;
+}
+.resource-card h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.resource-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.resource-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+.resource-tags span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: var(--muted);
+  font-size: 11px;
+  background: #fff;
+}
+.json-block {
+  margin: 10px 0 0;
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #111418;
+  color: #f3f7ef;
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+}
+.radar-hero {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.radar-score {
+  display: grid;
+  place-items: center;
+  min-height: 190px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcf8;
+}
+.radar-score strong {
+  font-size: 48px;
+  line-height: 1;
+}
+.score-caption {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.recommendation-card {
+  margin-top: 12px;
+  border-left: 4px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: #f4fbf7;
+  padding: 12px;
+}
+.recommendation-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.recommendation-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.radar-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 13px;
+  background: #fffefa;
+}
+.radar-card h3 {
+  margin: 0 0 7px;
+  font-size: 15px;
+}
+.radar-card p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.radar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.workflow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.workflow-steps span {
+  border: 1px solid #cce3d7;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #f4fbf7;
+  color: #10533a;
+  font-size: 12px;
+  font-weight: 720;
+}
+.workflow-list,
+.plain-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.workflow-list li + li,
+.plain-list li + li {
+  margin-top: 5px;
+}
+.muted-inline {
+  color: var(--muted);
+  font-size: 12px;
+}
+.status-panel {
+  position: sticky;
+  top: 74px;
+}
+.surface { padding: 16px; }
+.surface h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+.kv {
+  display: grid;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.kv strong {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  margin-top: 2px;
+  word-break: break-word;
+}
+.error {
+  border-color: rgba(184, 100, 43, 0.45);
+  background: #fff8f0;
+  color: var(--warn);
+}
+.files {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.files a {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: var(--ink);
+  text-decoration: none;
+  background: #fffefa;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.improve-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+.improve-form textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+.improve-form .form-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: stretch;
+}
+.lineage {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.lineage strong {
+  color: var(--ink);
+}
+.lineage a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 720;
+}
+.handoff-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #cce3d7;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f4fbf7;
+}
+.handoff-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 13px;
+}
+.handoff-card code {
+  color: #10533a;
+  font-weight: 760;
+}
+.maturity {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.score-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcf8;
+}
+.score-value {
+  display: block;
+  font-size: 38px;
+  line-height: 1;
+  font-weight: 820;
+  letter-spacing: 0;
+}
+.score-value small {
+  font-size: 16px;
+  color: var(--muted);
+}
+.score-level {
+  margin-top: 8px;
+  color: var(--accent);
+  font-weight: 780;
+}
+.score-bar {
+  height: 9px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8ece5;
+}
+.score-bar span {
+  display: block;
+  height: 100%;
+  width: var(--score);
+  border-radius: inherit;
+  background: var(--accent);
+}
+.maturity-body {
+  display: grid;
+  gap: 13px;
+}
+.checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 8px;
+}
+.check-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #fffefa;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 680;
+}
+.check-mark {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #edf1ea;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+.check-item.ok {
+  color: #143f31;
+  border-color: #cce3d7;
+  background: #f4fbf7;
+}
+.check-item.ok .check-mark {
+  background: var(--accent);
+  color: white;
+}
+.insights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.insights h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.insights ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.insights li + li {
+  margin-top: 5px;
+}
+.artifact-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 680;
+}
+pre {
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--code);
+  color: #f2f4f0;
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.result-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+  grid-template-areas:
+    "maturity maturity"
+    "improve improve"
+    "files source"
+    "sandbox sandbox";
+  gap: 14px;
+}
+.maturity-panel { grid-area: maturity; }
+.improve-panel { grid-area: improve; }
+.files-panel { grid-area: files; }
+.source-panel { grid-area: source; }
+.sandbox-panel { grid-area: sandbox; }
+.preview-frame {
+  width: 100%;
+  min-height: 620px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+@media (max-width: 760px) {
+  .topbar-inner, .main { width: min(100vw - 22px, 1240px); }
+  .result-grid { grid-template-columns: 1fr; }
+  .status-panel { position: static; }
+  .result-dashboard {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "maturity"
+      "improve"
+      "files"
+      "source"
+      "sandbox";
+  }
+  .handoff-card { grid-template-columns: 1fr; }
+  .files { max-height: none; }
+  .controls { align-items: stretch; }
+  .actions, .modes { width: 100%; }
+  .mode span, button, .button { flex: 1; }
+  .model-row { grid-template-columns: 1fr; }
+  .maturity, .insights { grid-template-columns: 1fr; }
+  .radar-hero { grid-template-columns: 1fr; }
+  .section-heading { align-items: stretch; flex-direction: column; }
+  .search-box input { min-width: 0; width: 100%; }
+  .preview-frame { min-height: 520px; }
+}
+"""
+
+
+AUTH_TEMPLATE = """
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · Software Production Agent</title>
+  <style>{{ css|safe }}</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">Software Production Agent</div>
+      <div class="status-pill">workspace auth</div>
+    </div>
+  </header>
+  <main class="main">
+    <form class="composer auth-card" method="post" action="{{ action }}">
+      <label class="heading">{{ title }}</label>
+      {% if error %}<div class="auth-error">{{ error }}</div>{% endif %}
+      <input type="text" name="username" autocomplete="username" placeholder="用户名" autofocus required>
+      <input type="password" name="password" autocomplete="{{ autocomplete }}" placeholder="密码（至少 8 位）" required>
+      {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+      <button type="submit">{{ submit }}</button>
+      <div class="auth-links">
+        {% if mode == "login" %}
+          <a href="{{ url_for('register') }}">注册账号</a>
+        {% else %}
+          <a href="{{ url_for('login') }}">已有账号登录</a>
+        {% endif %}
+        <a href="{{ url_for('healthz') }}">健康检查</a>
+      </div>
+    </form>
+  </main>
+</body>
+</html>
+"""
+
+
+RESOURCES_TEMPLATE = """
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>资源中心 · Software Production Agent</title>
+  <style>{{ css|safe }}</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">Software Production Agent</div>
+      <div class="topbar-actions">
+        <div class="status-pill">{{ current_user.username }} · {{ current_user.role }}</div>
+        <a class="button secondary" href="{{ url_for('intent_page') }}">意图编排</a>
+        <a class="button secondary" href="{{ url_for('index') }}">新需求</a>
+        <a class="button secondary" href="{{ url_for('logout') }}">退出</a>
+      </div>
+    </div>
+  </header>
+  <main class="main">
+    <section class="surface page-hero">
+      <div>
+        <p class="eyebrow">资源中心</p>
+        <h1>系统当前可用能力</h1>
+        <p class="helper-copy">
+          这里汇总了主链可以调用的分链、模型服务、方案资产、知识库和训练数据。
+          你可以按类型筛选，也可以搜索某个能力名称、模块路径或标签。
+        </p>
+      </div>
+      <div class="metric-grid">
+        {% for item in resource_overview %}
+          <article class="metric-card">
+            <span>{{ item.label }}</span>
+            <strong>{{ item.count }}</strong>
+          </article>
+        {% endfor %}
+        <article class="metric-card">
+          <span>资源总数</span>
+          <strong>{{ registry.summary.total }}</strong>
+        </article>
+      </div>
+    </section>
+    <section class="surface" style="margin-top:14px;">
+      <div class="section-heading">
+        <div>
+          <h2>资源清单</h2>
+          <p class="helper-copy">默认先看中文说明，展开卡片后再看技术细节。</p>
+        </div>
+        <label class="search-box">
+          <span>搜索资源</span>
+          <input id="resource-search" type="search" placeholder="例如：研究、模型池、solution、RAG">
+        </label>
+      </div>
+      <div class="filter-row" role="toolbar" aria-label="资源类型筛选">
+        {% for tab in resource_tabs %}
+          <button class="filter-chip" type="button" data-resource-filter="{{ tab.value }}" aria-pressed="{% if loop.first %}true{% else %}false{% endif %}">
+            {{ tab.label }} · {{ tab.count }}
+          </button>
+        {% endfor %}
+      </div>
+      <div class="resource-toolbar-meta">
+        <span id="resource-visible-count">共显示 {{ resource_cards|length }} 项</span>
+        <div class="mini-actions">
+          <button type="button" data-resource-open="all">全部展开</button>
+          <button type="button" data-resource-open="none">全部收起</button>
+        </div>
+      </div>
+      <div class="resource-grid">
+        {% for item in resource_cards %}
+          <details class="resource-card interactive-card" data-resource-card data-type="{{ item.type }}" data-search="{{ item.search_text }}">
+            <summary>
+              <p class="eyebrow">{{ item.type_label }}</p>
+              <h3>{{ item.name }}</h3>
+              <p>{{ item.type_hint }}</p>
+              {% if item.display_tags %}
+                <div class="resource-tags">
+                  {% for tag in item.display_tags %}
+                    <span>{{ tag }}</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </summary>
+            <div class="detail-body">
+              {% if item.summary %}<p class="detail-lead">{{ item.summary }}</p>{% endif %}
+              {% if item.detail_rows %}
+                <dl class="detail-list">
+                  {% for row in item.detail_rows %}
+                    <div>
+                      <dt>{{ row.label }}</dt>
+                      <dd>{{ row.value }}</dd>
+                    </div>
+                  {% endfor %}
+                </dl>
+              {% endif %}
+            </div>
+          </details>
+        {% endfor %}
+      </div>
+      <p class="empty-state" id="resource-empty" hidden>没有找到匹配的资源，可以换个关键词或切回“全部”。</p>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const cards = [...document.querySelectorAll("[data-resource-card]")];
+      const buttons = [...document.querySelectorAll("[data-resource-filter]")];
+      const search = document.getElementById("resource-search");
+      const visibleCount = document.getElementById("resource-visible-count");
+      const emptyState = document.getElementById("resource-empty");
+      let activeType = "all";
+      function refresh() {
+        const keyword = (search.value || "").trim().toLowerCase();
+        let visible = 0;
+        cards.forEach((card) => {
+          const typeOk = activeType === "all" || card.dataset.type === activeType;
+          const textOk = !keyword || (card.dataset.search || "").includes(keyword);
+          const show = typeOk && textOk;
+          card.hidden = !show;
+          if (show) visible += 1;
+        });
+        visibleCount.textContent = `共显示 ${visible} 项`;
+        emptyState.hidden = visible !== 0;
+      }
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          activeType = button.dataset.resourceFilter || "all";
+          buttons.forEach((item) => item.setAttribute("aria-pressed", item === button ? "true" : "false"));
+          refresh();
+        });
+      });
+      search.addEventListener("input", refresh);
+      document.querySelector('[data-resource-open="all"]').addEventListener("click", () => {
+        cards.filter((card) => !card.hidden).forEach((card) => card.open = true);
+      });
+      document.querySelector('[data-resource-open="none"]').addEventListener("click", () => {
+        cards.forEach((card) => card.open = false);
+      });
+      refresh();
+    })();
+  </script>
+</body>
+</html>
+"""
+
+
+INNOVATION_TEMPLATE = """
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>创新雷达 · Software Production Agent</title>
+  <style>{{ css|safe }}</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">Software Production Agent</div>
+      <div class="topbar-actions">
+        <div class="status-pill">{{ current_user.username }} · {{ current_user.role }}</div>
+        <a class="button secondary" href="{{ url_for('intent_page') }}">意图编排</a>
+        <a class="button secondary" href="{{ url_for('resources_page') }}">资源中心</a>
+        <a class="button secondary" href="{{ url_for('index') }}">新需求</a>
+        <a class="button secondary" href="{{ url_for('logout') }}">退出</a>
+      </div>
+    </div>
+  </header>
+  <main class="main">
+    <section class="surface radar-hero">
+      <div class="radar-score">
+        <div>
+          <strong>{{ radar.platform_score }}</strong>
+          <p class="score-caption">平台能力评分</p>
+        </div>
+      </div>
+      <div>
+        <h2>{{ radar.north_star }}</h2>
+        <p class="mode-note">{{ radar.positioning }}</p>
+        <div class="resource-tags">
+          {% for bet in radar.signature_bets %}
+            <span>{{ bet }}</span>
+          {% endfor %}
+        </div>
+        {% if radar.recommended_next_build %}
+          <aside class="recommendation-card">
+            <strong>当前最值得优先推进</strong>
+            <p>{{ radar.recommended_next_build.title }}：{{ radar.recommended_next_build.thesis }}</p>
+          </aside>
+        {% endif %}
+      </div>
+    </section>
+    <section class="surface" style="margin-top:14px;">
+      <div class="section-heading">
+        <div>
+          <h2>创新机会卡</h2>
+          <p class="helper-copy">点击卡片可以查看“为什么做、依据是什么、下一步怎么走”。</p>
+        </div>
+      </div>
+      <div class="filter-row" role="toolbar" aria-label="创新机会筛选">
+        <button class="filter-chip" type="button" data-horizon-filter="all" aria-pressed="true">全部</button>
+        <button class="filter-chip" type="button" data-horizon-filter="immediate" aria-pressed="false">立即处理</button>
+        <button class="filter-chip" type="button" data-horizon-filter="near" aria-pressed="false">近期推进</button>
+      </div>
+      <div class="resource-toolbar-meta">
+        <span id="innovation-visible-count">共显示 {{ radar.innovation_cards|length }} 项</span>
+        <div class="mini-actions">
+          <button type="button" data-radar-open="all">全部展开</button>
+          <button type="button" data-radar-open="none">全部收起</button>
+        </div>
+      </div>
+      <div class="radar-grid">
+        {% for card in radar.innovation_cards %}
+          <details class="radar-card interactive-card" data-innovation-card data-horizon="{{ card.horizon }}">
+            <summary>
+              <h3>{{ card.title }}</h3>
+              <p>{{ card.thesis }}</p>
+              <div class="resource-tags">
+                <span>综合评分 {{ card.score }}</span>
+                <span>影响力 {{ card.impact }}</span>
+                <span>{{ card.horizon_label }}</span>
+              </div>
+            </summary>
+            <div class="detail-body">
+              <p class="detail-lead"><strong>为什么现在值得做：</strong>{{ card.why_now }}</p>
+              <h3>已有依据</h3>
+              <ul class="plain-list">
+                {% for item in card.evidence %}
+                  <li>{{ item }}</li>
+                {% endfor %}
+              </ul>
+              <h3 style="margin-top:12px;">下一步建议</h3>
+              <ul class="plain-list">
+                {% for item in card.next_steps %}
+                  <li>{{ item }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </details>
+        {% endfor %}
+      </div>
+      <p class="empty-state" id="innovation-empty" hidden>当前筛选下没有机会卡。</p>
+    </section>
+    <section class="surface" style="margin-top:14px;">
+      <div class="section-heading">
+        <div>
+          <h2>推荐工作流</h2>
+          <p class="helper-copy">展开后可以看到任务会经过哪些节点，以及是否联网、是否写文件。</p>
+        </div>
+      </div>
+      <div class="radar-grid">
+        {% for template in radar.workflow_templates %}
+          <details class="radar-card interactive-card">
+            <summary>
+              <h3>{{ template.title }}</h3>
+              <div class="workflow-steps">
+                {% for step in template.steps %}
+                  <span>{{ step.label }}</span>
+                {% endfor %}
+              </div>
+              <div class="resource-tags">
+                <span>{% if template.validation.ok %}已通过校验{% else %}需要修正{% endif %}</span>
+                {% if template.validation.network_required %}<span>需要联网</span>{% endif %}
+                {% if template.validation.writes_files %}<span>会写入文件</span>{% endif %}
+              </div>
+            </summary>
+            <div class="detail-body">
+              <ol class="workflow-list">
+                {% for step in template.steps %}
+                  <li>{{ step.label }} <span class="muted-inline">（{{ step.chain }}）</span></li>
+                {% endfor %}
+              </ol>
+            </div>
+          </details>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const cards = [...document.querySelectorAll("[data-innovation-card]")];
+      const filters = [...document.querySelectorAll("[data-horizon-filter]")];
+      const visibleCount = document.getElementById("innovation-visible-count");
+      const emptyState = document.getElementById("innovation-empty");
+      let activeHorizon = "all";
+      function refresh() {
+        let visible = 0;
+        cards.forEach((card) => {
+          const show = activeHorizon === "all" || card.dataset.horizon === activeHorizon;
+          card.hidden = !show;
+          if (show) visible += 1;
+        });
+        visibleCount.textContent = `共显示 ${visible} 项`;
+        emptyState.hidden = visible !== 0;
+      }
+      filters.forEach((button) => {
+        button.addEventListener("click", () => {
+          activeHorizon = button.dataset.horizonFilter || "all";
+          filters.forEach((item) => item.setAttribute("aria-pressed", item === button ? "true" : "false"));
+          refresh();
+        });
+      });
+      document.querySelector('[data-radar-open="all"]').addEventListener("click", () => {
+        cards.filter((card) => !card.hidden).forEach((card) => card.open = true);
+      });
+      document.querySelector('[data-radar-open="none"]').addEventListener("click", () => {
+        cards.forEach((card) => card.open = false);
+      });
+      refresh();
+    })();
+  </script>
+</body>
+</html>
+"""
+
+
+INTENT_TEMPLATE = """
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>意图编排 · Software Production Agent</title>
+  <style>{{ css|safe }}</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">Software Production Agent</div>
+      <div class="topbar-actions">
+        <div class="status-pill">{{ current_user.username }} · {{ current_user.role }}</div>
+        <a class="button secondary" href="{{ url_for('resources_page') }}">资源中心</a>
+        <a class="button secondary" href="{{ url_for('innovation_page') }}">创新雷达</a>
+        <a class="button secondary" href="{{ url_for('index') }}">新需求</a>
+        <a class="button secondary" href="{{ url_for('logout') }}">退出</a>
+      </div>
+    </div>
+  </header>
+  <main class="main">
+    <form class="composer" method="post" action="{{ url_for('intent_page') }}">
+      <label class="heading" for="intent_goal">意图</label>
+      <textarea id="intent_goal" name="goal" autofocus>{{ goal }}</textarea>
+      <div class="controls">
+        <div class="actions">
+          <button type="submit">编译意图</button>
+        </div>
+      </div>
+    </form>
+    {% if compilation %}
+      <section class="surface" style="margin-top:14px;">
+        <h2>编排结果</h2>
+        <div class="resource-tags">
+          {% for tag in compilation.intent_tags %}
+            <span>{{ tag }}</span>
+          {% endfor %}
+          <span>{% if compilation.validation.ok %}valid{% else %}needs fix{% endif %}</span>
+          {% if compilation.validation.network_required %}<span>network</span>{% endif %}
+          {% if compilation.validation.writes_files %}<span>writes files</span>{% endif %}
+        </div>
+      </section>
+      <section class="surface" style="margin-top:14px;">
+        <h2>节点</h2>
+        <div class="resource-grid">
+          {% for node in compilation.dry_run.nodes %}
+            <article class="resource-card">
+              <h3>{{ node.id }}</h3>
+              <p>{{ node.chain }} · {{ node.action }}</p>
+              <div class="resource-tags">
+                {% for permission in node.permissions %}
+                  <span>{{ permission }}</span>
+                {% endfor %}
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+      <section class="surface" style="margin-top:14px;">
+        <h2>风险与资源</h2>
+        <div class="radar-grid">
+          <article class="radar-card">
+            <h3>Risk Notes</h3>
+            {% for note in compilation.risk_notes %}
+              <p>{{ note }}</p>
+            {% endfor %}
+          </article>
+          <article class="radar-card">
+            <h3>Resource Suggestions</h3>
+            {% for item in compilation.resource_suggestions[:8] %}
+              <p>{{ item.type }} · {{ item.name }}</p>
+            {% endfor %}
+          </article>
+        </div>
+        <pre class="json-block">{{ workflow_json }}</pre>
+      </section>
+    {% endif %}
+  </main>
+</body>
+</html>
+"""
+
+
+INDEX_TEMPLATE = """
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Software Production Agent</title>
+  <style>{{ css|safe }}</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">Software Production Agent</div>
+      <div class="topbar-actions">
+        <div class="status-pill">{{ current_user.username }} · {{ current_user.role }}</div>
+        <a class="button secondary" href="{{ url_for('intent_page') }}">意图编排</a>
+        <a class="button secondary" href="{{ url_for('resources_page') }}">资源中心</a>
+        <a class="button secondary" href="{{ url_for('innovation_page') }}">创新雷达</a>
+        <a class="button secondary" href="{{ url_for('logout') }}">退出</a>
+      </div>
+    </div>
+  </header>
+  <main class="main">
+    <form class="composer" method="post" action="{{ url_for('run_product') }}">
+      <label class="heading" for="goal">需求</label>
+      <textarea id="goal" name="goal" autofocus placeholder="{{ default_goal }}"></textarea>
+      <div class="controls">
+        <div class="modes" role="radiogroup" aria-label="mode">
+          <label class="mode">
+            <input type="radio" name="mode" value="local_production" checked>
+            <span>默认生产</span>
+          </label>
+          <label class="mode">
+            <input type="radio" name="mode" value="llm">
+            <span>LLM 生成</span>
+          </label>
+        </div>
+        <span class="provider-label api-setting">API 大模型</span>
+        <div class="modes api-setting" role="radiogroup" aria-label="provider">
+          {% for provider in providers %}
+            <label class="mode">
+              <input type="radio" name="provider" value="{{ provider.name }}" {% if loop.first %}checked{% endif %}>
+              <span>{{ provider.label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        <div class="model-row api-setting">
+          <select id="model-select" name="model"></select>
+          <input id="custom-model" name="custom_model" type="text" placeholder="自定义 model id（可选）">
+        </div>
+        <div class="actions">
+          <label class="check">
+            <input type="checkbox" name="events" value="1" checked>
+            <span>事件日志</span>
+          </label>
+          <button type="submit">生成软件</button>
+        </div>
+        <p class="mode-note">
+          <strong>默认生产</strong> 优先使用主 DeepSeek 生产并写入方案备份，主模型不可用时自动使用 Codex/离线高成熟度模板兜底；
+          <strong>LLM 生成</strong> 使用 OPENAI/GROQ/DEEPSEEK API，Planner 和 Brain 都走大模型链路。
+        </p>
+      </div>
+    </form>
+  </main>
+  <script>
+    const providers = {{ providers|tojson }};
+    const modeInputs = document.querySelectorAll('input[name="mode"]');
+    const providerInputs = document.querySelectorAll('input[name="provider"]');
+    const modelSelect = document.getElementById('model-select');
+    const customModel = document.getElementById('custom-model');
+    const apiSettings = document.querySelectorAll('.api-setting');
+
+    function selectedMode() {
+      return document.querySelector('input[name="mode"]:checked')?.value || 'local_production';
+    }
+
+    function selectedProvider() {
+      return document.querySelector('input[name="provider"]:checked')?.value || providers[0].name;
+    }
+
+    function refreshModels() {
+      const provider = providers.find((item) => item.name === selectedProvider()) || providers[0];
+      const current = modelSelect.value;
+      modelSelect.innerHTML = '';
+      provider.models.forEach((model) => {
+        const option = document.createElement('option');
+        option.value = model;
+        option.textContent = model;
+        modelSelect.appendChild(option);
+      });
+      modelSelect.value = provider.models.includes(current) ? current : provider.default_model;
+      customModel.placeholder = `自定义 model id（默认 ${provider.default_model}）`;
+    }
+
+    function refreshVisibility() {
+      const needsApi = selectedMode() === 'llm';
+      apiSettings.forEach((node) => {
+        node.hidden = !needsApi;
+      });
+    }
+
+    providerInputs.forEach((input) => input.addEventListener('change', refreshModels));
+    modeInputs.forEach((input) => input.addEventListener('change', refreshVisibility));
+    refreshModels();
+    refreshVisibility();
+  </script>
+</body>
+</html>
+"""
+
+
+RESULT_TEMPLATE = """
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ run_id }} · Software Production Agent</title>
+  <style>{{ css|safe }}</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">Software Production Agent</div>
+      <div class="actions">
+        <span class="status-pill">{{ current_user.username }} · {{ current_user.role }}</span>
+        {% if preview_url %}
+          <a class="button secondary" href="{{ preview_url }}" target="_blank" rel="noreferrer">沙盒预览</a>
+        {% endif %}
+        {% if solution_backup_url %}
+          <a class="button secondary" href="{{ solution_backup_url }}">方案备份</a>
+        {% endif %}
+        <a class="button secondary" href="{{ url_for('download_run', run_id=run_id) }}">下载 ZIP</a>
+        <a class="button secondary" href="{{ url_for('index') }}">新需求</a>
+        <a class="button secondary" href="{{ url_for('intent_page') }}">意图编排</a>
+        <a class="button secondary" href="{{ url_for('resources_page') }}">资源中心</a>
+        <a class="button secondary" href="{{ url_for('innovation_page') }}">创新雷达</a>
+        <a class="button secondary" href="{{ url_for('logout') }}">退出</a>
+      </div>
+    </div>
+  </header>
+  <main class="main">
+    <div class="result-grid">
+      <aside class="surface status-panel {% if error %}error{% endif %}">
+        <h2>运行状态</h2>
+        <div class="kv">
+          <div>模式<strong>{{ mode }}</strong></div>
+          <div>Provider<strong>{{ provider }}</strong></div>
+          <div>Model<strong>{{ model }}</strong></div>
+          <div>进度<strong>{{ progress }}</strong></div>
+          <div>阶段<strong>{{ stage }}</strong></div>
+          <div>工作区<strong>{{ workspace }}</strong></div>
+          {% if error %}<div>错误<strong>{{ error }}</strong></div>{% endif %}
+        </div>
+      </aside>
+      <section class="result-dashboard">
+        <div class="surface maturity-panel">
+          <h2>项目成熟度</h2>
+          <div class="maturity">
+            <div class="score-card">
+              <span class="score-value">{{ maturity.score }}<small>/100</small></span>
+              <div class="score-level">{{ maturity.level }}</div>
+              <div class="score-bar" style="--score: {{ maturity.score }}%;"><span></span></div>
+              <div class="artifact-count">{{ maturity.artifact_count }} 个用户产物文件</div>
+            </div>
+            <div class="maturity-body">
+              <div class="checks">
+                {% for item in maturity.checks %}
+                  <div class="check-item {% if item.ok %}ok{% endif %}">
+                    <span class="check-mark">{% if item.ok %}✓{% else %}!{% endif %}</span>
+                    <span>{{ item.label }}</span>
+                  </div>
+                {% endfor %}
+              </div>
+              <div class="insights">
+                <div>
+                  <h3>主要缺口</h3>
+                  <ul>
+                    {% for gap in maturity.gaps %}
+                      <li>{{ gap }}</li>
+                    {% else %}
+                      <li>暂无明显结构缺口</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                <div>
+                  <h3>下一步建议</h3>
+                  <ul>
+                    {% for step in maturity.next_steps %}
+                      <li>{{ step }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="surface improve-panel">
+          <h2>基于此方案继续改进</h2>
+          <form class="improve-form" method="post" action="{{ url_for('improve_run', run_id=run_id) }}">
+            <textarea
+              name="improvement_goal"
+              placeholder="输入二次改进要求，例如：增加导入导出、审批流、审计日志、登录权限、真实数据库落库"
+              required
+            ></textarea>
+            <div class="form-actions">
+              <input type="hidden" name="mode" value="{{ mode_value }}">
+              <input type="hidden" name="provider" value="{{ provider }}">
+              <input type="hidden" name="model" value="{{ model }}">
+              <label class="check">
+                <input type="checkbox" name="events" value="1" checked>
+                <span>事件日志</span>
+              </label>
+              <button type="submit">继续改进</button>
+            </div>
+          </form>
+          {% if source_run %}
+            <div class="lineage">
+              <strong>版本来源</strong>：
+              <a href="{{ url_for('show_run', run_id=source_run) }}">{{ source_run }}</a>
+              {% if display_improvement_goal %}
+                · <strong>本次改进</strong>：{{ display_improvement_goal }}
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+        <div class="surface files-panel">
+          <h2>产物文件</h2>
+          <ul class="files">
+            {% for file in files %}
+              <li><a href="{{ file.url }}">{{ file.path }}</a></li>
+            {% else %}
+              <li><a href="#">暂无文件</a></li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="surface source-panel">
+          <h2>{{ preview_title }}</h2>
+          <pre>{{ preview }}</pre>
+        </div>
+        {% if preview_url %}
+        <div class="surface sandbox-panel">
+          <h2>隔离交互预览</h2>
+          <iframe
+            class="preview-frame"
+            src="{{ preview_url }}"
+            sandbox="allow-scripts"
+            referrerpolicy="no-referrer"
+            loading="lazy"
+          ></iframe>
+        </div>
+        {% endif %}
+      </section>
+    </div>
+  </main>
+</body>
+</html>
+"""
+
+
+def _default_runs_root() -> Path:
+    return Path.cwd() / "product_runs"
+
+
+def _prompts_dir() -> Path:
+    return Path(__file__).resolve().parents[1] / "prompts"
+
+
+def _slugify_goal(goal: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", goal.strip().lower()).strip("-")
+    return slug[:28] or "software"
+
+
+def _build_run_id(goal: str) -> str:
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"run_{stamp}_{_slugify_goal(goal)}_{secrets.token_hex(3)}"
+
+
+def _normalise_mode(value: str) -> str:
+    mode = (value or "local_production").strip()
+    mode = MODE_ALIASES.get(mode, mode)
+    return mode if mode in ALLOWED_MODES else "local_production"
+
+
+def _normalise_provider(value: str) -> str:
+    provider = (value or "openai").strip().lower()
+    return provider if provider in ALLOWED_PROVIDERS else "openai"
+
+
+def _display_mode(mode: str) -> str:
+    return "默认生产" if _normalise_mode(mode) == "local_production" else "LLM 生成"
+
+
+def _resource_type_label(resource_type: str) -> str:
+    return RESOURCE_TYPE_META.get(resource_type, (resource_type or "未知资源", "系统资源"))[0]
+
+
+def _resource_type_hint(resource_type: str) -> str:
+    return RESOURCE_TYPE_META.get(resource_type, (resource_type or "未知资源", "系统资源"))[1]
+
+
+def _localise_resource_tag(tag: Any) -> str:
+    raw = str(tag or "")
+    return RESOURCE_TAG_LABELS.get(raw, raw)
+
+
+def _yes_no(value: Any) -> str:
+    return "是" if bool(value) else "否"
+
+
+def _append_detail(rows: list[dict[str, str]], label: str, value: Any) -> None:
+    if value in (None, "", [], (), {}):
+        return
+    if isinstance(value, (list, tuple, set)):
+        text = "、".join(str(item) for item in value if str(item))
+    else:
+        text = str(value)
+    if text:
+        rows.append({"label": label, "value": text})
+
+
+def _resource_detail_rows(item: dict[str, Any]) -> list[dict[str, str]]:
+    resource_type = str(item.get("type", "") or "")
+    metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+    rows: list[dict[str, str]] = []
+    _append_detail(rows, "内部标识", item.get("id"))
+    if resource_type == "chain":
+        _append_detail(rows, "动作名称", metadata.get("action"))
+        _append_detail(rows, "所属模块", metadata.get("module"))
+        _append_detail(rows, "所需权限", metadata.get("permissions"))
+        _append_detail(rows, "是否联网", _yes_no(metadata.get("network_allowed")))
+        _append_detail(rows, "是否写文件", _yes_no(metadata.get("writes_files")))
+        _append_detail(rows, "成本等级", _localise_resource_tag(metadata.get("cost_level")))
+    elif resource_type == "model_provider":
+        _append_detail(rows, "默认模型", metadata.get("default_model"))
+        _append_detail(rows, "密钥环境变量", metadata.get("api_key_env"))
+        _append_detail(rows, "服务地址", metadata.get("base_url"))
+        _append_detail(rows, "是否需要密钥", _yes_no(metadata.get("api_key_required")))
+    elif resource_type == "model_runtime":
+        _append_detail(rows, "运行状态", metadata.get("serving_hint"))
+        _append_detail(rows, "服务地址", metadata.get("base_url"))
+        _append_detail(rows, "是否本地端点", _yes_no(metadata.get("local_endpoint")))
+    elif resource_type == "model_pool":
+        _append_detail(rows, "运行时", metadata.get("runtime"))
+        _append_detail(rows, "最大上下文", metadata.get("max_model_len"))
+        _append_detail(rows, "并发上限", metadata.get("max_concurrency"))
+        _append_detail(rows, "能力标签", metadata.get("features"))
+    elif resource_type == "model_admission":
+        _append_detail(rows, "默认后端", metadata.get("default_backend"))
+        _append_detail(rows, "后端配置项", metadata.get("backend_env"))
+        _append_detail(rows, "覆盖模型池", metadata.get("pools"))
+    elif resource_type == "integration":
+        manifest = metadata.get("manifest") if isinstance(metadata.get("manifest"), dict) else {}
+        _append_detail(rows, "接入类别", manifest.get("category"))
+        _append_detail(rows, "风险等级", manifest.get("risk_level"))
+        _append_detail(rows, "支持界面", manifest.get("surfaces"))
+        _append_detail(rows, "支持能力", manifest.get("capabilities"))
+    elif resource_type == "solution":
+        _append_detail(rows, "技术栈", metadata.get("stack"))
+        _append_detail(rows, "质量分", metadata.get("quality_score"))
+        _append_detail(rows, "可进入训练", _yes_no(metadata.get("training_eligible")))
+    elif resource_type == "knowledge_store":
+        _append_detail(rows, "知识卡数量", metadata.get("cards"))
+        _append_detail(rows, "是否就绪", _yes_no(metadata.get("ready")))
+        _append_detail(rows, "向量索引", metadata.get("vector_index"))
+    elif resource_type == "training_dataset":
+        _append_detail(rows, "样本数量", metadata.get("examples"))
+        _append_detail(rows, "运行目录", metadata.get("run_dir"))
+    elif resource_type == "run_manifest":
+        _append_detail(rows, "任务类型", metadata.get("kind"))
+        _append_detail(rows, "清单 ID", metadata.get("manifest_id"))
+        _append_detail(rows, "评价分", metadata.get("evaluation_score"))
+    elif resource_type == "evidence_ledger":
+        _append_detail(rows, "证据条数", metadata.get("entries"))
+        _append_detail(rows, "创建时间", metadata.get("created_at"))
+    _append_detail(rows, "路径 / 地址", item.get("path"))
+    return rows
+
+
+def _resource_ui_context(registry: dict[str, Any]) -> dict[str, Any]:
+    raw_counts = registry.get("summary", {}).get("by_type", {}) if isinstance(registry.get("summary"), dict) else {}
+    counts = {str(key): int(value) for key, value in raw_counts.items()}
+    cards: list[dict[str, Any]] = []
+    for row in registry.get("resources", []):
+        if not isinstance(row, dict):
+            continue
+        item = dict(row)
+        detail_rows = _resource_detail_rows(item)
+        tags = [_localise_resource_tag(tag) for tag in item.get("tags", []) if str(tag)]
+        search_parts = [
+            item.get("id", ""),
+            item.get("name", ""),
+            item.get("summary", ""),
+            item.get("path", ""),
+            _resource_type_label(str(item.get("type", "") or "")),
+            *tags,
+            *(entry["value"] for entry in detail_rows),
+        ]
+        item.update(
+            {
+                "type_label": _resource_type_label(str(item.get("type", "") or "")),
+                "type_hint": _resource_type_hint(str(item.get("type", "") or "")),
+                "display_tags": tags[:8],
+                "detail_rows": detail_rows,
+                "search_text": " ".join(str(part) for part in search_parts if str(part)).lower(),
+            }
+        )
+        cards.append(item)
+    ordered_types = [item for item in RESOURCE_TYPE_ORDER if counts.get(item)]
+    ordered_types.extend(sorted(item for item in counts if item not in RESOURCE_TYPE_ORDER))
+    tabs = [{"value": "all", "label": "全部", "count": int(registry.get("summary", {}).get("total", 0) or 0)}]
+    tabs.extend(
+        {
+            "value": resource_type,
+            "label": _resource_type_label(resource_type),
+            "count": counts.get(resource_type, 0),
+        }
+        for resource_type in ordered_types
+    )
+    overview = [
+        {"label": "分链能力", "count": counts.get("chain", 0)},
+        {
+            "label": "模型相关",
+            "count": sum(counts.get(key, 0) for key in ("model_provider", "model_runtime", "model_pool", "model_admission")),
+        },
+        {"label": "方案资产", "count": counts.get("solution", 0)},
+        {"label": "知识与训练", "count": counts.get("knowledge_store", 0) + counts.get("training_dataset", 0)},
+    ]
+    return {"cards": cards, "tabs": tabs, "overview": overview}
+
+
+def _workflow_chain_label(chain_name: str) -> str:
+    return WORKFLOW_CHAIN_LABELS.get(chain_name, chain_name or "未知节点")
+
+
+def _innovation_ui_context(radar: dict[str, Any]) -> dict[str, Any]:
+    prepared = dict(radar)
+    cards: list[dict[str, Any]] = []
+    for row in radar.get("innovation_cards", []):
+        if not isinstance(row, dict):
+            continue
+        card = dict(row)
+        card["horizon_label"] = HORIZON_LABELS.get(str(card.get("horizon", "") or ""), str(card.get("horizon", "") or ""))
+        cards.append(card)
+    workflows: list[dict[str, Any]] = []
+    for row in radar.get("workflow_templates", []):
+        if not isinstance(row, dict):
+            continue
+        template = dict(row)
+        spec = template.get("spec") if isinstance(template.get("spec"), dict) else {}
+        nodes = spec.get("nodes") if isinstance(spec.get("nodes"), list) else []
+        template["steps"] = [
+            {
+                "id": str(node.get("id", "") or ""),
+                "chain": str(node.get("chain", "") or ""),
+                "label": _workflow_chain_label(str(node.get("chain", "") or "")),
+            }
+            for node in nodes
+            if isinstance(node, dict)
+        ]
+        workflows.append(template)
+    prepared["innovation_cards"] = cards
+    prepared["workflow_templates"] = workflows
+    return prepared
+
+
+def _default_production_runtime() -> tuple[str, str]:
+    provider_name = normalise_provider(os.environ.get("DEFAULT_PRODUCTION_PROVIDER", DEFAULT_PRODUCTION_PROVIDER))
+    provider = resolve_llm_provider(provider_name, os.environ.get("DEFAULT_PRODUCTION_MODEL", ""))
+    return provider.name, provider.model
+
+
+def _default_production_timeout() -> float:
+    raw = os.environ.get("DEFAULT_PRODUCTION_DEEPSEEK_TIMEOUT", "1.5").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        value = 1.5
+    return max(0.2, min(value, 60.0))
+
+
+def _selected_model(provider: str, model: str, custom_model: str) -> str:
+    selected = custom_model.strip() or model.strip()
+    return resolve_llm_provider(provider, selected).model
+
+
+def _selected_runtime(mode: str, provider: str, model: str, custom_model: str) -> tuple[str, str]:
+    if mode == "local_production":
+        return _default_production_runtime()
+    provider_name = _normalise_provider(provider)
+    return provider_name, _selected_model(provider_name, model, custom_model)
+
+
+def _checkbox_enabled(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _safe_next(value: str | None) -> str:
+    nxt = str(value or "").strip()
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        return url_for("index")
+    return nxt
+
+
+def _build_config(mode: str, *, events: bool, provider: str, model: str) -> AppConfig:
+    cfg = AppConfig.from_env()
+    llm_provider = normalise_provider(provider or cfg.llm_provider)
+    planner_model = model if mode == "llm" else cfg.planner_model
+    return replace(
+        cfg,
+        event_log=events,
+        llm_provider=llm_provider,
+        brain_model=model,
+        planner_model=planner_model,
+        planner_use_llm=(mode == "llm"),
+        max_agent_iterations=min(max(int(cfg.max_agent_iterations), 8), 48),
+    )
+
+
+def _build_brain(mode: str, workspace: Path, prompts_dir: Path, cfg: AppConfig) -> AgentBrain:
+    if mode == "local_production":
+        provider = resolve_llm_provider(cfg.llm_provider, cfg.brain_model)
+        primary = OpenAIBrain(
+            prompts_dir,
+            model=provider.model,
+            provider=provider.name,
+            client_timeout=_default_production_timeout(),
+        )
+        return DefaultProductionBrain(primary, OfflineProductBrain(workspace))
+    provider = resolve_llm_provider(cfg.llm_provider, cfg.brain_model)
+    if not provider.has_api_key:
+        raise RuntimeError(f"{provider.api_key_env} is required for {provider.label} modes")
+    return OpenAIBrain(prompts_dir, model=provider.model, provider=provider.name)
+
+
+def _safe_goal(raw: str) -> str:
+    goal = raw.strip()
+    return goal or DEFAULT_GOAL
+
+
+def _safe_improvement_goal(raw: str) -> str:
+    goal = raw.strip()
+    if not goal:
+        abort(400)
+    return goal[:2000]
+
+
+def _resolve_run_workspace(runs_root: Path, run_id: str) -> Path:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", run_id):
+        abort(404)
+    root = runs_root.resolve()
+    workspace = (root / run_id).resolve()
+    if not workspace.is_relative_to(root) or not workspace.exists():
+        abort(404)
+    return workspace
+
+
+def _resolve_run_file(workspace: Path, file_path: str) -> Path:
+    if _is_internal_file(file_path):
+        abort(404)
+    target = (workspace / file_path).resolve()
+    if not target.is_relative_to(workspace) or not target.is_file():
+        abort(404)
+    return target
+
+
+def _load_state(workspace: Path) -> ProjectState | None:
+    state_path = workspace / ".agent_state.json"
+    if not state_path.exists():
+        return None
+    try:
+        return ProjectState.load(state_path)
+    except (OSError, ValueError):
+        return None
+
+
+def _save_run_meta(
+    workspace: Path,
+    *,
+    goal: str,
+    mode: str,
+    provider: str,
+    model: str,
+    source_run: str = "",
+    improvement_goal: str = "",
+    base_goal: str = "",
+    owner_user_id: str = "",
+) -> None:
+    meta = {
+        "goal": goal,
+        "mode": mode,
+        "provider": provider,
+        "model": model,
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    if owner_user_id:
+        meta["owner_user_id"] = owner_user_id
+    if source_run:
+        meta["source_run"] = source_run
+    if improvement_goal:
+        meta["improvement_goal"] = improvement_goal
+    if base_goal:
+        meta["base_goal"] = base_goal
+    try:
+        (workspace / ".agent_ui.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        return
+
+
+def _load_run_meta(workspace: Path) -> dict[str, str]:
+    try:
+        raw = json.loads((workspace / ".agent_ui.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): str(v) for k, v in raw.items()}
+
+
+def _find_sandbox_preview(workspace: Path) -> str | None:
+    try:
+        manifest = json.loads((workspace / "sandbox_manifest.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(manifest, dict) or manifest.get("type") not in {"frontend_sandbox", "static_preview"}:
+        return None
+    entrypoint = str(manifest.get("entrypoint", "frontend/index.html"))
+    if entrypoint not in ("frontend/index.html", "index.html", "preview/index.html"):
+        return None
+    target = (workspace / entrypoint).resolve()
+    if target.is_file() and target.is_relative_to(workspace):
+        return entrypoint
+    return None
+
+
+def _find_solution_backup(workspace: Path) -> str | None:
+    for rel in ("docs/SOLUTION_BACKUP.md", "solution_manifest.json"):
+        target = (workspace / rel).resolve()
+        if target.is_file() and target.is_relative_to(workspace):
+            return rel
+    return None
+
+
+def _is_internal_file(rel: str) -> bool:
+    parts = rel.split("/")
+    if not parts:
+        return True
+    return (
+        parts[0].startswith(".agent_")
+        or rel.startswith(".git/")
+        or "__pycache__" in parts
+        or ".pytest_cache" in parts
+    )
+
+
+def _list_run_files(workspace: Path) -> list[str]:
+    out: list[str] = []
+    for path in sorted(workspace.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(workspace).as_posix()
+        if _is_internal_file(rel):
+            continue
+        out.append(rel)
+    return out
+
+
+def _is_downloadable_artifact(rel: str) -> bool:
+    return not _is_internal_file(rel)
+
+
+def _iter_downloadable_files(workspace: Path) -> list[tuple[Path, str]]:
+    out: list[tuple[Path, str]] = []
+    for rel in _list_run_files(workspace):
+        if not _is_downloadable_artifact(rel):
+            continue
+        path = _resolve_run_file(workspace, rel)
+        out.append((path, rel))
+    return out
+
+
+def _copy_artifacts_for_improvement(source: Path, target: Path) -> int:
+    copied = 0
+    target_root = target.resolve()
+    for path, rel in _iter_downloadable_files(source):
+        dest = (target_root / rel).resolve()
+        if not dest.is_relative_to(target_root):
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, dest)
+        copied += 1
+    return copied
+
+
+def _build_improvement_goal(*, base_goal: str, source_run: str, improvement_goal: str) -> str:
+    return f"""基于上一版软件方案继续改进，不要从零开始。
+
+上一版 run:
+{source_run}
+
+上一版原始需求:
+{base_goal}
+
+本次改进要求:
+{improvement_goal}
+
+生产要求:
+- 保留上一版已有业务场景、数据模型、CRUD、文档、测试和预览。
+- 优先做增量改进，能复用就复用，不能覆盖掉与改进无关的成熟产物。
+- 如果是管理系统，继续保持产品规格、API 契约、数据库设计、测试和交付清单。
+- 产出必须仍然能通过结果页成熟度、ZIP 下载和沙盒预览验收。
+"""
+
+
+def _write_improvement_context(
+    workspace: Path,
+    *,
+    source_run: str,
+    base_goal: str,
+    improvement_goal: str,
+    copied_count: int,
+) -> None:
+    docs = workspace / "docs"
+    docs.mkdir(parents=True, exist_ok=True)
+    text = f"""# Improvement Request
+
+## Source Run
+
+`{source_run}`
+
+## Base Goal
+
+```text
+{base_goal}
+```
+
+## Improvement Goal
+
+```text
+{improvement_goal}
+```
+
+## Iteration Notes
+
+- Copied user artifact files from source run: `{copied_count}`.
+- Internal `.agent_*` state/event/session files were not copied.
+- This run should be treated as a second production iteration over the previous solution.
+"""
+    (docs / "IMPROVEMENT_REQUEST.md").write_text(text, encoding="utf-8")
+
+
+def _build_zip_response(workspace: Path, run_id: str):
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for path, rel in _iter_downloadable_files(workspace):
+            zf.write(path, arcname=rel)
+        if not zf.namelist():
+            zf.writestr("README.txt", "No downloadable artifacts were generated.\n")
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"{run_id}.zip",
+    )
+
+
+def _sandbox_csp() -> str:
+    return "; ".join(
+        [
+            "default-src 'none'",
+            "script-src 'unsafe-inline'",
+            "style-src 'unsafe-inline'",
+            "img-src data: blob:",
+            "font-src data:",
+            "media-src data: blob:",
+            "connect-src 'none'",
+            "form-action 'none'",
+            "object-src 'none'",
+            "base-uri 'none'",
+            "frame-ancestors 'self'",
+        ]
+    )
+
+
+def _build_preview_response(workspace: Path) -> Response:
+    rel = _find_sandbox_preview(workspace)
+    if not rel:
+        abort(404)
+    target = _resolve_run_file(workspace, rel)
+    html = target.read_text(encoding="utf-8", errors="replace")
+    resp = Response(html, mimetype="text/html; charset=utf-8")
+    resp.headers["Content-Security-Policy"] = _sandbox_csp()
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    resp.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+def _choose_preview_file(files: list[str]) -> str | None:
+    for preferred in ("README.md", "preview/index.html", "frontend/index.html", "app.py", "main.py"):
+        if preferred in files:
+            return preferred
+    for file in files:
+        if file.endswith((".py", ".md", ".txt", ".json", ".jsonl")):
+            return file
+    return files[0] if files else None
+
+
+def _read_preview(workspace: Path, file_path: str | None) -> tuple[str, str]:
+    if not file_path:
+        return "预览", ""
+    target = _resolve_run_file(workspace, file_path)
+    try:
+        text = target.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return file_path, f"Could not read preview: {exc}"
+    if len(text) > 12000:
+        text = text[:12000] + "\n...[truncated]"
+    return file_path, text
+
+
+def _display_text(value: str) -> str:
+    text = " ".join(str(value or "").split())
+    if not text:
+        return ""
+    question_count = text.count("?")
+    if question_count >= 8 and question_count / max(len(text), 1) > 0.55:
+        return "改进说明已记录，但旧运行的文本编码不可读"
+    return text[:220]
+
+
+def _render_run_page(
+    *,
+    runs_root: Path,
+    run_id: str,
+    workspace: Path,
+    mode: str,
+    user: Any,
+    provider: str = "openai",
+    model: str = "",
+    error: str = "",
+    status_code: int = 200,
+) -> tuple[str, int]:
+    mode = _normalise_mode(mode)
+    state = _load_state(workspace)
+    meta = _load_run_meta(workspace)
+    files = _list_run_files(workspace)
+    progress = state.progress if state else ("failed" if error else "created")
+    stage = state.current_stage if state else ""
+    maturity = build_maturity_report(files, progress, mode)
+    preview_file = _choose_preview_file(files)
+    preview_title, preview = _read_preview(workspace, preview_file)
+    preview_rel = _find_sandbox_preview(workspace)
+    preview_url = url_for("preview_run", run_id=run_id) if preview_rel else ""
+    solution_backup_rel = _find_solution_backup(workspace)
+    solution_backup_url = (
+        url_for("run_file", run_id=run_id, file_path=solution_backup_rel)
+        if solution_backup_rel
+        else ""
+    )
+    file_links = [
+        {"path": path, "url": url_for("run_file", run_id=run_id, file_path=path)}
+        for path in files
+    ]
+    html = render_template_string(
+        RESULT_TEMPLATE,
+        css=CSS,
+        run_id=run_id,
+        mode=_display_mode(mode),
+        mode_value=mode,
+        provider=provider,
+        model=model,
+        progress=progress,
+        stage=stage,
+        workspace=str(workspace),
+        error=error,
+        files=file_links,
+        maturity=maturity,
+        preview_title=preview_title,
+        preview=preview,
+        preview_url=preview_url,
+        solution_backup_url=solution_backup_url,
+        runs_root=str(runs_root),
+        source_run=meta.get("source_run", ""),
+        improvement_goal=meta.get("improvement_goal", ""),
+        display_improvement_goal=_display_text(meta.get("improvement_goal", "")),
+        current_user=user,
+    )
+    return html, status_code
+
+
+def create_app(
+    runs_root: Path | None = None,
+    prompts_dir: Path | None = None,
+) -> Flask:
+    root = (runs_root or _default_runs_root()).resolve()
+    prompts = (prompts_dir or _prompts_dir()).resolve()
+    app = Flask(__name__)
+    app.config["RUNS_ROOT"] = root
+    app.config["PROMPTS_DIR"] = prompts
+    app.secret_key = os.environ.get("AGENT_UI_SECRET_KEY", "").strip() or secrets.token_hex(32)
+    auth_store = LocalAuthStore(root / ".agent_users.json")
+    admission_controller = PoolAdmissionController()
+    root.mkdir(parents=True, exist_ok=True)
+
+    def _auth_store() -> LocalAuthStore:
+        return auth_store
+
+    def _current_user():
+        return current_user(auth_store)
+
+    def _require_run_access(workspace: Path):
+        user = _current_user()
+        if not can_access_run(_load_run_meta(workspace), user):
+            abort(404)
+        return user
+
+    def _request_payload() -> dict[str, Any]:
+        data = request.get_json(silent=True)
+        if isinstance(data, dict):
+            return data
+        return dict(request.form.items())
+
+    def _payload_roots(payload: dict[str, Any]) -> tuple[Path, ...]:
+        roots = payload.get("roots", ())
+        if isinstance(roots, str):
+            roots = [roots]
+        if not isinstance(roots, list):
+            return ()
+        return tuple(Path(str(x)) for x in roots if str(x).strip())
+
+    def _payload_path(payload: dict[str, Any], key: str, *, base: Path) -> Path | None:
+        raw = str(payload.get(key, "") or "").strip()
+        if not raw:
+            return None
+        path = Path(raw)
+        return path.resolve() if path.is_absolute() else (base / path).resolve()
+
+    @app.get("/healthz")
+    def healthz() -> Response:
+        return jsonify({"ok": True, "runs_root": str(root), "has_users": auth_store.has_users()})
+
+    @app.get("/login")
+    def login() -> str | Response:
+        if _current_user():
+            return redirect(url_for("index"))
+        return render_template_string(
+            AUTH_TEMPLATE,
+            css=CSS,
+            title="登录",
+            mode="login",
+            action=url_for("login"),
+            submit="登录",
+            autocomplete="current-password",
+            next_url=_safe_next(request.args.get("next")),
+            error="",
+        )
+
+    @app.post("/login")
+    def login_submit() -> str | Response:
+        user = auth_store.verify(request.form.get("username", ""), request.form.get("password", ""))
+        if user:
+            sign_in(user)
+            return redirect(_safe_next(request.form.get("next")))
+        return render_template_string(
+            AUTH_TEMPLATE,
+            css=CSS,
+            title="登录",
+            mode="login",
+            action=url_for("login"),
+            submit="登录",
+            autocomplete="current-password",
+            next_url=_safe_next(request.form.get("next")),
+            error="用户名或密码错误",
+        ), 401
+
+    @app.get("/register")
+    def register() -> str | Response:
+        if _current_user():
+            return redirect(url_for("index"))
+        return render_template_string(
+            AUTH_TEMPLATE,
+            css=CSS,
+            title="注册",
+            mode="register",
+            action=url_for("register"),
+            submit="创建账号",
+            autocomplete="new-password",
+            next_url="",
+            error="",
+        )
+
+    @app.post("/register")
+    def register_submit() -> str | Response:
+        try:
+            user = auth_store.register(request.form.get("username", ""), request.form.get("password", ""))
+        except ValueError as exc:
+            return render_template_string(
+                AUTH_TEMPLATE,
+                css=CSS,
+                title="注册",
+                mode="register",
+                action=url_for("register"),
+                submit="创建账号",
+                autocomplete="new-password",
+                next_url="",
+                error=str(exc),
+            ), 400
+        sign_in(user)
+        return redirect(url_for("index"))
+
+    @app.get("/logout")
+    def logout() -> Response:
+        sign_out()
+        return redirect(url_for("login"))
+
+    @app.get("/")
+    @login_required(_auth_store)
+    def index() -> str:
+        return render_template_string(
+            INDEX_TEMPLATE,
+            css=CSS,
+            default_goal=DEFAULT_GOAL,
+            providers=provider_choices_for_ui(),
+            current_user=_current_user(),
+        )
+
+    @app.get("/resources")
+    @login_required(_auth_store)
+    def resources_page() -> str:
+        registry = discover_resources(root)
+        resource_ui = _resource_ui_context(registry)
+        return render_template_string(
+            RESOURCES_TEMPLATE,
+            css=CSS,
+            registry=registry,
+            resource_cards=resource_ui["cards"],
+            resource_tabs=resource_ui["tabs"],
+            resource_overview=resource_ui["overview"],
+            current_user=_current_user(),
+        )
+
+    @app.get("/api/resources")
+    @login_required(_auth_store)
+    def api_resources() -> Response:
+        return jsonify(discover_resources(root, type_filter=str(request.args.get("type", "") or "")))
+
+    @app.get("/api/integrations")
+    @login_required(_auth_store)
+    def api_integrations() -> Response:
+        return jsonify(list_integration_catalog(str(request.args.get("category", "") or "")))
+
+    @app.post("/api/integrations/embed-plan")
+    @login_required(_auth_store)
+    def api_integration_embed_plan() -> Response:
+        payload = _request_payload()
+        requested = payload.get("requested_capabilities", [])
+        if isinstance(requested, str):
+            requested_capabilities = tuple(x.strip() for x in requested.split(",") if x.strip())
+        elif isinstance(requested, list):
+            requested_capabilities = tuple(str(x) for x in requested if str(x).strip())
+        else:
+            requested_capabilities = ()
+        plan = build_integration_embed_plan(
+            str(payload.get("integration_id", "") or ""),
+            resource_url=str(payload.get("resource_url", "") or ""),
+            mode=str(payload.get("mode", "embed_panel") or "embed_panel"),
+            workspace_context=str(payload.get("workspace_context", "") or ""),
+            requested_capabilities=requested_capabilities,
+        )
+        return jsonify(plan), 200 if bool(plan.get("admission", {}).get("embeddable")) else 400
+
+    @app.get("/api/model-runtime")
+    @login_required(_auth_store)
+    def api_model_runtime() -> Response:
+        provider = str(request.args.get("provider", "main_deepseek") or "main_deepseek")
+        model = str(request.args.get("model", "") or "") or None
+        probe = str(request.args.get("probe", "1") or "1").lower() not in {"0", "false", "no"}
+        try:
+            timeout = float(request.args.get("timeout", "2") or 2)
+        except ValueError:
+            timeout = 2.0
+        return jsonify(model_runtime_status(provider, model, probe=probe, timeout=max(timeout, 0.1)))
+
+    @app.get("/api/model-pools")
+    @login_required(_auth_store)
+    def api_model_pools() -> Response:
+        return jsonify(list_model_pools())
+
+    @app.post("/api/model-route-plan")
+    @login_required(_auth_store)
+    def api_model_route_plan() -> Response:
+        payload = _request_payload()
+        raw_max_output = payload.get("max_output_tokens")
+        max_output_tokens = raw_max_output if isinstance(raw_max_output, int) and raw_max_output > 0 else None
+        return jsonify(
+            build_model_route_plan(
+                _safe_goal(str(payload.get("goal", "") or "")),
+                prompt=str(payload.get("prompt", "") or ""),
+                max_output_tokens=max_output_tokens,
+                business_type=str(payload.get("business_type", "") or ""),
+                require_json=bool(payload.get("require_json", False)),
+            )
+        )
+
+    @app.get("/api/model-admission/status")
+    @login_required(_auth_store)
+    def api_model_admission_status() -> Response:
+        return jsonify(admission_controller.snapshot())
+
+    @app.post("/api/model-admission/acquire")
+    @login_required(_auth_store)
+    def api_model_admission_acquire() -> Response:
+        payload = _request_payload()
+        raw_max_output = payload.get("max_output_tokens")
+        max_output_tokens = raw_max_output if isinstance(raw_max_output, int) and raw_max_output > 0 else None
+        raw_ttl = payload.get("lease_ttl_s")
+        lease_ttl_s = raw_ttl if isinstance(raw_ttl, (int, float)) and raw_ttl > 0 else None
+        admission = admission_controller.acquire(
+            _safe_goal(str(payload.get("goal", "") or "")),
+            prompt=str(payload.get("prompt", "") or ""),
+            max_output_tokens=max_output_tokens,
+            business_type=str(payload.get("business_type", "") or ""),
+            require_json=bool(payload.get("require_json", False)),
+            idempotency_key=str(payload.get("idempotency_key", "") or ""),
+            lease_ttl_s=lease_ttl_s,
+            metadata={"source": "product_ui"},
+        )
+        return jsonify(admission), int(admission.get("backpressure", {}).get("http_status", 200))
+
+    @app.post("/api/model-admission/release")
+    @login_required(_auth_store)
+    def api_model_admission_release() -> Response:
+        payload = _request_payload()
+        return jsonify(admission_controller.release(str(payload.get("lease_id", "") or "")))
+
+    @app.post("/api/model-admission/renew")
+    @login_required(_auth_store)
+    def api_model_admission_renew() -> Response:
+        payload = _request_payload()
+        raw_ttl = payload.get("lease_ttl_s")
+        lease_ttl_s = raw_ttl if isinstance(raw_ttl, (int, float)) and raw_ttl > 0 else None
+        return jsonify(
+            admission_controller.renew(
+                str(payload.get("lease_id", "") or ""),
+                lease_ttl_s=lease_ttl_s,
+            )
+        )
+
+    @app.post("/api/enterprise-stack")
+    @login_required(_auth_store)
+    def api_enterprise_stack() -> Response:
+        payload = _request_payload()
+        return jsonify(
+            build_enterprise_stack_plan(
+                _safe_goal(str(payload.get("goal", "") or "")),
+                root,
+                scale=str(payload.get("scale", "") or ""),
+                regulated=bool(payload.get("regulated", False)),
+                provider=str(payload.get("provider", "main_deepseek") or "main_deepseek"),
+            )
+        )
+
+    @app.post("/api/industrial-maturity")
+    @login_required(_auth_store)
+    def api_industrial_maturity() -> Response:
+        payload = _request_payload()
+        return jsonify(
+            build_industrial_maturity_plan(
+                _safe_goal(str(payload.get("goal", "") or "")),
+                root,
+                scale=str(payload.get("scale", "listed") or "listed"),
+                regulated=bool(payload.get("regulated", True)),
+                provider=str(payload.get("provider", "main_deepseek") or "main_deepseek"),
+            )
+        )
+
+    @app.get("/api/enterprise-readiness")
+    @login_required(_auth_store)
+    def api_enterprise_readiness() -> Response:
+        return jsonify(build_enterprise_readiness_report(root))
+
+    @app.get("/innovation")
+    @login_required(_auth_store)
+    def innovation_page() -> str:
+        radar = _innovation_ui_context(build_innovation_radar(root))
+        return render_template_string(
+            INNOVATION_TEMPLATE,
+            css=CSS,
+            radar=radar,
+            current_user=_current_user(),
+        )
+
+    @app.get("/api/innovation")
+    @login_required(_auth_store)
+    def api_innovation() -> Response:
+        return jsonify(build_innovation_radar(root))
+
+    @app.route("/intent", methods=["GET", "POST"])
+    @login_required(_auth_store)
+    def intent_page() -> str:
+        goal = DEFAULT_GOAL
+        compilation = None
+        workflow_json = ""
+        if request.method == "POST":
+            goal = _safe_goal(request.form.get("goal", ""))
+            compilation = compile_intent(goal, root, roots=(root,))
+            workflow_json = json.dumps(compilation["workflow"], ensure_ascii=False, indent=2)
+        return render_template_string(
+            INTENT_TEMPLATE,
+            css=CSS,
+            goal=goal,
+            compilation=compilation,
+            workflow_json=workflow_json,
+            current_user=_current_user(),
+        )
+
+    @app.post("/api/intent/compile")
+    @login_required(_auth_store)
+    def api_intent_compile() -> Response:
+        payload = _request_payload()
+        goal = _safe_goal(str(payload.get("goal", "") or ""))
+        return jsonify(compile_intent(goal, root, roots=_payload_roots(payload)))
+
+    @app.post("/api/workflow/dry-run")
+    @login_required(_auth_store)
+    def api_workflow_dry_run() -> Response:
+        payload = _request_payload()
+        spec = payload.get("spec") if isinstance(payload.get("spec"), dict) else {}
+        return jsonify(dry_run_workflow(spec, root))
+
+    @app.post("/api/evidence-ledger")
+    @login_required(_auth_store)
+    def api_evidence_ledger() -> Response:
+        payload = _request_payload()
+        ledger = build_evidence_ledger(
+            root,
+            roots=_payload_roots(payload),
+            write_path=_payload_path(payload, "output_path", base=root),
+        )
+        return jsonify(ledger)
+
+    @app.post("/runs/<run_id>/publish-solution")
+    @login_required(_auth_store)
+    def publish_run_solution(run_id: str) -> Response:
+        workspace = _resolve_run_workspace(root, run_id)
+        user = _require_run_access(workspace)
+        require_permission(user, "run:improve")
+        payload = _request_payload()
+        result = publish_solution_from_run(
+            workspace,
+            output_dir=_payload_path(payload, "output_dir", base=root) or (root / "solution_library"),
+            title=str(payload.get("title", "") or ""),
+            source_type=str(payload.get("source_type", "product_run") or "product_run"),
+        )
+        return jsonify(result)
+
+    @app.post("/run")
+    @login_required(_auth_store)
+    def run_product() -> Response | tuple[str, int]:
+        user = _current_user()
+        require_permission(user, "run:create")
+        goal = _safe_goal(request.form.get("goal", ""))
+        mode = _normalise_mode(request.form.get("mode", "local_production"))
+        provider_name, model = _selected_runtime(
+            mode,
+            request.form.get("provider", "openai"),
+            request.form.get("model", ""),
+            request.form.get("custom_model", ""),
+        )
+        events = _checkbox_enabled(request.form.get("events"))
+        run_id = _build_run_id(goal)
+        workspace = (root / run_id).resolve()
+        workspace.mkdir(parents=True, exist_ok=True)
+        _save_run_meta(workspace, goal=goal, mode=mode, provider=provider_name, model=model, owner_user_id=user.id if user else "")
+        cfg = _build_config(mode, events=events, provider=provider_name, model=model)
+        try:
+            brain = _build_brain(mode, workspace, prompts, cfg)
+            run_agent_loop(goal, workspace, prompts, brain, config=cfg, resume=False)
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            return _render_run_page(
+                runs_root=root,
+                run_id=run_id,
+                workspace=workspace,
+                mode=mode,
+                user=user,
+                provider=provider_name,
+                model=model,
+                error=error,
+                status_code=400,
+            )
+        return redirect(url_for("show_run", run_id=run_id))
+
+    @app.post("/runs/<run_id>/improve")
+    @login_required(_auth_store)
+    def improve_run(run_id: str) -> Response | tuple[str, int]:
+        source_workspace = _resolve_run_workspace(root, run_id)
+        user = _require_run_access(source_workspace)
+        require_permission(user, "run:improve")
+        source_meta = _load_run_meta(source_workspace)
+        improvement_goal = _safe_improvement_goal(request.form.get("improvement_goal", ""))
+        base_goal = source_meta.get("base_goal") or source_meta.get("goal") or DEFAULT_GOAL
+        mode = _normalise_mode(source_meta.get("mode") or request.form.get("mode", "local_production"))
+        if mode == "local_production":
+            provider_name, model = _selected_runtime(mode, "", "", "")
+        else:
+            provider_name, model = _selected_runtime(
+                mode,
+                source_meta.get("provider") or request.form.get("provider", "openai"),
+                source_meta.get("model") or request.form.get("model", ""),
+                "",
+            )
+        events = _checkbox_enabled(request.form.get("events"))
+        goal = _build_improvement_goal(
+            base_goal=base_goal,
+            source_run=run_id,
+            improvement_goal=improvement_goal,
+        )
+        new_run_id = _build_run_id(f"{base_goal} improve {improvement_goal}")
+        workspace = (root / new_run_id).resolve()
+        workspace.mkdir(parents=True, exist_ok=True)
+        copied_count = _copy_artifacts_for_improvement(source_workspace, workspace)
+        _write_improvement_context(
+            workspace,
+            source_run=run_id,
+            base_goal=base_goal,
+            improvement_goal=improvement_goal,
+            copied_count=copied_count,
+        )
+        _save_run_meta(
+            workspace,
+            goal=goal,
+            mode=mode,
+            provider=provider_name,
+            model=model,
+            source_run=run_id,
+            improvement_goal=improvement_goal,
+            base_goal=base_goal,
+            owner_user_id=user.id if user else "",
+        )
+        cfg = _build_config(mode, events=events, provider=provider_name, model=model)
+        try:
+            brain = _build_brain(mode, workspace, prompts, cfg)
+            run_agent_loop(goal, workspace, prompts, brain, config=cfg, resume=False)
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            return _render_run_page(
+                runs_root=root,
+                run_id=new_run_id,
+                workspace=workspace,
+                mode=mode,
+                user=user,
+                provider=provider_name,
+                model=model,
+                error=error,
+                status_code=400,
+            )
+        return redirect(url_for("show_run", run_id=new_run_id))
+
+    @app.get("/runs/<run_id>")
+    @login_required(_auth_store)
+    def show_run(run_id: str) -> tuple[str, int]:
+        workspace = _resolve_run_workspace(root, run_id)
+        user = _require_run_access(workspace)
+        meta = _load_run_meta(workspace)
+        return _render_run_page(
+            runs_root=root,
+            run_id=run_id,
+            workspace=workspace,
+            mode=meta.get("mode", "saved"),
+            user=user,
+            provider=meta.get("provider", ""),
+            model=meta.get("model", ""),
+        )
+
+    @app.get("/runs/<run_id>/files/<path:file_path>")
+    @login_required(_auth_store)
+    def run_file(run_id: str, file_path: str) -> Response:
+        workspace = _resolve_run_workspace(root, run_id)
+        _require_run_access(workspace)
+        target = _resolve_run_file(workspace, file_path)
+        text = target.read_text(encoding="utf-8", errors="replace")
+        return Response(text, mimetype="text/plain; charset=utf-8")
+
+    @app.get("/runs/<run_id>/download")
+    @login_required(_auth_store)
+    def download_run(run_id: str):
+        workspace = _resolve_run_workspace(root, run_id)
+        user = _require_run_access(workspace)
+        require_permission(user, "run:download")
+        return _build_zip_response(workspace, run_id)
+
+    @app.get("/runs/<run_id>/preview")
+    @login_required(_auth_store)
+    def preview_run(run_id: str) -> Response:
+        workspace = _resolve_run_workspace(root, run_id)
+        _require_run_access(workspace)
+        return _build_preview_response(workspace)
+
+    return app
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Software Production Agent product UI")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=7860)
+    parser.add_argument("--runs-root", default="./product_runs")
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--verbose", "-v", action="store_true")
+    args = parser.parse_args(argv)
+
+    configure_logging(verbose=args.verbose)
+    app = create_app(runs_root=Path(args.runs_root).resolve())
+    app.run(host=args.host, port=max(int(args.port), 1), debug=args.debug)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex 本地接管任务包</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #f7f5ef; color: #171a1d; }
+    main { width: min(1120px, calc(100vw - 32px)); margin: 0 auto; padding: 32px 0; }
+    header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 22px; }
+    h1 { margin: 0; font-size: 30px; letter-spacing: 0; }
+    p { color: #5f685f; line-height: 1.6; }
+    .badge { border: 1px solid #1d7a57; color: #10533a; background: #e8f5ee; border-radius: 999px; padding: 8px 12px; font-weight: 800; white-space: nowrap; }
+    .goal { background: #fff; border: 1px solid #d9ded4; border-radius: 8px; padding: 16px; margin-bottom: 18px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    article { background: #fff; border: 1px solid #d9ded4; border-radius: 8px; padding: 15px; min-height: 118px; }
+    article strong { display: block; margin-bottom: 8px; color: #10533a; }
+    article span { color: #5f685f; line-height: 1.48; }
+    .steps { margin-top: 18px; background: #111418; color: #fff; border-radius: 8px; padding: 16px; }
+    .steps code { color: #d7ffe9; }
+    @media (max-width: 860px) {
+      header { display: block; }
+      .badge { display: inline-flex; margin-top: 12px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Codex 本地接管任务包</h1>
+        <p>本地模式不消耗 API 额度；它把智能工作交给当前 Codex 会话执行。</p>
+      </div>
+      <div class="badge">waiting for Codex</div>
+    </header>
+    <section class="goal"><strong>需求</strong><p>写一个人员管理系统</p></section>
+    <section class="grid"><article><strong>需求澄清与验收标准</strong><span>抽取项目类型、核心实体、页面、API、数据模型、验收条件。</span></article>
+<article><strong>架构方案</strong><span>确定前端、后端、存储、测试、沙盒预览和交付结构。</span></article>
+<article><strong>软件生产</strong><span>在当前 run workspace 内生成或改进用户产物。</span></article>
+<article><strong>沙箱运行测试</strong><span>只在产物目录内运行可控 smoke check，不触碰平台源码。</span></article>
+<article><strong>交付封装</strong><span>更新 README、交付清单、预览入口和 ZIP 可下载产物。</span></article></section>
+    <section class="steps">
+      <strong>下一步</strong>
+      <p>在 Codex 会话中要求：<code>读取这个 run 的 CODEX_TASK.md，并只在该工作区内实现产物。</code></p>
+    </section>
+  </main>
+</body>
+</html>

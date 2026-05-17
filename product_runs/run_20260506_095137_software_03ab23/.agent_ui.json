@@ -1,0 +1,7 @@
+{
+  "goal": "图书管理系统",
+  "mode": "llm_planner",
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "created_at": "2026-05-06T09:51:37"
+}

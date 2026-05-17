@@ -1,0 +1,2 @@
+"""Minimal MCP adapter layer."""
+

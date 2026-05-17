@@ -1,0 +1,9 @@
+{
+  "type": "frontend_sandbox",
+  "provider": "groq",
+  "model": "openai/gpt-oss-20b",
+  "used_llm": false,
+  "validation_issues": [],
+  "entrypoint": "frontend/index.html",
+  "execution_policy": "preview only; generated frontend code is not executed by agent tools"
+}

@@ -1,0 +1,124 @@
+services:
+  platform-api:
+    build:
+      context: ../..
+      dockerfile: deploy/production/Dockerfile.platform
+    image: software-production-agent/platform-api:local
+    ports:
+      - "${PLATFORM_PORT:-8080}:8080"
+    environment:
+      AGENT_RUNS_ROOT: /data/product_runs
+      AGENT_PLATFORM_API_TOKEN: ${AGENT_PLATFORM_API_TOKEN:-}
+      MAIN_DEEPSEEK_BASE_URL: ${MAIN_DEEPSEEK_BASE_URL:-http://model-vllm:8000/v1}
+      MAIN_DEEPSEEK_MODEL: ${MAIN_DEEPSEEK_MODEL:-Qwen/Qwen2.5-Coder-7B-Instruct}
+      MAIN_DEEPSEEK_API_KEY: ${MAIN_DEEPSEEK_API_KEY:-local-vllm}
+      MODEL_ADMISSION_BACKEND: ${MODEL_ADMISSION_BACKEND:-local}
+      MODEL_SHORT_BASE_URL: ${MODEL_SHORT_BASE_URL:-http://model-vllm-short:8000/v1}
+      MODEL_LONG_BASE_URL: ${MODEL_LONG_BASE_URL:-http://model-vllm-long:8000/v1}
+      MODEL_AGENT_BASE_URL: ${MODEL_AGENT_BASE_URL:-http://model-agent:8000/v1}
+      MODEL_BATCH_BASE_URL: ${MODEL_BATCH_BASE_URL:-http://model-batch:8000/v1}
+      MODEL_SHORT_POOL_MAX_CONCURRENCY: ${MODEL_SHORT_POOL_MAX_CONCURRENCY:-128}
+      MODEL_LONG_POOL_MAX_CONCURRENCY: ${MODEL_LONG_POOL_MAX_CONCURRENCY:-8}
+      MODEL_AGENT_POOL_MAX_CONCURRENCY: ${MODEL_AGENT_POOL_MAX_CONCURRENCY:-32}
+      MODEL_TRAINING_BATCH_POOL_MAX_CONCURRENCY: ${MODEL_TRAINING_BATCH_POOL_MAX_CONCURRENCY:-4}
+    volumes:
+      - ../../product_runs:/data/product_runs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  model-vllm:
+    image: ${VLLM_IMAGE:?set VLLM_IMAGE to a pinned image tag, for example vllm/vllm-openai:v0.8.5}
+    profiles: ["model"]
+    ports:
+      - "${MODEL_PORT:-8000}:8000"
+    environment:
+      HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
+    command:
+      - --model
+      - ${MODEL_ID:-Qwen/Qwen2.5-Coder-7B-Instruct}
+      - --served-model-name
+      - ${SERVED_MODEL_NAME:-Qwen/Qwen2.5-Coder-7B-Instruct}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --gpu-memory-utilization
+      - ${GPU_MEMORY_UTILIZATION:-0.88}
+      - --max-model-len
+      - ${MAX_MODEL_LEN:-32768}
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${GPU_COUNT:-1}
+              capabilities: [gpu]
+
+  model-vllm-short:
+    image: ${VLLM_IMAGE:?set VLLM_IMAGE to a pinned image tag, for example vllm/vllm-openai:v0.8.5}
+    profiles: ["model-pools"]
+    ports:
+      - "${MODEL_SHORT_PORT:-8001}:8000"
+    environment:
+      HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
+    command:
+      - --model
+      - ${SHORT_MODEL_ID:-Qwen/Qwen2.5-Coder-7B-Instruct}
+      - --served-model-name
+      - ${SHORT_SERVED_MODEL_NAME:-short-coder}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --gpu-memory-utilization
+      - ${SHORT_GPU_MEMORY_UTILIZATION:-0.88}
+      - --max-model-len
+      - "16384"
+      - --max-num-seqs
+      - "256"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${SHORT_GPU_COUNT:-1}
+              capabilities: [gpu]
+
+  model-vllm-long:
+    image: ${VLLM_IMAGE:?set VLLM_IMAGE to a pinned image tag, for example vllm/vllm-openai:v0.8.5}
+    profiles: ["model-pools"]
+    ports:
+      - "${MODEL_LONG_PORT:-8002}:8000"
+    environment:
+      HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
+    command:
+      - --model
+      - ${LONG_MODEL_ID:-Qwen/Qwen2.5-Coder-7B-Instruct}
+      - --served-model-name
+      - ${LONG_SERVED_MODEL_NAME:-long-coder}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --gpu-memory-utilization
+      - ${LONG_GPU_MEMORY_UTILIZATION:-0.88}
+      - --max-model-len
+      - "65536"
+      - --max-num-seqs
+      - "16"
+      - --enable-prefix-caching
+      - --enable-chunked-prefill
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${LONG_GPU_COUNT:-1}
+              capabilities: [gpu]

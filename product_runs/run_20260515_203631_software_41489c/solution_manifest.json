@@ -1,0 +1,20 @@
+{
+  "schema": "solution_manifest.v1",
+  "template": "spring-vue-management",
+  "stack": "Spring Boot + Vue",
+  "goal": "写一个成熟的企业员工管理系统，包含部门、岗位、工资、登录权限和操作审计",
+  "retrieval_tags": [
+    "personnel-management",
+    "crud",
+    "api-contract",
+    "static-preview",
+    "delivery-checklist"
+  ],
+  "artifact_hints": [
+    "README.md",
+    "docs/PRODUCT_SPEC.md",
+    "docs/API_CONTRACT.md",
+    "docs/DATABASE_SCHEMA.md",
+    "preview/index.html"
+  ]
+}

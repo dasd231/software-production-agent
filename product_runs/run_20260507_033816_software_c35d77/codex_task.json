@@ -1,0 +1,61 @@
+{
+  "schema": "codex_handoff.v1",
+  "created_at": "2026-05-07T03:38:16",
+  "mode": "codex_handoff",
+  "execution_owner": "current Codex chat session",
+  "workspace": "E:\\Agent\\Demo1\\software-production-agent\\product_runs\\run_20260507_033816_software_c35d77",
+  "goal": "人员管理系统",
+  "planner_stage": "coding",
+  "pipeline_layers": [
+    {
+      "id": "requirement.normalize",
+      "name": "需求澄清与验收标准",
+      "description": "抽取项目类型、核心实体、页面、API、数据模型、验收条件。"
+    },
+    {
+      "id": "architecture.plan",
+      "name": "架构方案",
+      "description": "确定前端、后端、存储、测试、沙盒预览和交付结构。"
+    },
+    {
+      "id": "implementation.generate",
+      "name": "软件生产",
+      "description": "在当前 run workspace 内生成或改进用户产物。"
+    },
+    {
+      "id": "sandbox.verify",
+      "name": "沙箱运行测试",
+      "description": "只在产物目录内运行可控 smoke check，不触碰平台源码。"
+    },
+    {
+      "id": "delivery.package",
+      "name": "交付封装",
+      "description": "更新 README、交付清单、预览入口和 ZIP 可下载产物。"
+    }
+  ],
+  "existing_artifacts": [],
+  "acceptance_criteria": [
+    "所有用户可见产物必须写在本次 product_runs/<run_id> 工作区内。",
+    "不得修改 software-production-agent 平台源码，除非用户在 Codex 会话里明确要求。",
+    "需要生成 README、运行说明、验收清单和可下载产物。",
+    "如果是管理系统，必须包含业务场景、数据模型、CRUD、API 契约、测试说明和可预览界面。",
+    "运行测试或构建前先说明命令目的；失败时保留错误摘要和下一步修复建议。"
+  ],
+  "isolation_policy": {
+    "allowed_write_root": "E:\\Agent\\Demo1\\software-production-agent\\product_runs\\run_20260507_033816_software_c35d77",
+    "protected_roots": [
+      "software-production-agent/",
+      "agent_算法学习/",
+      "ai-codegen-pipeline-/",
+      "模块_模型训练/"
+    ],
+    "requires_user_approval_for_platform_source_changes": true
+  },
+  "handoff_steps": [
+    "Open CODEX_TASK.md in this run.",
+    "Implement inside the run workspace only.",
+    "Run focused verification commands when practical.",
+    "Write RESULT_SUMMARY.md with changed files, test results and residual risks."
+  ],
+  "improvement_context": ""
+}

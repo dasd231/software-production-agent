@@ -1,0 +1,69 @@
+{
+  "schema": "research_dataset_evolution.v1",
+  "generated_at": "2026-05-17T04:57:59+00:00",
+  "summary": {
+    "datasets": 4,
+    "balanced_datasets": 1,
+    "watch_datasets": 3
+  },
+  "observations": [
+    "grounded supervision improved from 1 to 10 examples",
+    "best-balanced dataset is protocol_rebalanced_20260516 with min_task_share=0.0625",
+    "best-balanced dataset already has a candidate model prepared"
+  ],
+  "rows": [
+    {
+      "training_run": "protocol_hardmix_20260516",
+      "dataset_id": "dataset-1e4c574e483686c6385a924e",
+      "accepted_examples": 103,
+      "min_task_share": 0.0097,
+      "task_balance_status": "watch",
+      "rag_grounded_answer_count": 1,
+      "action_protocol_count": 34,
+      "model_runs": [
+        "backup_qwen_protocol_hardmix_20260516"
+      ],
+      "has_candidate_model": false
+    },
+    {
+      "training_run": "protocol_mix_20260516",
+      "dataset_id": "dataset-ccd957c9b2d5f2887280ff92",
+      "accepted_examples": 91,
+      "min_task_share": 0.011,
+      "task_balance_status": "watch",
+      "rag_grounded_answer_count": 1,
+      "action_protocol_count": 22,
+      "model_runs": [
+        "backup_protocol_mix_20260516",
+        "backup_qwen_protocol_20260516"
+      ],
+      "has_candidate_model": false
+    },
+    {
+      "training_run": "protocol_rebalanced_20260516",
+      "dataset_id": "dataset-0f1cc25c95e3a85ab41e3b3c",
+      "accepted_examples": 112,
+      "min_task_share": 0.0625,
+      "task_balance_status": "ok",
+      "rag_grounded_answer_count": 10,
+      "action_protocol_count": 34,
+      "model_runs": [
+        "backup_qwen_grounding_rebalanced_20260516"
+      ],
+      "has_candidate_model": true
+    },
+    {
+      "training_run": "quality_training_20260515",
+      "dataset_id": "dataset-6f447ebebbe5f1e5d3ad24c9",
+      "accepted_examples": 69,
+      "min_task_share": 0.0145,
+      "task_balance_status": "watch",
+      "rag_grounded_answer_count": 1,
+      "action_protocol_count": 0,
+      "model_runs": [
+        "backup_quality_20260515"
+      ],
+      "has_candidate_model": false
+    }
+  ]
+}

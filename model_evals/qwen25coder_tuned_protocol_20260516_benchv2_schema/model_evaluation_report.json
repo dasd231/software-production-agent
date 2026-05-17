@@ -1,0 +1,510 @@
+{
+  "schema": "model_evaluation_report.v1",
+  "label": "qwen25coder_tuned_protocol_benchv2_schema",
+  "summary": {
+    "schema": "metric_report.v1",
+    "stage": "model_eval.summary",
+    "overall_score": 8.02,
+    "grade": "excellent",
+    "summary": {
+      "reports": 3,
+      "average_score": 6.26,
+      "grades": [
+        "watch",
+        "good",
+        "watch"
+      ],
+      "stages": [
+        "model_eval.action_protocol",
+        "model_eval.grounded_answer",
+        "model_eval.solution_reuse"
+      ]
+    },
+    "metrics": {
+      "report_count": {
+        "value": 3,
+        "score": 10.0,
+        "weight": 1.0,
+        "status": "ok",
+        "detail": ""
+      },
+      "average_score": {
+        "value": 6.26,
+        "score": 6.26,
+        "weight": 2.0,
+        "status": "ok",
+        "detail": ""
+      },
+      "risk_count": {
+        "value": 0,
+        "score": 10.0,
+        "weight": 1.2,
+        "status": "ok",
+        "detail": ""
+      },
+      "watch_count": {
+        "value": 2,
+        "score": 7.0,
+        "weight": 0.8,
+        "status": "ok",
+        "detail": ""
+      }
+    }
+  },
+  "reports": [
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.action_protocol",
+      "overall_score": 5.88,
+      "grade": "watch",
+      "summary": {
+        "cases": 8
+      },
+      "metrics": {
+        "valid_action_rate": {
+          "value": 0.75,
+          "score": 7.5,
+          "weight": 1.4,
+          "status": "ok",
+          "detail": ""
+        },
+        "expected_action_rate": {
+          "value": 0.5,
+          "score": 5.0,
+          "weight": 1.4,
+          "status": "ok",
+          "detail": ""
+        },
+        "expected_args_rate": {
+          "value": 0.5,
+          "score": 5.0,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.grounded_answer",
+      "overall_score": 7.1,
+      "grade": "good",
+      "summary": {
+        "cases": 4
+      },
+      "metrics": {
+        "required_term_recall": {
+          "value": 0.5,
+          "score": 5.0,
+          "weight": 1.5,
+          "status": "ok",
+          "detail": ""
+        },
+        "citation_recall": {
+          "value": 0.75,
+          "score": 7.5,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        },
+        "forbidden_term_safety": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "average_case_score": {
+          "value": 6.375,
+          "score": 6.38,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "final_answer_rate": {
+          "value": 0.75,
+          "score": 7.5,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.solution_reuse",
+      "overall_score": 5.81,
+      "grade": "watch",
+      "summary": {
+        "cases": 4
+      },
+      "metrics": {
+        "required_term_recall": {
+          "value": 0.25,
+          "score": 2.5,
+          "weight": 1.5,
+          "status": "ok",
+          "detail": ""
+        },
+        "citation_recall": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        },
+        "forbidden_term_safety": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "average_case_score": {
+          "value": 5.5,
+          "score": 5.5,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "final_answer_rate": {
+          "value": 0.25,
+          "score": 2.5,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "action_workspace_index_v2",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"list_files\",\"args\":{}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "list_files",
+        "args": {}
+      },
+      "action_valid": true,
+      "action_match": false,
+      "expected_args_ok": true,
+      "error": "",
+      "score": 6.67
+    },
+    {
+      "case_id": "action_resource_registry_v2",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"training_dataset\",\"args\":{\"roots\":[\"./training_runs\"]}}",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "2 validation errors for ActionDTO\ntype\n  Input should be 'action' [type=literal_error, input_value='training_dataset', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\naction\n  Field required [type=missing, input_value={'type': 'training_datase...': ['./training_runs']}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_research_synthesize_v2",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"research_synthesize\",\"args\":{\"query\":\"权限升级方案\",\"top_k\":3,\"solution_dirs\":[\"./product_runs\"]}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "research_synthesize",
+        "args": {
+          "query": "权限升级方案",
+          "top_k": 3,
+          "solution_dirs": [
+            "./product_runs"
+          ]
+        }
+      },
+      "action_valid": true,
+      "action_match": true,
+      "expected_args_ok": false,
+      "error": "",
+      "score": 6.67
+    },
+    {
+      "case_id": "action_training_prepare_v2",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"training_prepare\",\"args\":{\"output_dir\":\"./training_runs/v2\",\"learning_dirs\":[\"./learning_runs/demo\"],\"solution_dirs\":[\"./product_runs\"],\"dataset_format\":\"messages\"}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "training_prepare",
+        "args": {
+          "output_dir": "./training_runs/v2",
+          "learning_dirs": [
+            "./learning_runs/demo"
+          ],
+          "solution_dirs": [
+            "./product_runs"
+          ],
+          "dataset_format": "messages"
+        }
+      },
+      "action_valid": true,
+      "action_match": true,
+      "expected_args_ok": true,
+      "error": "",
+      "score": 10.0
+    },
+    {
+      "case_id": "action_backup_model_train_v2",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"training_prepare\",\"args\":{\"output_dir\":\"./model_runs/v2\",\"learning_dirs\":[\"./learning_runs/v2\"],\"solution_dirs\":[\"./product_runs\"],\"dataset_format\":\"messages\",\"eval_ratio\":0.15,\"min_chars\":20,\"max_examples\":2000,\"model_hint\":\"deepseek\",\"include_protocol_examples\":true,\"protocol_example_limit\":0}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "training_prepare",
+        "args": {
+          "output_dir": "./model_runs/v2",
+          "learning_dirs": [
+            "./learning_runs/v2"
+          ],
+          "solution_dirs": [
+            "./product_runs"
+          ],
+          "dataset_format": "messages",
+          "eval_ratio": 0.15,
+          "min_chars": 20,
+          "max_examples": 2000,
+          "model_hint": "deepseek",
+          "include_protocol_examples": true,
+          "protocol_example_limit": 0
+        }
+      },
+      "action_valid": true,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "",
+      "score": 3.33
+    },
+    {
+      "case_id": "action_evidence_ledger_v2",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"evidence_ledger\",\"args\":{\"roots\":[\"./product_runs\",\"./learning_runs\"],\"output_path\":\"evidence_ledger.json\"}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "evidence_ledger",
+        "args": {
+          "roots": [
+            "./product_runs",
+            "./learning_runs"
+          ],
+          "output_path": "evidence_ledger.json"
+        }
+      },
+      "action_valid": true,
+      "action_match": true,
+      "expected_args_ok": true,
+      "error": "",
+      "score": 10.0
+    },
+    {
+      "case_id": "action_model_route_plan_v2",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"model_route_plan\",\"args\":{\"goal\":\"长上下文 RAG 请求\",\"prompt\":\"可选原始prompt或上下文\",\"business_type\":\"\",\"require_json\":true,\"max_output_tokens\":2048}}",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "2 validation errors for ActionDTO\ntype\n  Input should be 'action' [type=literal_error, input_value='model_route_plan', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\naction\n  Field required [type=missing, input_value={'type': 'model_route_pla...x_output_tokens': 2048}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_finish_v2",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"finish\",\"args\":{\"reason\":\"done\"}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "finish",
+        "args": {
+          "reason": "done"
+        }
+      },
+      "action_valid": true,
+      "action_match": true,
+      "expected_args_ok": true,
+      "error": "",
+      "score": 10.0
+    },
+    {
+      "case_id": "grounding_stack_v2",
+      "category": "grounded_answer",
+      "prediction": "答案：Spring Boot + Vue [E1]",
+      "answer": "Spring Boot + Vue [E1]",
+      "has_final_answer": true,
+      "found_terms": [
+        "Spring Boot",
+        "Vue"
+      ],
+      "missing_terms": [],
+      "found_citations": [
+        "[E1]"
+      ],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 1.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 10.0
+    },
+    {
+      "case_id": "grounding_role_v2",
+      "category": "grounded_answer",
+      "prediction": "答案：HR_ADMIN[E1]",
+      "answer": "HR_ADMIN[E1]",
+      "has_final_answer": true,
+      "found_terms": [
+        "HR_ADMIN"
+      ],
+      "missing_terms": [],
+      "found_citations": [
+        "[E1]"
+      ],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 1.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 10.0
+    },
+    {
+      "case_id": "grounding_endpoints_v2",
+      "category": "grounded_answer",
+      "prediction": "```json\n{\"新增接口\": \"/employees\", \"删除接口\": \"/employees/{id}\"}\n```",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "POST /employees",
+        "DELETE /employees/{id}"
+      ],
+      "found_citations": [],
+      "missing_citations": [
+        "[E1]"
+      ],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 0.0,
+      "safe": true,
+      "score": 1.5
+    },
+    {
+      "case_id": "grounding_permissions_v2",
+      "category": "grounded_answer",
+      "prediction": "答案：[E1]",
+      "answer": "[E1]",
+      "has_final_answer": true,
+      "found_terms": [],
+      "missing_terms": [
+        "employee:read",
+        "employee:write"
+      ],
+      "found_citations": [
+        "[E1]"
+      ],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_surface_v2",
+      "category": "solution_reuse",
+      "prediction": "```json\n{\"answer\":\"README, API contract, data schema, tests, preview\"}\n```",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "README",
+        "API contract",
+        "data schema",
+        "tests",
+        "preview"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_incremental_v2",
+      "category": "solution_reuse",
+      "prediction": "```json\n{\"answer\":\"升级成熟方案时优先考虑改进现有代码和文档，而不是完全重写。\"}\n```",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "incremental improvement"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_auth_upgrade_v2",
+      "category": "solution_reuse",
+      "prediction": "```json\n{\"answer\":\"请提供两个正式生产环境的权限升级动作。\"}\n```",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "JWT",
+        "database",
+        "route guards",
+        "permission interceptors"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_evidence_v2",
+      "category": "solution_reuse",
+      "prediction": "{\"answers\":\"答案：manifests, evaluation reports, evidence ledger\"}",
+      "answer": "manifests, evaluation reports, evidence ledger\"}",
+      "has_final_answer": true,
+      "found_terms": [
+        "manifests",
+        "evaluation reports",
+        "evidence ledger"
+      ],
+      "missing_terms": [],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 1.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 10.0
+    }
+  ],
+  "benchmark_id": "backup_model_eval.v2.json",
+  "lineage_backfill": {
+    "backfilled_at": "2026-05-16T12:57:43+00:00",
+    "benchmark_method": "exact_case_signature",
+    "subject_method": "explicit_override",
+    "model_run": "backup_qwen_protocol_20260516"
+  },
+  "subject": {
+    "model_version": "backup-08e1a18c01536ed4f030",
+    "base_model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    "adapter_name": "backup-qwen-protocol-lora",
+    "dataset_snapshot_id": "dataset-ccd957c9b2d5f2887280ff92",
+    "training_job_spec_id": "jobspec-da7605e938fd05c049842a14"
+  }
+}

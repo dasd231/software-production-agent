@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spring Vue Preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5f7f4;
+      --ink: #171a1d;
+      --line: #d9ded4;
+      --panel: #ffffff;
+      --accent: #176f52;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    .login-screen {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .login-card {
+      width: min(460px, calc(100vw - 32px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      padding: 24px;
+      box-shadow: 0 18px 46px rgba(26,30,27,.12);
+      display: grid;
+      gap: 10px;
+    }
+    .login-card h1 { margin: 0; font-size: 42px; letter-spacing: 0; }
+    .eyebrow { margin: 0; color: var(--accent); font-weight: 780; }
+    .permission-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .permission-list span { border-radius: 999px; padding: 5px 8px; background: #e9f7ef; color: #12513b; font-size: 12px; font-weight: 720; }
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 230px 1fr;
+    }
+    aside {
+      border-right: 1px solid var(--line);
+      background: #111815;
+      color: white;
+      padding: 22px;
+    }
+    aside h1 { margin: 0 0 24px; font-size: 20px; letter-spacing: 0; }
+    nav button {
+      width: 100%;
+      min-height: 42px;
+      margin-bottom: 8px;
+      border: 0;
+      border-radius: 8px;
+      background: rgba(255,255,255,.08);
+      color: white;
+      text-align: left;
+      padding: 0 12px;
+      font-weight: 720;
+      cursor: pointer;
+    }
+    nav button.active { background: #e9f7ef; color: #124b38; }
+    main { padding: 24px; display: grid; gap: 16px; align-content: start; }
+    .hero, .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 14px 36px rgba(26,30,27,.08);
+    }
+    .hero { padding: 20px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 16px; }
+    .hero h2 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .stat { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #fbfcf8; }
+    .stat strong { display: block; font-size: 24px; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; }
+    input, select {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 12px;
+      font: inherit;
+      background: white;
+    }
+    button.primary {
+      min-height: 40px;
+      border: 0;
+      border-radius: 8px;
+      padding: 0 14px;
+      background: #111815;
+      color: white;
+      font-weight: 760;
+      cursor: pointer;
+    }
+    button.ghost {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 10px;
+      background: white;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    button.danger { color: #9b3d26; background: #fff3ef; border-color: #efc7b9; }
+    .crud-form {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(110px, 1fr)) auto auto;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { color: #5f6861; font-size: 13px; }
+    .badge { border-radius: 999px; padding: 4px 8px; background: #e9f7ef; color: #12513b; font-size: 12px; }
+    .card { padding: 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+    .row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .extension-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .module-card { display: grid; gap: 10px; }
+    .module-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 9px; background: #fbfcf8; }
+    .module-row em { color: #687269; font-style: normal; font-size: 12px; }
+    .timeline { display: grid; gap: 10px; }
+    .timeline div { border-left: 3px solid var(--accent); padding-left: 10px; }
+    @media (max-width: 860px) {
+      .app { grid-template-columns: 1fr; }
+      aside { border-right: 0; }
+      .hero, .grid { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: 1fr; }
+      .crud-form { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <section id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <p class="eyebrow">人员管理系统</p>
+      <h1>登录页面</h1>
+      <p>默认演示账号：admin / admin123。登录后进入带角色权限的人事管理工作台。</p>
+      <input id="loginUser" value="admin" placeholder="用户名">
+      <input id="loginPass" value="admin123" type="password" placeholder="密码">
+      <button class="primary" id="loginButton" type="button">登录进入系统</button>
+      <div class="permission-list">
+        <span>HR_ADMIN</span><span>employee:read</span><span>employee:write</span><span>audit:read</span>
+      </div>
+    </div>
+  </section>
+  <div class="app" id="appShell" hidden>
+    <aside>
+      <h1>人员管理系统</h1>
+      <nav>
+        <button class="active" data-view="员工总览">员工总览</button>
+        <button data-view="工资管理">工资管理</button>
+        <button data-view="部门配置">部门配置</button>
+        <button data-view="岗位流转">岗位流转</button>
+        <button data-view="权限中心">权限中心</button>
+        
+      </nav>
+    </aside>
+    <main>
+      <section class="hero">
+        <div>
+          <h2 id="viewTitle">员工总览</h2>
+          <p>基于上一版软件方案继续改进，不要从零开始。 上一版 run: run_20260507_035530_improve_970d88 上一版原始需求: 写一个成熟</p>
+          <div class="toolbar">
+            <input id="search" placeholder="搜索姓名、部门或岗位">
+            <select id="department">
+              <option value="">全部部门</option>
+              <option>研发部</option>
+              <option>财务部</option>
+              <option>人事部</option>
+            </select>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat"><span>员工</span><strong id="total">4</strong></div>
+          <div class="stat"><span>平均工资</span><strong>12.8k</strong></div>
+          <div class="stat"><span>待审批</span><strong>3</strong></div>
+        </div>
+      </section>
+      <section class="grid">
+        <div class="card">
+          <form id="employeeForm" class="crud-form">
+            <input id="nameInput" placeholder="姓名">
+            <select id="formDepartment">
+              <option>研发部</option>
+              <option>财务部</option>
+              <option>人事部</option>
+              <option>市场部</option>
+            </select>
+            <select id="positionInput">
+              <option>后端工程师</option>
+              <option>前端工程师</option>
+              <option>薪酬专员</option>
+              <option>HRBP</option>
+              <option>产品经理</option>
+            </select>
+            <input id="salaryInput" type="number" min="0" placeholder="工资">
+            <select id="statusInput">
+              <option>在职</option>
+              <option>试用</option>
+              <option>待调岗</option>
+              <option>离职</option>
+            </select>
+            <button class="primary" id="submitButton" type="submit">新增</button>
+            <button class="ghost" id="resetButton" type="button">清空</button>
+          </form>
+          <table>
+            <thead><tr><th>姓名</th><th>部门</th><th>岗位</th><th>工资</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h3>项目成熟度提示</h3>
+          <div class="timeline">
+            <div>后端提供员工 GET/POST/PUT/DELETE</div>
+            <div>前端提供新增、编辑、删除、筛选</div>
+            <div>已增加登录页面、角色权限和 Auth API</div>
+            
+            <div>下一步需要接入数据库、JWT/权限拦截器和测试</div>
+          </div>
+        </div>
+      </section>
+      <section class="extension-grid">
+        
+      </section>
+    </main>
+  </div>
+  <script>
+    const loginButton = document.getElementById('loginButton');
+    if (loginButton) {
+      loginButton.addEventListener('click', () => {
+        document.getElementById('loginScreen').hidden = true;
+        document.getElementById('appShell').hidden = false;
+      });
+    }
+
+    let people = [
+      { id: 1, name: '林夏', department: '研发部', position: '后端工程师', salary: 15000, status: '在职' },
+      { id: 2, name: '周澄', department: '研发部', position: '前端工程师', salary: 13000, status: '试用' },
+      { id: 3, name: '许诺', department: '财务部', position: '薪酬专员', salary: 11000, status: '在职' },
+      { id: 4, name: '陈一', department: '人事部', position: 'HRBP', salary: 12000, status: '待调岗' }
+    ];
+    const rows = document.getElementById('rows');
+    const search = document.getElementById('search');
+    const department = document.getElementById('department');
+    const form = document.getElementById('employeeForm');
+    const nameInput = document.getElementById('nameInput');
+    const formDepartment = document.getElementById('formDepartment');
+    const positionInput = document.getElementById('positionInput');
+    const salaryInput = document.getElementById('salaryInput');
+    const statusInput = document.getElementById('statusInput');
+    const submitButton = document.getElementById('submitButton');
+    let editingId = null;
+
+    function resetForm() {
+      editingId = null;
+      nameInput.value = '';
+      formDepartment.value = '研发部';
+      positionInput.value = '后端工程师';
+      salaryInput.value = '';
+      statusInput.value = '在职';
+      submitButton.textContent = '新增';
+    }
+
+    function render() {
+      const q = search.value.trim().toLowerCase();
+      const dep = department.value;
+      const filtered = people.filter((p) => {
+        const hit = [p.name, p.department, p.position, p.status].join(' ').toLowerCase().includes(q);
+        return hit && (!dep || p.department === dep);
+      });
+      rows.innerHTML = filtered.map((p) => `
+        <tr>
+          <td>${p.name}</td><td>${p.department}</td><td>${p.position}</td><td>${p.salary}</td>
+          <td><span class="badge">${p.status}</span></td>
+          <td class="row-actions">
+            <button class="ghost" type="button" data-edit="${p.id}">编辑</button>
+            <button class="ghost danger" type="button" data-delete="${p.id}">删除</button>
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById('total').textContent = filtered.length;
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const payload = {
+        name: nameInput.value.trim(),
+        department: formDepartment.value,
+        position: positionInput.value,
+        salary: Number(salaryInput.value || 0),
+        status: statusInput.value
+      };
+      if (!payload.name) return;
+      if (editingId) {
+        people = people.map((person) => person.id === editingId ? { ...person, ...payload } : person);
+      } else {
+        const nextId = Math.max(0, ...people.map((person) => person.id)) + 1;
+        people = [...people, { id: nextId, ...payload }];
+      }
+      resetForm();
+      render();
+    });
+
+    rows.addEventListener('click', (event) => {
+      const editId = event.target.dataset.edit;
+      const deleteId = event.target.dataset.delete;
+      if (editId) {
+        const person = people.find((item) => item.id === Number(editId));
+        if (!person) return;
+        editingId = person.id;
+        nameInput.value = person.name;
+        formDepartment.value = person.department;
+        positionInput.value = person.position;
+        salaryInput.value = person.salary;
+        statusInput.value = person.status;
+        submitButton.textContent = '保存';
+      }
+      if (deleteId) {
+        people = people.filter((item) => item.id !== Number(deleteId));
+        if (editingId === Number(deleteId)) resetForm();
+        render();
+      }
+    });
+
+    document.querySelectorAll('nav button').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('nav button').forEach((x) => x.classList.remove('active'));
+        button.classList.add('active');
+        document.getElementById('viewTitle').textContent = button.dataset.view;
+      });
+    });
+    search.addEventListener('input', render);
+    department.addEventListener('change', render);
+    document.getElementById('resetButton').addEventListener('click', resetForm);
+    const importButton = document.getElementById('importButton');
+    const exportButton = document.getElementById('exportButton');
+    if (importButton) importButton.addEventListener('click', () => document.getElementById('exchangeStatus').textContent = '已模拟导入 3 条员工数据');
+    if (exportButton) exportButton.addEventListener('click', () => document.getElementById('exchangeStatus').textContent = '已生成员工导出预览数据');
+    resetForm();
+    render();
+  </script>
+</body>
+</html>

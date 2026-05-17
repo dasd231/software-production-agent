@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: platform-api-token
+  namespace: software-production-agent
+type: Opaque
+stringData:
+  token: "change-me"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: product-runs-pvc
+  namespace: software-production-agent
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-api
+  namespace: software-production-agent
+  labels:
+    app: platform-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: platform-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: platform-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: platform-api
+          image: registry.example.com/software-production-agent/platform-api:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: AGENT_RUNS_ROOT
+              value: /data/product_runs
+            - name: MAIN_DEEPSEEK_BASE_URL
+              value: http://model-vllm:8000/v1
+            - name: MAIN_DEEPSEEK_MODEL
+              value: Qwen/Qwen2.5-Coder-7B-Instruct
+            - name: MAIN_DEEPSEEK_API_KEY
+              value: local-vllm
+            - name: MODEL_ADMISSION_BACKEND
+              value: local
+            - name: MODEL_SHORT_BASE_URL
+              value: http://model-vllm-short:8000/v1
+            - name: MODEL_LONG_BASE_URL
+              value: http://model-vllm-long:8000/v1
+            - name: MODEL_AGENT_BASE_URL
+              value: http://model-agent:8000/v1
+            - name: MODEL_BATCH_BASE_URL
+              value: http://model-batch:8000/v1
+            - name: MODEL_SHORT_POOL_MAX_CONCURRENCY
+              value: "128"
+            - name: MODEL_LONG_POOL_MAX_CONCURRENCY
+              value: "8"
+            - name: MODEL_AGENT_POOL_MAX_CONCURRENCY
+              value: "32"
+            - name: MODEL_TRAINING_BATCH_POOL_MAX_CONCURRENCY
+              value: "4"
+            - name: AGENT_PLATFORM_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: platform-api-token
+                  key: token
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          volumeMounts:
+            - name: product-runs
+              mountPath: /data/product_runs
+      volumes:
+        - name: product-runs
+          persistentVolumeClaim:
+            claimName: product-runs-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-api
+  namespace: software-production-agent
+spec:
+  selector:
+    app: platform-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

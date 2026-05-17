@@ -1,0 +1,6 @@
+{
+  "goal": "生成Spring Boot+Vue的人员管理系统，包含工资，部门，岗位啥的，标准的大学生毕业设计",
+  "mode": "demo",
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}

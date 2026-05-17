@@ -1,0 +1,64 @@
+{
+  "schema": "research_task_taxonomy.v1",
+  "research_goal": "agent_operations_and_project_evidence_understanding",
+  "task_families": [
+    {
+      "id": "project_understanding",
+      "label": "项目理解",
+      "description": "理解项目结构、技术栈、入口、模块边界与运行方式。",
+      "example_tasks": [
+        "architecture_qa",
+        "module_localization",
+        "entrypoint_detection",
+        "dependency_understanding"
+      ]
+    },
+    {
+      "id": "evidence_grounding",
+      "label": "证据定位",
+      "description": "为结论定位代码、文档、日志或 manifest 证据。",
+      "example_tasks": [
+        "evidence_retrieval",
+        "citation_selection",
+        "evidence_verification"
+      ]
+    },
+    {
+      "id": "evidence_chain_reasoning",
+      "label": "证据链理解",
+      "description": "将多源证据组织成可追踪的项目结论链。",
+      "example_tasks": [
+        "chain_reconstruction",
+        "multi_hop_grounding",
+        "source_conflict_resolution"
+      ]
+    },
+    {
+      "id": "agent_operations",
+      "label": "Agent 运维",
+      "description": "理解 Agent 状态、工具调用、失败恢复与任务推进。",
+      "example_tasks": [
+        "tool_selection",
+        "state_diagnosis",
+        "failure_classification",
+        "next_action_prediction"
+      ]
+    },
+    {
+      "id": "change_understanding",
+      "label": "变更理解",
+      "description": "理解代码、配置或训练变化带来的影响。",
+      "example_tasks": [
+        "change_impact_analysis",
+        "regression_localization",
+        "artifact_delta_summary"
+      ]
+    }
+  ],
+  "reserved_for_future_innovation": [
+    "project_encoder",
+    "evidence_encoder",
+    "cross_attention_fusion",
+    "graph_or_hierarchical_reasoning"
+  ]
+}

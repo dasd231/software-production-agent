@@ -1,0 +1,213 @@
+{
+  "schema": "training_lineage_backfill_report.v1",
+  "generated_at": "2026-05-16T13:04:18+00:00",
+  "mode": "apply",
+  "overrides_path": "E:\\Agent\\Demo1\\software-production-agent\\research_workbench\\lineage_overrides.json",
+  "summary": {
+    "model_runs": 4,
+    "changed_model_runs": 0,
+    "evaluation_runs": 15,
+    "benchmark_ids_backfilled": 0,
+    "evaluation_links_backfilled": 0,
+    "promotion_decisions_generated": 0,
+    "linked_evaluations": 5,
+    "baseline_only_evaluations": 7,
+    "unresolved_candidate_evaluations": 3
+  },
+  "model_runs": [
+    {
+      "run": "backup_protocol_mix_20260516",
+      "changed": false,
+      "changes": [],
+      "dataset_snapshot_id": "dataset-ccd957c9b2d5f2887280ff92",
+      "training_job_spec_id": "jobspec-ec7629aea07c7e119c7d32d3"
+    },
+    {
+      "run": "backup_quality_20260515",
+      "changed": false,
+      "changes": [],
+      "dataset_snapshot_id": "dataset-6f447ebebbe5f1e5d3ad24c9",
+      "training_job_spec_id": "jobspec-3e638b94c5e10f014a24ccd9"
+    },
+    {
+      "run": "backup_qwen_protocol_20260516",
+      "changed": false,
+      "changes": [],
+      "dataset_snapshot_id": "dataset-ccd957c9b2d5f2887280ff92",
+      "training_job_spec_id": "jobspec-da7605e938fd05c049842a14"
+    },
+    {
+      "run": "backup_qwen_protocol_hardmix_20260516",
+      "changed": false,
+      "changes": [],
+      "dataset_snapshot_id": "dataset-1e4c574e483686c6385a924e",
+      "training_job_spec_id": "jobspec-9e126f5ba54d273291ece2bc"
+    }
+  ],
+  "benchmark_backfill": [
+    {
+      "evaluation_run": "base_20260516",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v1.json"
+    },
+    {
+      "evaluation_run": "base_20260516_benchv2",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v2.json"
+    },
+    {
+      "evaluation_run": "base_20260516_benchv2_schema",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v2.json"
+    },
+    {
+      "evaluation_run": "base_20260516_v2",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v1.json"
+    },
+    {
+      "evaluation_run": "qwen25coder_base_20260516_benchv2",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v2.json"
+    },
+    {
+      "evaluation_run": "qwen25coder_base_20260516_benchv2_schema",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v2.json"
+    },
+    {
+      "evaluation_run": "qwen25coder_base_20260516_benchv3",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v3.json"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_hardmix_20260516_benchv2_schema",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v2.json"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_hardmix_20260516_benchv3",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v3.json"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_protocol_20260516_benchv2",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v2.json"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_protocol_20260516_benchv2_schema",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v2.json"
+    },
+    {
+      "evaluation_run": "tuned_20260516",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v1.json"
+    },
+    {
+      "evaluation_run": "tuned_20260516_v2",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v1.json"
+    },
+    {
+      "evaluation_run": "tuned_old_20260516_benchv2",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v2.json"
+    },
+    {
+      "evaluation_run": "tuned_protocol_20260516_benchv2",
+      "changed": false,
+      "benchmark_id": "backup_model_eval.v2.json"
+    }
+  ],
+  "evaluation_links": [
+    {
+      "evaluation_run": "qwen25coder_tuned_protocol_20260516_benchv2",
+      "changed": false,
+      "model_run": "backup_qwen_protocol_20260516",
+      "model_version": "backup-08e1a18c01536ed4f030"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_protocol_20260516_benchv2_schema",
+      "changed": false,
+      "model_run": "backup_qwen_protocol_20260516",
+      "model_version": "backup-08e1a18c01536ed4f030"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_hardmix_20260516_benchv2_schema",
+      "changed": false,
+      "model_run": "backup_qwen_protocol_hardmix_20260516",
+      "model_version": "backup-6cc03ce09f7d72204aba"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_hardmix_20260516_benchv3",
+      "changed": false,
+      "model_run": "backup_qwen_protocol_hardmix_20260516",
+      "model_version": "backup-6cc03ce09f7d72204aba"
+    },
+    {
+      "evaluation_run": "tuned_protocol_20260516_benchv2",
+      "changed": false,
+      "model_run": "backup_protocol_mix_20260516",
+      "model_version": "backup-f4a25b2403a8832a2c01"
+    }
+  ],
+  "promotion_decisions": [
+    {
+      "evaluation_run": "qwen25coder_tuned_protocol_20260516_benchv2",
+      "changed": false,
+      "status": "blocked",
+      "passed": false,
+      "baseline_evaluation_run": "qwen25coder_base_20260516_benchv2"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_protocol_20260516_benchv2_schema",
+      "changed": false,
+      "status": "blocked",
+      "passed": false,
+      "baseline_evaluation_run": "qwen25coder_base_20260516_benchv2_schema"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_hardmix_20260516_benchv2_schema",
+      "changed": false,
+      "status": "blocked",
+      "passed": false,
+      "baseline_evaluation_run": "qwen25coder_base_20260516_benchv2_schema"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_hardmix_20260516_benchv3",
+      "changed": false,
+      "status": "blocked",
+      "passed": false,
+      "baseline_evaluation_run": "qwen25coder_base_20260516_benchv3"
+    },
+    {
+      "evaluation_run": "tuned_protocol_20260516_benchv2",
+      "changed": false,
+      "status": "blocked",
+      "passed": false,
+      "baseline_evaluation_run": "base_20260516_benchv2"
+    }
+  ],
+  "baseline_only_evaluations": [
+    "base_20260516",
+    "base_20260516_benchv2",
+    "base_20260516_benchv2_schema",
+    "base_20260516_v2",
+    "qwen25coder_base_20260516_benchv2",
+    "qwen25coder_base_20260516_benchv2_schema",
+    "qwen25coder_base_20260516_benchv3"
+  ],
+  "unresolved_candidate_evaluations": [
+    "tuned_20260516",
+    "tuned_20260516_v2",
+    "tuned_old_20260516_benchv2"
+  ],
+  "notes": [
+    "模型训练产物只做可确定重建，不改写历史 model_version。",
+    "评测到模型版本的关联只接受显式 override，避免根据命名猜测错误挂接。",
+    "benchmark_id 通过 case-id 精确签名匹配反推，而不是通过目录名模糊猜测。",
+    "baseline 评测不要求挂到 adapter 版本，只有缺少 model_version 的候选评测才算待处理项。"
+  ]
+}

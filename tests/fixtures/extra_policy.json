@@ -1,0 +1,5 @@
+{
+  "forbidden_substrings": [
+    "__agent_policy_probe_block__"
+  ]
+}

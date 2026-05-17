@@ -1,0 +1,24 @@
+{
+  "schema": "ui_users.v1",
+  "users": [
+    {
+      "id": "c286808ec25778dac2e85c2b",
+      "username": "showcase_admin",
+      "role": "admin",
+      "permissions": [
+        "run:create",
+        "run:read",
+        "run:improve",
+        "run:download",
+        "solution:read",
+        "admin:users",
+        "chain:registry",
+        "training:prepare",
+        "crawler:profile"
+      ],
+      "salt": "00cb97dc7d47111fba6c0489bb2d0fb1",
+      "password_hash": "deaf4b0cc3563809931f20e44c9a7fff2c09f50f023da9159ac51e8310a223c0",
+      "created_at": "2026-05-15T11:50:41+00:00"
+    }
+  ]
+}

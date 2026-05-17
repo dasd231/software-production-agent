@@ -1,0 +1,64 @@
+{
+  "schema": "research_platform_evolution.v1",
+  "generated_at": "2026-05-17T04:57:59+00:00",
+  "north_star": "control-plane owned evidence, Ray-first execution, data-plane by workload",
+  "adoption_order": [
+    "1. Ray execution contracts and manifests",
+    "2. Parquet/object-storage dataset snapshots",
+    "3. Spark batch pipelines for large training corpora",
+    "4. Flink for genuinely stateful real-time flows"
+  ],
+  "anti_patterns": [
+    "Do not replace the control plane with a scheduler.",
+    "Do not introduce Flink before there is a real streaming problem.",
+    "Do not let Spark own model-promotion or workflow semantics.",
+    "Do not start clusters from ordinary metadata inspection paths."
+  ],
+  "rows": [
+    {
+      "name": "control_plane",
+      "primary": "project-owned",
+      "owns": [
+        "job spec",
+        "manifest",
+        "lineage",
+        "promotion gate",
+        "audit"
+      ],
+      "entry_condition": ""
+    },
+    {
+      "name": "execution_plane",
+      "primary": "Ray",
+      "owns": [
+        "distributed tasks",
+        "actors",
+        "resource labels",
+        "retryable jobs"
+      ],
+      "entry_condition": ""
+    },
+    {
+      "name": "batch_data_plane",
+      "primary": "Spark",
+      "owns": [
+        "lakehouse transforms",
+        "large-scale cleaning",
+        "dedupe",
+        "partitioned datasets"
+      ],
+      "entry_condition": "JSONL snapshots become too large or too numerous for local Python preparation"
+    },
+    {
+      "name": "streaming_data_plane",
+      "primary": "Flink",
+      "owns": [
+        "event streams",
+        "stateful monitoring",
+        "online feature updates",
+        "audit aggregation"
+      ],
+      "entry_condition": "continuous event throughput and stateful real-time decisions become material"
+    }
+  ]
+}

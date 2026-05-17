@@ -1,0 +1,135 @@
+{
+  "schema": "backup_model_benchmark.v1",
+  "cases": [
+    {
+      "case_id": "action_workspace_index",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。为了了解当前工作区，调用 workspace_index。",
+      "expected_action": "workspace_index",
+      "expected_args": {},
+      "max_new_tokens": 96
+    },
+    {
+      "case_id": "action_training_prepare",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。请准备微调数据集：output_dir='./training_runs/eval-demo'，learning_dirs=['./learning_runs/demo']，dataset_format='messages'。",
+      "expected_action": "training_prepare",
+      "expected_args": {
+        "output_dir": "./training_runs/eval-demo",
+        "learning_dirs": [
+          "./learning_runs/demo"
+        ],
+        "dataset_format": "messages"
+      },
+      "max_new_tokens": 128
+    },
+    {
+      "case_id": "action_backup_train",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。请为备用本地模型生成训练任务：training_dir='./training_runs/demo'，output_dir='./model_runs/demo'，base_model='deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'，launch=false。",
+      "expected_action": "backup_model_train",
+      "expected_args": {
+        "training_dir": "./training_runs/demo",
+        "output_dir": "./model_runs/demo",
+        "base_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+        "launch": false
+      },
+      "max_new_tokens": 160
+    },
+    {
+      "case_id": "grounding_stack",
+      "category": "grounded_answer",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。只能依据证据回答，并在句末保留 [E1]。证据 [E1]：Stack = `Spring Boot + Vue`。问题：该方案使用什么技术栈？",
+      "required_terms": [
+        "Spring Boot",
+        "Vue"
+      ],
+      "required_citations": [
+        "[E1]"
+      ],
+      "forbidden_terms": [
+        "React",
+        "Django"
+      ],
+      "max_new_tokens": 220
+    },
+    {
+      "case_id": "grounding_endpoints",
+      "category": "grounded_answer",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。只能依据证据回答，并在句末保留 [E1]。证据 [E1]：Employee CRUD 包含 GET /employees、POST /employees、PUT /employees/{id}、DELETE /employees/{id}。问题：列出新增员工和删除员工对应的接口。",
+      "required_terms": [
+        "POST /employees",
+        "DELETE /employees/{id}"
+      ],
+      "required_citations": [
+        "[E1]"
+      ],
+      "forbidden_terms": [
+        "PATCH /employees",
+        "GET /delete"
+      ],
+      "max_new_tokens": 240
+    },
+    {
+      "case_id": "grounding_auth",
+      "category": "grounded_answer",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。只能依据证据回答，并在句末保留 [E1]。证据 [E1]：Demo account username=admin，role=HR_ADMIN；权限包括 employee:read、employee:write、payroll:read、audit:read。问题：演示账号的角色是什么，并列出两个权限。",
+      "required_terms": [
+        "HR_ADMIN",
+        "employee:read",
+        "employee:write"
+      ],
+      "required_citations": [
+        "[E1]"
+      ],
+      "forbidden_terms": [
+        "SUPER_ADMIN",
+        "finance:write"
+      ],
+      "max_new_tokens": 240
+    },
+    {
+      "case_id": "reuse_surface",
+      "category": "solution_reuse",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。根据历史方案复用笔记，概括一个成熟人员管理系统最少要保留哪些交付物。笔记：Keep the product surface complete: README, API contract, data schema, tests and preview.",
+      "required_terms": [
+        "README",
+        "API",
+        "data schema",
+        "tests",
+        "preview"
+      ],
+      "forbidden_terms": [
+        "blockchain"
+      ],
+      "max_new_tokens": 260
+    },
+    {
+      "case_id": "reuse_incremental",
+      "category": "solution_reuse",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。根据历史方案复用笔记回答：升级成熟方案时，应该优先增量改进还是整体替换？笔记：Prefer incremental improvement over replacing mature artifacts.",
+      "required_terms": [
+        "incremental improvement"
+      ],
+      "forbidden_terms": [
+        "整体替换"
+      ],
+      "max_new_tokens": 220
+    },
+    {
+      "case_id": "reuse_auth_upgrade",
+      "category": "solution_reuse",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。根据升级笔记，给出两个正式生产环境的权限升级动作。笔记：Replace demo token with JWT or server session. Store users, roles and permissions in database tables. Add route guards and backend permission interceptors.",
+      "required_terms": [
+        "JWT",
+        "database",
+        "route guards",
+        "permission interceptors"
+      ],
+      "forbidden_terms": [
+        "明文密码"
+      ],
+      "max_new_tokens": 280
+    }
+  ]
+}

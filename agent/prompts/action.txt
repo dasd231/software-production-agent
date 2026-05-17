@@ -1,0 +1,38 @@
+单行 JSON，必须字段：
+{"type":"action","action":"<write_file|read_file|run_command|list_files|finish|git_status|git_init|workspace_index|mcp_capabilities|mcp_call|production_check|web_search|chain_registry|resource_registry|integration_catalog|integration_embed_plan|model_runtime_status|model_admission_status|model_admission_acquire|model_admission_release|model_admission_renew|model_route_plan|enterprise_stack_plan|industrial_maturity_plan|enterprise_readiness_check|workflow_validate|innovation_radar|intent_compile|workflow_dry_run|evidence_ledger|solution_publish|research_synthesize|training_prepare|backup_model_train|github_crawl_profile>","args":{}}
+
+write_file: {"path":"相对工作区路径","content":"..."}
+read_file: {"path":"..."}
+run_command: {"command":"...","timeout":120}
+list_files: {"pattern":"**/*"}  # 可选
+finish: {"reason":"..."}
+git_status: {}   # 无额外字段
+git_init: {}    # 无额外字段；幂等
+workspace_index: {}  # 无额外字段；获取工作区轻量索引
+mcp_capabilities: {}  # 无额外字段；获取 MCP 能力目录
+mcp_call: {"tool":"workspace.search","args":{"query":"flask","top_k":3}}  # args 可选，默认 {}
+production_check: {"include_pytest":true,"timeout":120}  # 字段可选；运行本地生产验证
+web_search: {"query":"搜索词","top_k":5,"provider":"duckduckgo"}  # 字段可选；DuckDuckGo 网络搜索
+chain_registry: {"name":"research"}  # name 可选；查看主链可调用分链、权限、成本、输入输出和评价阶段
+resource_registry: {"type":"solution","roots":["./product_runs"]}  # 字段可选；查看模型、分链、知识库、方案、训练集和 run manifest
+integration_catalog: {"category":"design"}  # category 可选；查看第三方嵌入能力目录
+integration_embed_plan: {"integration_id":"figma","resource_url":"https://www.figma.com/file/abc/Product","mode":"embed_panel","requested_capabilities":["frame_selection","design_token_handoff"]}  # 生成第三方嵌入、postMessage 桥、安全权限和资产映射方案
+model_runtime_status: {"provider":"main_deepseek","probe":true,"timeout":2}  # 字段可选；查看本地/兼容模型服务 base_url、模型、API key 状态和健康探测
+model_admission_status: {}  # 无额外字段；查看模型池活动 lease、可用并发和 backpressure 状态
+model_admission_acquire: {"goal":"短API请求","prompt":"","business_type":"","require_json":false,"max_output_tokens":256,"idempotency_key":"req-001","lease_ttl_s":20}  # 高并发模型准入，拿到 lease 后才能转发模型网关
+model_admission_release: {"lease_id":"..."}  # 模型请求完成后释放 lease
+model_admission_renew: {"lease_id":"...","lease_ttl_s":20}  # 长请求续租 lease
+model_route_plan: {"goal":"分析长上下文RAG请求如何进入vLLM/SGLang池","prompt":"可选原始prompt或上下文","business_type":"","require_json":false,"max_output_tokens":2048}  # 估算token、判断业务类型、选择short/long/agent/training模型池和准入策略
+enterprise_stack_plan: {"goal":"上市企业级软件生产平台，支持热迭代、vLLM模型服务、审计和灰度发布","scale":"listed","regulated":true,"provider":"main_deepseek"}  # 企业技术选型、热迭代、Model Plane 和治理门禁规划
+industrial_maturity_plan: {"goal":"军工工业级私有化AI CTO审查成熟度","scale":"listed","regulated":true,"provider":"main_deepseek"}  # 安全关键/工业级成熟度评估、CTO拷问证据包、路线图和非协商门禁
+enterprise_readiness_check: {}  # 无额外字段；运行企业上线静态门禁，检查 FastAPI/ASGI、vLLM、K8s、HPA、PDB、NetworkPolicy、CI 等
+workflow_validate: {"spec":{"schema":"workflow.v1","version":"demo","nodes":[{"id":"research","chain":"research"},{"id":"train","chain":"training"}],"edges":[["research","train"]]}}  # 校验轻量工作流 JSON，不执行
+innovation_radar: {"roots":["./product_runs","./learning_runs"]}  # 字段可选；生成项目创新雷达、差异化机会卡和推荐工作流
+intent_compile: {"goal":"爬取常规前后端项目，产出方案资产并准备训练数据","roots":["./product_runs","./learning_runs"]}  # 自然语言需求 -> workflow.v1 + 校验 + dry-run + 资源建议
+workflow_dry_run: {"spec":{"schema":"workflow.v1","version":"demo","nodes":[{"id":"research","chain":"research"},{"id":"publish","chain":"solution_publish"},{"id":"ledger","chain":"evidence_ledger"}],"edges":[["research","publish"],["publish","ledger"]]}}  # 展示执行顺序、权限、预期产物和前置门禁，不执行
+evidence_ledger: {"roots":["./product_runs","./learning_runs"],"output_path":"evidence_ledger.json"}  # 汇总 run/solution/evaluation/governance/events 证据，可选落盘
+solution_publish: {"output_dir":"./solution_library","title":"personnel-management-auth-workflow","source_type":"product_run"}  # 把当前 run 发布为可复用方案资产
+research_synthesize: {"query":"需求或问题","top_k":4,"use_web":false,"use_llm":false,"solution_dirs":["./product_runs"],"learning_dirs":["./learning_runs/demo"],"web_provider":"duckduckgo","llm_provider":"openai","llm_model":null}  # 本地方案库+RAG优先，可选Web补充和LLM综合
+training_prepare: {"output_dir":"./training_runs/demo","learning_dirs":["./learning_runs/demo"],"solution_dirs":["./product_runs"],"dataset_format":"messages","eval_ratio":0.15,"min_chars":20,"max_examples":2000,"model_hint":"deepseek","include_protocol_examples":true,"protocol_example_limit":0}  # 准备微调/SFT数据集和训练计划；默认注入动作协议样本；不启动GPU训练
+backup_model_train: {"training_dir":"./training_runs/demo","output_dir":"./model_runs/backup-demo","base_model":"deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B","adapter_name":"backup-local-lora","launch":false,"min_quality_score":6.5,"min_train_examples":20,"per_device_train_batch_size":1,"gradient_accumulation_steps":8,"lora_r":16,"lora_alpha":32,"target_modules":"all-linear"}  # 基于高质量训练集生成备用本地模型训练任务、环境门禁和版本清单；只有门禁通过时才可启动
+github_crawl_profile: {"query":"spring boot vue management system","output_dir":"./crawl_runs/fullstack","github":false,"local_repos":["./some_repo"],"repo_limit":5,"min_stars":50,"allowed_licenses":["MIT","Apache-2.0"],"updated_after":"2024-01-01T00:00:00Z","quality_threshold":6.5}  # 爬取/画像常规前后端项目，打架构标签和质量分，高质量样本导出本地方案备份

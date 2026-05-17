@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sandboxed Frontend Prototype</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f6f7f3;
+      --ink: #151817;
+      --line: #d9ded4;
+      --accent: #16724f;
+      --panel: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+    main {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 36px 0;
+      display: grid;
+      gap: 16px;
+    }
+    .toolbar, .board, .drawer {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 16px 40px rgba(24, 30, 26, 0.08);
+    }
+    .toolbar {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+    h1 { margin: 0; font-size: clamp(28px, 5vw, 52px); letter-spacing: 0; }
+    p { line-height: 1.6; }
+    input {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 12px;
+      font: inherit;
+    }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      border: 0;
+      border-radius: 8px;
+      min-height: 38px;
+      padding: 0 12px;
+      background: #111418;
+      color: white;
+      font-weight: 760;
+      cursor: pointer;
+    }
+    button.secondary { background: #e9eee8; color: var(--ink); }
+    .board {
+      padding: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .lane {
+      min-height: 260px;
+      border: 1px dashed #bfc7bd;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcf8;
+    }
+    .lane h2 { margin: 0 0 10px; font-size: 14px; color: var(--accent); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: white;
+      margin-bottom: 10px;
+      cursor: grab;
+    }
+    .drawer {
+      padding: 16px;
+      display: none;
+    }
+    .drawer.open { display: block; }
+    .note { color: #a45b26; }
+    @media (max-width: 760px) {
+      .board { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="toolbar">
+      <h1>自定义前端交互沙盒</h1>
+      <p>给我一个无敌华丽的网页，我不喜欢目前这个交互页面，最好跟豆包长得一样</p>
+      <p class="note">LLM generation failed; using offline sandbox template. RateLimitError: Error code: 429 - {&#x27;error&#x27;: {&#x27;message&#x27;: &#x27;You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.&#x27;, &#x27;type&#x27;: &#x27;insufficient_quota&#x27;, &#x27;param&#x27;: None, &#x27;code&#x27;: &#x27;insufficient_quota&#x27;}}</p>
+      <input id="search" placeholder="筛选卡片，例如：安全、交互、需求">
+      <div class="actions">
+        <button data-tag="dashboard">dashboard</button>
+<button data-tag="filter">filter</button>
+<button data-tag="modal">modal</button>
+        <button id="openDrawer" class="secondary">打开交互说明</button>
+        <button id="addCard">新增卡片</button>
+      </div>
+    </section>
+    <section class="board" aria-label="interactive board">
+      <div class="lane" data-lane="idea"><h2>Idea</h2><article class="card"><h3>需求捕获</h3><p>把自然语言需求拆成页面、组件、状态和动作。</p></article>
+<article class="card"><h3>交互编排</h3><p>用本地状态模拟用户点击、筛选、弹窗和看板流转。</p></article>
+<article class="card"><h3>安全预览</h3><p>脚本只在 sandbox iframe 中运行，不能联网或访问父页面。</p></article></div>
+      <div class="lane" data-lane="build"><h2>Build</h2></div>
+      <div class="lane" data-lane="verify"><h2>Verify</h2></div>
+    </section>
+    <aside id="drawer" class="drawer">
+      <h2>交互说明</h2>
+      <p>点击标签筛选卡片；点击新增卡片模拟用户需求变更；拖拽卡片到不同列模拟任务流转。</p>
+      <button id="closeDrawer" class="secondary">关闭</button>
+    </aside>
+  </main>
+  <script>
+    const board = document.querySelector('.board');
+    const lanes = [...document.querySelectorAll('.lane')];
+    const search = document.getElementById('search');
+    const drawer = document.getElementById('drawer');
+    let dragged = null;
+
+    function refreshFilter(value) {
+      const term = value.trim().toLowerCase();
+      document.querySelectorAll('.card').forEach((card) => {
+        card.style.display = card.textContent.toLowerCase().includes(term) ? '' : 'none';
+      });
+    }
+
+    document.querySelectorAll('.card').forEach((card) => {
+      card.draggable = true;
+      card.addEventListener('dragstart', () => dragged = card);
+    });
+    lanes.forEach((lane) => {
+      lane.addEventListener('dragover', (event) => event.preventDefault());
+      lane.addEventListener('drop', () => {
+        if (dragged) lane.appendChild(dragged);
+      });
+    });
+    search.addEventListener('input', (event) => refreshFilter(event.target.value));
+    document.querySelectorAll('[data-tag]').forEach((button) => {
+      button.addEventListener('click', () => refreshFilter(button.dataset.tag));
+    });
+    document.getElementById('openDrawer').addEventListener('click', () => drawer.classList.add('open'));
+    document.getElementById('closeDrawer').addEventListener('click', () => drawer.classList.remove('open'));
+    document.getElementById('addCard').addEventListener('click', () => {
+      const card = document.createElement('article');
+      card.className = 'card';
+      card.draggable = true;
+      card.innerHTML = '<h3>用户新增想法</h3><p>这个卡片来自本地交互，不会写回源代码。</p>';
+      card.addEventListener('dragstart', () => dragged = card);
+      document.querySelector('[data-lane="idea"]').appendChild(card);
+    });
+  </script>
+</body>
+</html>

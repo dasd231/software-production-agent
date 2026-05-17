@@ -1,0 +1,107 @@
+{
+  "schema": "research_metric_taxonomy.v1",
+  "metric_groups": [
+    {
+      "id": "project_understanding",
+      "label": "项目理解指标",
+      "metrics": [
+        {
+          "name": "architecture_qa_accuracy",
+          "meaning": "项目结构与设计问答的正确率"
+        },
+        {
+          "name": "module_localization_accuracy",
+          "meaning": "关键模块、入口或实现位置定位正确率"
+        },
+        {
+          "name": "dependency_relation_accuracy",
+          "meaning": "模块关系与依赖判断正确率"
+        }
+      ]
+    },
+    {
+      "id": "evidence_quality",
+      "label": "证据质量指标",
+      "metrics": [
+        {
+          "name": "evidence_recall",
+          "meaning": "关键证据是否被召回"
+        },
+        {
+          "name": "citation_precision",
+          "meaning": "引用证据中真正支持结论的比例"
+        },
+        {
+          "name": "evidence_chain_completeness",
+          "meaning": "证据链是否覆盖结论形成所需的关键环节"
+        },
+        {
+          "name": "grounded_answer_rate",
+          "meaning": "最终回答中带有效证据支撑的比例"
+        }
+      ]
+    },
+    {
+      "id": "agent_operations",
+      "label": "Agent 运维指标",
+      "metrics": [
+        {
+          "name": "tool_selection_accuracy",
+          "meaning": "面对状态与目标时选对工具或动作的比例"
+        },
+        {
+          "name": "state_diagnosis_accuracy",
+          "meaning": "对失败、阻塞和运行状态判断的正确率"
+        },
+        {
+          "name": "recovery_policy_accuracy",
+          "meaning": "失败后给出正确恢复策略的比例"
+        },
+        {
+          "name": "protocol_validity_rate",
+          "meaning": "结构化动作输出满足协议的比例"
+        }
+      ]
+    },
+    {
+      "id": "generalization",
+      "label": "泛化指标",
+      "metrics": [
+        {
+          "name": "heldout_project_score",
+          "meaning": "在未见项目上的综合表现"
+        },
+        {
+          "name": "cross_domain_transfer_score",
+          "meaning": "跨技术栈或跨项目类型迁移能力"
+        }
+      ]
+    },
+    {
+      "id": "training_efficiency",
+      "label": "训练效率指标",
+      "metrics": [
+        {
+          "name": "trainable_parameter_count",
+          "meaning": "新增或可训练参数量"
+        },
+        {
+          "name": "gpu_hours",
+          "meaning": "训练耗时与算力消耗"
+        },
+        {
+          "name": "score_gain_per_gpu_hour",
+          "meaning": "单位算力带来的性能收益"
+        },
+        {
+          "name": "min_task_share",
+          "meaning": "训练集中最稀少任务族的占比，用于暴露极端任务失衡"
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "当前先保留主流、可解释指标；后续创新指标可在此基础上扩展。",
+    "论文实验中建议区分协议有效性、工具选择能力和证据理解能力，避免混测。"
+  ]
+}

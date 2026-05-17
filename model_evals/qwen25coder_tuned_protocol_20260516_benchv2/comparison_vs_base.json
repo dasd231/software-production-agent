@@ -1,0 +1,31 @@
+{
+  "schema": "model_evaluation_comparison.v1",
+  "base_label": "qwen25coder_base_benchv2",
+  "tuned_label": "qwen25coder_tuned_protocol_benchv2",
+  "stages": [
+    {
+      "stage": "model_eval.action_protocol",
+      "base_score": 0.0,
+      "tuned_score": 0.0,
+      "delta": 0.0
+    },
+    {
+      "stage": "model_eval.grounded_answer",
+      "base_score": 7.99,
+      "tuned_score": 7.1,
+      "delta": -0.89
+    },
+    {
+      "stage": "model_eval.solution_reuse",
+      "base_score": 4.92,
+      "tuned_score": 5.81,
+      "delta": 0.89
+    },
+    {
+      "stage": "summary",
+      "base_score": 6.76,
+      "tuned_score": 6.76,
+      "delta": 0.0
+    }
+  ]
+}

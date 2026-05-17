@@ -1,0 +1,439 @@
+{
+  "schema": "model_evaluation_report.v1",
+  "label": "base_benchv2_schema",
+  "summary": {
+    "schema": "metric_report.v1",
+    "stage": "model_eval.summary",
+    "overall_score": 6.16,
+    "grade": "watch",
+    "summary": {
+      "reports": 3,
+      "average_score": 3.39,
+      "grades": [
+        "risk",
+        "watch",
+        "watch"
+      ],
+      "stages": [
+        "model_eval.action_protocol",
+        "model_eval.grounded_answer",
+        "model_eval.solution_reuse"
+      ]
+    },
+    "metrics": {
+      "report_count": {
+        "value": 3,
+        "score": 10.0,
+        "weight": 1.0,
+        "status": "ok",
+        "detail": ""
+      },
+      "average_score": {
+        "value": 3.39,
+        "score": 3.39,
+        "weight": 2.0,
+        "status": "ok",
+        "detail": ""
+      },
+      "risk_count": {
+        "value": 1,
+        "score": 7.0,
+        "weight": 1.2,
+        "status": "ok",
+        "detail": ""
+      },
+      "watch_count": {
+        "value": 2,
+        "score": 7.0,
+        "weight": 0.8,
+        "status": "ok",
+        "detail": ""
+      }
+    }
+  },
+  "reports": [
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.action_protocol",
+      "overall_score": 0.0,
+      "grade": "risk",
+      "summary": {
+        "cases": 8
+      },
+      "metrics": {
+        "valid_action_rate": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.4,
+          "status": "ok",
+          "detail": ""
+        },
+        "expected_action_rate": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.4,
+          "status": "ok",
+          "detail": ""
+        },
+        "expected_args_rate": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.grounded_answer",
+      "overall_score": 5.25,
+      "grade": "watch",
+      "summary": {
+        "cases": 4
+      },
+      "metrics": {
+        "required_term_recall": {
+          "value": 0.5,
+          "score": 5.0,
+          "weight": 1.5,
+          "status": "ok",
+          "detail": ""
+        },
+        "citation_recall": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        },
+        "forbidden_term_safety": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "average_case_score": {
+          "value": 4.5,
+          "score": 4.5,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "final_answer_rate": {
+          "value": 0.75,
+          "score": 7.5,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.solution_reuse",
+      "overall_score": 4.92,
+      "grade": "watch",
+      "summary": {
+        "cases": 4
+      },
+      "metrics": {
+        "required_term_recall": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.5,
+          "status": "ok",
+          "detail": ""
+        },
+        "citation_recall": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        },
+        "forbidden_term_safety": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "average_case_score": {
+          "value": 4.0,
+          "score": 4.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "final_answer_rate": {
+          "value": 0.25,
+          "score": 2.5,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "action_workspace_index_v2",
+      "category": "action_protocol",
+      "prediction": "嗯，用户让我先读取当前工作区概况。我需要理解用户的需求是什么。看起来用户可能是在处理一个自动化或自动化的工作流程，比如在生产环境中运行测试或监控。用户提到要使用web_search，所以可能需要搜索相关的文档或文档。\n\n用户还提到要使用web_search，所以我要确保在action.json中包含这个字段。同时，用户可能需要一些额外的字段，比如路径和内容。我需要检查是否有其他字段",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_resource_registry_v2",
+      "category": "action_protocol",
+      "prediction": "嗯，用户现在想要查看训练集资源。他们希望我生成一个action JSON，类型是training_dataset，根目录是./training_runs。首先，我需要确认这个请求是否符合我的职责范围。\n\n根据我的知识库，我有提供资源管理相关的动作，比如resource_registry，可以查看模型、知识库、方案库等。所以，这个请求应该属于资源管理，而不是直接的训练数据处理。\n\n接下来，我需要检查是否有相关的mcp_call或mcp_capabilities。资源管理方面，mcp_call可能需要特定的工具，比如workspace.search，但用户提供的示例中没有使用这个",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_research_synthesize_v2",
+      "category": "action_protocol",
+      "prediction": "嗯，我现在需要处理一个用户请求，他希望我生成一个针对“权限升级方案”的动作。用户特别指出不要联网，先做本地研究综合，查询关键词“权限升级方案”，top_k=3，solution_dirs=['./product_runs']。我得仔细分析这些要求，确保生成的JSON符合所有条件。\n\n首先，用户明确指出不要联网，这意味着我应该专注于本地研究，而不是通过网络搜索获取信息。这可能意味着我需要自己设计查询参数，或者使用特定的工具来爬取相关项目。但用户已经提供了具体的query参数，所以我需要按照这些参数来执行。\n\n接下来，用户要求top_k=3，这意味着在结果中选择三个最相关的项目。这可能涉及到从产品_runs目录下提取三个相关的内容。",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_training_prepare_v2",
+      "category": "action_protocol",
+      "prediction": "嗯，用户让我准备备用模型训练集，具体要求是输出dir是./training_runs/v2，学习_dirs是./learning_runs/demo，解决方案dir是./product_runs，格式是messages。首先，我需要确认用户的需求是什么。看起来他们可能在准备数据集，可能用于微调模型或者训练新模型。\n\n接下来，我要考虑用户可能的身份。可能是软件开发人员，正在准备数据集，或者是在准备数据集的准备阶段。他们可能需要一个结构化的JSON文件，方便后续处理和部署。\n\n然后，我要检查是否有相关的动作或工具可以执行这个任务。根据之前的指示，用户需要使用training_prepare动作，它会生成可审计的数据集和训练计划。所以，我需要确保这个动作能够满足他们的需求。\n\n用户可能",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_backup_model_train_v2",
+      "category": "action_protocol",
+      "prediction": "嗯，用户希望生成一个备用本地模型候选任务。首先，我需要理解用户的具体需求。他们提供了一个示例，看起来是使用了GitHub CrawlProfile工具来爬取项目，并生成备份任务。用户提供的示例中，训练_dir、output_dir和base_model都明确给出，而launch参数是false，这可能意味着不需要启动训练。\n\n接下来，我要考虑用户可能的深层需求。他们可能需要一个类似示例的结构，用于他们的本地模型训练任务。这可能包括训练数据的路径、输出路径和预训练模型。此外，用户可能希望生成一个备份任务，以备不时之需，所以备份任务的参数也需要明确。\n\n然后，我需要检查是否有相关的工具或资源可以使用。用户提到使用GitHub CrawlProfile，所以这可能是一个合适的工具。此外，他们可能需要了解如何配置备份",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_evidence_ledger_v2",
+      "category": "action_protocol",
+      "prediction": "嗯，我现在需要处理一个用户请求，用户希望把 product_runs 和 learning_runs 汇总成证据账本，并将结果保存到 evidence_ledger.json。首先，我得理解用户的具体需求是什么。\n\n用户提到“product_runs”和“learning_runs”，这两个可能是指不同的项目或阶段的运行数据。product_runs可能指的是生产阶段，而learning_runs可能指的是学习或训练阶段。用户希望将这些数据整合成一个证据账本，这可能意味着需要记录执行顺序、权限、预期结果和前置条件。\n\n接下来，我需要查看现有的action.json结构，看看是否有相关的动作可以执行这些任务。用户已经提到了evidence_ledger这个字段，所以可能需要使用 evidence_ledger。但用户已经明确要求输出到 evidence_ledger",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_model_route_plan_v2",
+      "category": "action_protocol",
+      "prediction": "嗯，我现在需要处理一个长上下文的RAG请求，目标是给这个请求分配模型路由。首先，我得理解RAG是什么。RAG通常指的是“Retrieval-Augmented Generation”，它结合了检索和生成，用于提高模型的响应速度和准确性。在上下文处理中，RAG可以帮助模型在遇到新上下文时，快速找到相关的信息。\n\n接下来，我需要明确用户的需求。用户希望给长上下文的RAG请求分配模型路由，这意味着我需要分析上下文，找到最相关的模型或者策略，然后决定如何路由这个请求。用户还提到max_output_tokens=2048，这可能意味着模型需要处理较长的上下文，所以模型的响应长度可能会更长。\n\n然后，我",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_finish_v2",
+      "category": "action_protocol",
+      "prediction": "嗯，用户给了我一个任务，让我作为软件生产 Agent 的主控，用 JSON 助手来管理各种动作。首先，我需要仔细阅读用户提供的所有规则和示例，确保自己完全理解任务要求。\n\n用户提到，每次只能输出一行合法 JSON，结构化，且不能把 gstack 或 shell 当作主框架。这意味着我需要专注于生成正确的 JSON 助手，而不是处理外部命令或脚本。\n\n接下来，用户给出了一个",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "grounding_stack_v2",
+      "category": "grounded_answer",
+      "prediction": "好，我现在需要回答用户的问题：“该方案使用什么技术栈？”，并且根据用户的要求，只能以“答案：”开头，保留证据，并且在句末保留 [E1]。用户已经提供了一个示例，我需要按照这个格式来。\n\n首先，用户提到这是一个可审计的软件生产 Agent，所以我的回答需要严格遵循技术栈的定义和用户提供的示例。用户提供的示例是“答案：Spring Boot + Vue，证据：Stack = `Spring Boot + Vue`。”，这说明我需要以技术栈的形式回答，使用Spring Boot和Vue，并在句末加上证据。\n\n接下来，我需要确定技术栈的具体内容。技术栈通常包括框架和库的组合。Spring Boot是一个框架，它提供了RESTful API、组件管理、测试框架和集成工具。Vue则是前端框架，它提供了响应式设计、组件化、适配器和适配器适配器（AAS）。\n\n因此，技术栈的组合应该是Spring Boot和Vue。在证据部分，我需要明确指出",
+      "answer": "Spring Boot + Vue，证据：Stack = `Spring Boot + Vue`。”，这说明我需要以技术栈的形式回答，使用Spring Boot和Vue，并在句末加上证据。\n\n接下来，我需要确定技术栈的具体内容。技术栈通常包括框架和库的组合。Spring Boot是一个框架，它提供了RESTful API、组件管理、测试框架和集成工具。Vue则是前端框架，它提供了响应式设计、组件化、适配器和适配器适配器（AAS）。\n\n因此，技术栈的组合应该是Spring Boot和Vue。在证据部分，我需要明确指出",
+      "has_final_answer": true,
+      "found_terms": [
+        "Spring Boot",
+        "Vue"
+      ],
+      "missing_terms": [],
+      "found_citations": [],
+      "missing_citations": [
+        "[E1]"
+      ],
+      "found_forbidden": [],
+      "term_recall": 1.0,
+      "citation_recall": 0.0,
+      "safe": true,
+      "score": 7.5
+    },
+    {
+      "case_id": "grounding_role_v2",
+      "category": "grounded_answer",
+      "prediction": "好，我现在需要回答用户的问题：“admin 的角色是什么？”首先，我得确认用户提供的上下文。用户提到这是一个可审计的软件生产 Agent，严格按用户要求回答，如果需要JSON就只输出JSON，而且不要展示思考过程，只输出最终答案，证据用[E1]。\n\n接下来，我需要分析用户提供的上下文。用户提到系统角色包括HR_ADMIN、MANAGER、EMPLOYEE，其中演示账号admin的角色是HR_ADMIN。这说明admin在系统中扮演HR_ADMIN的角色，但用户的问题是“admin 的角色是什么？”，所以可能需要进一步确认。\n\n用户可能是在测试我的能力，或者是在准备一个文档。我需要确保回答准确，同时遵守格式要求。根据用户提供的证据，系统角色中admin是HR_ADMIN，但问题问的是admin的具体角色，可能需要更多的信息。\n\n考虑到用户的问题，可能需要更多的上下文来确定admin的具体角色。例如，系统中可能还有其他角色，比如MANAGER和EMPLOYEE，但用户的问题只涉及admin。因此，可能需要假设admin在",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "HR_ADMIN"
+      ],
+      "found_citations": [],
+      "missing_citations": [
+        "[E1]"
+      ],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 0.0,
+      "safe": true,
+      "score": 1.5
+    },
+    {
+      "case_id": "grounding_endpoints_v2",
+      "category": "grounded_answer",
+      "prediction": "好，我现在需要解决的问题是分别列出新增和删除接口。根据用户提供的信息，新增员工使用 POST /employees，删除员工使用 DELETE /employees/{id}。我需要确保回答准确，并且以“答案：”开头，保留问题中的标签。\n\n首先，新增员工的接口是 POST /employees，这个接口用于发送请求来添加员工。接下来，删除员工的接口是 DELETE /employees/{id}，这里需要包含员工的唯一标识符，以便在删除时正确找到该员工。\n\n我应该按照用户的要求，只输出最终答案，并且以“答案：”开头，同时在句末保留问题中的标签。所以，我需要确保回答清晰，准确，并且符合格式要求。\n\n总结一下，新增员工的接口是 POST /employees，删除员工的接口是 DELETE /employees/{id}。这两个接口分别用于添加和删除员工，确保系统能够正确管理员工列表。\n</think>\n\n答案：新增员工使用 POST /employees，删除员工使用 DELETE /employees/{id}。",
+      "answer": "新增员工使用 POST /employees，删除员工使用 DELETE /employees/{id}。",
+      "has_final_answer": true,
+      "found_terms": [
+        "POST /employees",
+        "DELETE /employees/{id}"
+      ],
+      "missing_terms": [],
+      "found_citations": [],
+      "missing_citations": [
+        "[E1]"
+      ],
+      "found_forbidden": [],
+      "term_recall": 1.0,
+      "citation_recall": 0.0,
+      "safe": true,
+      "score": 7.5
+    },
+    {
+      "case_id": "grounding_permissions_v2",
+      "category": "grounded_answer",
+      "prediction": "好，我现在需要解决的问题是列出两个员工相关权限。用户已经告诉我，权限包括 employee:read、employee:write、audit:read。我需要按照要求，以“答案：”开头，只输出最终答案，而且句末保留这些权限信息。\n\n首先，我应该明确问题。问题是要列出两个员工相关的权限。员工通常指的是用户，而这里的权限是权限管理中的角色。所以，我需要从提供的权限中选择两个。\n\n提供的权限有三个：employee:read、employee:write、audit:read。我需要从中选出两个。可能的选择包括：\n\n1. 检查员工是否可以读取权限（employee:read）和写入权限（employee:write）。\n2. 检查员工是否可以读取审计权限（audit:read）。\n\n或者，也可以选择检查员工是否可以读取和写入普通权限，以及读取审计权限。这样，我就能列出两个员工相关权限。\n\n接下来，我需要确保输出格式正确。答案应该以“答案：”开头，然后列出两个权限，每个权限后面用逗号分隔，最后用句号结束。同时",
+      "answer": "”开头，然后列出两个权限，每个权限后面用逗号分隔，最后用句号结束。同时",
+      "has_final_answer": true,
+      "found_terms": [],
+      "missing_terms": [
+        "employee:read",
+        "employee:write"
+      ],
+      "found_citations": [],
+      "missing_citations": [
+        "[E1]"
+      ],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 0.0,
+      "safe": true,
+      "score": 1.5
+    },
+    {
+      "case_id": "reuse_surface_v2",
+      "category": "solution_reuse",
+      "prediction": "好，我现在需要回答用户的问题：“最少要保留哪些交付物？”这个问题是关于软件交付物的，用户希望了解最少需要保留哪些，以便确保软件的质量和可审计性。\n\n首先，用户提到“复用笔记”，这可能是指软件的文档和说明，比如README、API文档、数据 schema等。这些文档是软件开发的重要组成部分，帮助用户和团队理解软件的功能、实现方式以及数据的结构。\n\n接下来，用户提到“测试”，这包括单元测试、集成测试、用户界面测试等。测试确保软件在各种情况下都能正常运行，这在软件交付物中非常重要，因为测试结果直接影响到软件的可用性和可靠性。\n\n然后是“预览”，这可能指的是用户在使用软件时的初步体验，比如界面设计、功能测试等。预览阶段帮助用户了解软件的潜在问题，以便在正式交付时进行调整。\n\n此外，用户还提到了“代码”，这包括源代码、注释和文档。代码是软件的核心，代码质量直接影响软件的质量，而文档则帮助用户理解和维护代码。\n\n最后，用户提到“文档”，这可能包括用户手册、API文档、数据文档等。文档是软件的长期维护和用户支持的基础，确保用户能够顺利使用",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "README",
+        "API contract",
+        "data schema",
+        "tests",
+        "preview"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_incremental_v2",
+      "category": "solution_reuse",
+      "prediction": "嗯，我现在要升级一个成熟方案，但我不太确定该怎么做。根据用户的要求，升级成熟方案时应该优先怎么做呢？我记得之前学过一点关于软件升级的知识，但可能有些细节记不太清楚了。\n\n首先，我应该先了解当前方案的结构和功能。可能需要回顾一下现有的系统架构，看看哪些部分还在运行，哪些可能需要调整。然后，可能需要进行功能模块的分解，看看哪些部分是需要升级的，哪些是不需要的，或者可以优化的。\n\n接下来，可能需要进行需求分析。升级方案可能需要新的功能，或者对现有功能进行扩展，所以了解用户的需求非常重要。如果需求不明确，升级可能会出问题，甚至影响用户体验。\n\n然后，可能需要进行原型开发。通过模拟系统运行，看看升级后的系统如何表现，是否有性能问题，或者是否有新功能无法实现。这可能帮助发现潜在的问题，比如性能瓶颈或者功能遗漏。\n\n测试也是关键一步。升级方案需要经过全面的测试，包括功能测试、性能测试、安全性测试等。如果",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "incremental improvement"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_auth_upgrade_v2",
+      "category": "solution_reuse",
+      "prediction": "好，我现在需要回答用户的问题，给出两个正式生产环境的权限升级动作。用户已经提供了一些指导，包括使用软件生产代理，替换示例 token 为 JWT 或服务器 session，存储用户、角色和权限到数据库，添加路由 guard 和后端权限拦截。\n\n首先，我应该回顾用户提供的示例，看看它们是如何结构化的。示例中提到使用代理，替换 token，存储到数据库，添加路由 guard，以及后端权限拦截。这些步骤看起来是完整的，但可能需要更详细地描述每个动作。\n\n接下来，我需要考虑正式生产环境的权限升级通常包括哪些方面。通常，升级权限会涉及以下几个步骤：替换示例 token 为实际的 JWT 或 session，存储到数据库，添加路由 guard，以及后端权限拦截。此外，可能还需要添加权限管理模块，比如 API 验证，或者使用 API Gateway 来管理 API 的访问。\n\n然后，我应该思考每个步骤的具体内容。例如，替换 token 为 JWT 时，需要确保 token 的长度和格式正确，可能还需要使用正确的库，比如 JWT.js。存储到数据库时，可能需要使用 Postgres、MongoDB 或其他数据库，根据具体需求选择合适的表结构。路由 guard 是用于限制 API 的访问，确保只有授权的用户才能访问特定的 API 部分。",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "JWT",
+        "database",
+        "route guards",
+        "permission interceptors"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_evidence_v2",
+      "category": "solution_reuse",
+      "prediction": "好，我现在需要回答用户的问题：“为了后续可审计，应保留哪三类材料？”用户提到这是一个可审计的软件生产 Agent，所以我要严格遵循要求，只输出最终答案，且必须以“答案：”开头，同时不展示思考过程，只输出最终答案，且必须以“答案：”开头。\n\n首先，我需要理解用户的问题。用户问的是关于可审计的软件生产，特别是关于如何保留三类材料。用户还提到，复用笔记中提到复用材料，即保持相关数据，以便后续审计。因此，我需要确定在可审计的软件生产中，哪些材料是必须保留的。\n\n在软件生产中，通常会生成多个文档，包括用户手册、用户手册电子版、用户手册电子版修订版、用户手册电子版修订版的附录、用户手册电子版修订版的附录修订版、用户手册电子版修订版的附录修订版的附录、用户手册电子版修订版的附录修订版的附录修订版，以及用户手册电子版修订版的附录修订版的附录修订版的附录。这些都是重要的文档，用于用户手册的维护和更新。\n\n此外，用户手册的修订版、",
+      "answer": "”开头。\n\n首先，我需要理解用户的问题。用户问的是关于可审计的软件生产，特别是关于如何保留三类材料。用户还提到，复用笔记中提到复用材料，即保持相关数据，以便后续审计。因此，我需要确定在可审计的软件生产中，哪些材料是必须保留的。\n\n在软件生产中，通常会生成多个文档，包括用户手册、用户手册电子版、用户手册电子版修订版、用户手册电子版修订版的附录、用户手册电子版修订版的附录修订版、用户手册电子版修订版的附录修订版的附录、用户手册电子版修订版的附录修订版的附录修订版，以及用户手册电子版修订版的附录修订版的附录修订版的附录。这些都是重要的文档，用于用户手册的维护和更新。\n\n此外，用户手册的修订版、",
+      "has_final_answer": true,
+      "found_terms": [],
+      "missing_terms": [
+        "manifests",
+        "evaluation reports",
+        "evidence ledger"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    }
+  ],
+  "benchmark_id": "backup_model_eval.v2.json",
+  "lineage_backfill": {
+    "backfilled_at": "2026-05-16T12:57:43+00:00",
+    "benchmark_method": "exact_case_signature"
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "schema": "research_distributed_execution_overview.v1",
+  "generated_at": "2026-05-17T04:57:59+00:00",
+  "summary": {
+    "workloads": 6,
+    "gpu_workloads": 2,
+    "queues": 6
+  },
+  "queue_counts": {
+    "learning": 1,
+    "evaluation": 1,
+    "governance": 1,
+    "ingestion": 1,
+    "training": 1,
+    "workflow": 1
+  },
+  "gpu_workloads": [
+    "benchmark_evaluation",
+    "training_dispatch"
+  ],
+  "rows": [
+    {
+      "schema": "distributed_workload_spec.v1",
+      "id": "learning_run",
+      "label": "Learning material build",
+      "source_action": "agent.learning.cli",
+      "description": "Repository learning, slicing, cards and local RAG export.",
+      "queue": "learning",
+      "priority": "normal",
+      "backend": "ray_cluster",
+      "resources": {
+        "cpu": 2,
+        "gpu": 0,
+        "memory_gb": 4
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "retryable_failures": [
+          "transient_io",
+          "remote_fetch"
+        ]
+      },
+      "expected_outputs": [
+        "knowledge_cards.json",
+        "vector_index.jsonl",
+        "training_examples.jsonl"
+      ]
+    },
+    {
+      "schema": "distributed_workload_spec.v1",
+      "id": "benchmark_evaluation",
+      "label": "Model benchmark evaluation",
+      "source_action": "backup_eval",
+      "description": "Candidate or baseline model evaluation against a frozen benchmark.",
+      "queue": "evaluation",
+      "priority": "high",
+      "backend": "ray_cluster",
+      "resources": {
+        "cpu": 2,
+        "gpu": 1,
+        "memory_gb": 12
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "retryable_failures": [
+          "preempted",
+          "node_lost"
+        ]
+      },
+      "expected_outputs": [
+        "model_evaluation_report.json"
+      ]
+    },
+    {
+      "schema": "distributed_workload_spec.v1",
+      "id": "promotion_gate",
+      "label": "Promotion gate",
+      "source_action": "promotion",
+      "description": "Conservative candidate-vs-baseline gating after evaluation.",
+      "queue": "governance",
+      "priority": "high",
+      "backend": "ray_cluster",
+      "resources": {
+        "cpu": 1,
+        "gpu": 0,
+        "memory_gb": 2
+      },
+      "retry_policy": {
+        "max_attempts": 1,
+        "retryable_failures": []
+      },
+      "expected_outputs": [
+        "model_promotion_decision.json",
+        "promotion_report.md"
+      ]
+    },
+    {
+      "schema": "distributed_workload_spec.v1",
+      "id": "github_crawl_profile",
+      "label": "Repository crawl profile",
+      "source_action": "github_crawl_profile",
+      "description": "Batch crawling and architecture profiling for solution ingestion.",
+      "queue": "ingestion",
+      "priority": "normal",
+      "backend": "ray_cluster",
+      "resources": {
+        "cpu": 2,
+        "gpu": 0,
+        "memory_gb": 4
+      },
+      "retry_policy": {
+        "max_attempts": 3,
+        "retryable_failures": [
+          "transient_io",
+          "remote_fetch",
+          "rate_limited"
+        ]
+      },
+      "expected_outputs": [
+        "crawl_report.json",
+        "solutions/"
+      ]
+    },
+    {
+      "schema": "distributed_workload_spec.v1",
+      "id": "training_dispatch",
+      "label": "Training dispatch",
+      "source_action": "backup_model_train",
+      "description": "Dispatch an already-reviewed training job to a distributed execution substrate.",
+      "queue": "training",
+      "priority": "high",
+      "backend": "ray_cluster",
+      "resources": {
+        "cpu": 4,
+        "gpu": 1,
+        "memory_gb": 16
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "retryable_failures": [
+          "preempted",
+          "node_lost",
+          "transient_io"
+        ]
+      },
+      "expected_outputs": [
+        "adapter/",
+        "training_result.json",
+        "training_job_manifest.json"
+      ]
+    },
+    {
+      "schema": "distributed_workload_spec.v1",
+      "id": "agent_workflow",
+      "label": "Agent workflow",
+      "source_action": "workflow_dry_run",
+      "description": "Future distributed execution envelope for approved workflow nodes.",
+      "queue": "workflow",
+      "priority": "normal",
+      "backend": "ray_cluster",
+      "resources": {
+        "cpu": 1,
+        "gpu": 0,
+        "memory_gb": 2
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "retryable_failures": [
+          "transient_io"
+        ]
+      },
+      "expected_outputs": [
+        "run_manifest.json",
+        ".agent_events.jsonl"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schema": "model_evaluation_comparison.v1",
+  "base_label": "base_benchv2",
+  "tuned_label": "tuned_protocol_benchv2",
+  "stages": [
+    {
+      "stage": "model_eval.action_protocol",
+      "base_score": 0.0,
+      "tuned_score": 0.0,
+      "delta": 0.0
+    },
+    {
+      "stage": "model_eval.grounded_answer",
+      "base_score": 5.25,
+      "tuned_score": 7.27,
+      "delta": 2.02
+    },
+    {
+      "stage": "model_eval.solution_reuse",
+      "base_score": 4.92,
+      "tuned_score": 6.82,
+      "delta": 1.9
+    },
+    {
+      "stage": "summary",
+      "base_score": 6.16,
+      "tuned_score": 7.16,
+      "delta": 1.0
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-vllm-short
+  namespace: software-production-agent
+  labels:
+    app: model-vllm-short
+    model-pool: short
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: model-vllm-short
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: model-vllm-short
+        model-pool: short
+    spec:
+      containers:
+        - name: vllm-openai
+          image: vllm/vllm-openai:v0.8.5
+          args:
+            - --model
+            - Qwen/Qwen2.5-Coder-7B-Instruct
+            - --served-model-name
+            - short-coder
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+            - --gpu-memory-utilization
+            - "0.88"
+            - --max-model-len
+            - "16384"
+            - --max-num-seqs
+            - "256"
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+              memory: 48Gi
+            requests:
+              nvidia.com/gpu: "1"
+              cpu: "4"
+              memory: 32Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-vllm-short
+  namespace: software-production-agent
+spec:
+  selector:
+    app: model-vllm-short
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-vllm-long
+  namespace: software-production-agent
+  labels:
+    app: model-vllm-long
+    model-pool: long
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: model-vllm-long
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: model-vllm-long
+        model-pool: long
+    spec:
+      containers:
+        - name: vllm-openai
+          image: vllm/vllm-openai:v0.8.5
+          args:
+            - --model
+            - Qwen/Qwen2.5-Coder-7B-Instruct
+            - --served-model-name
+            - long-coder
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+            - --gpu-memory-utilization
+            - "0.88"
+            - --max-model-len
+            - "65536"
+            - --max-num-seqs
+            - "16"
+            - --enable-prefix-caching
+            - --enable-chunked-prefill
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+              memory: 80Gi
+            requests:
+              nvidia.com/gpu: "1"
+              cpu: "6"
+              memory: 64Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-vllm-long
+  namespace: software-production-agent
+spec:
+  selector:
+    app: model-vllm-long
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

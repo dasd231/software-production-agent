@@ -1,0 +1,230 @@
+{
+  "schema": "backup_model_benchmark.v2",
+  "description": "held-out, stricter benchmark with a heavier protocol-following slice",
+  "cases": [
+    {
+      "case_id": "action_workspace_index_v2",
+      "category": "action_protocol",
+      "prompt": "请先读取当前工作区概况。要求：只输出一行 action JSON，不要解释。",
+      "expected_action": "workspace_index",
+      "expected_args": {},
+      "max_new_tokens": 96
+    },
+    {
+      "case_id": "action_resource_registry_v2",
+      "category": "action_protocol",
+      "prompt": "我要查看训练集资源。只输出 action JSON：type='training_dataset'，roots=['./training_runs']。",
+      "expected_action": "resource_registry",
+      "expected_args": {
+        "type": "training_dataset",
+        "roots": [
+          "./training_runs"
+        ]
+      },
+      "max_new_tokens": 128
+    },
+    {
+      "case_id": "action_research_synthesize_v2",
+      "category": "action_protocol",
+      "prompt": "不要联网，先做本地研究综合。query='权限升级方案'，top_k=3，solution_dirs=['./product_runs']。只输出动作 JSON。",
+      "expected_action": "research_synthesize",
+      "expected_args": {
+        "query": "权限升级方案",
+        "top_k": 3,
+        "solution_dirs": [
+          "./product_runs"
+        ],
+        "use_web": false
+      },
+      "max_new_tokens": 160
+    },
+    {
+      "case_id": "action_training_prepare_v2",
+      "category": "action_protocol",
+      "prompt": "请准备备用模型训练集：output_dir='./training_runs/v2'，learning_dirs=['./learning_runs/demo']，solution_dirs=['./product_runs']，dataset_format='messages'。只输出 JSON。",
+      "expected_action": "training_prepare",
+      "expected_args": {
+        "output_dir": "./training_runs/v2",
+        "learning_dirs": [
+          "./learning_runs/demo"
+        ],
+        "solution_dirs": [
+          "./product_runs"
+        ],
+        "dataset_format": "messages"
+      },
+      "max_new_tokens": 160
+    },
+    {
+      "case_id": "action_backup_model_train_v2",
+      "category": "action_protocol",
+      "prompt": "生成备用本地模型候选任务：training_dir='./training_runs/v2'，output_dir='./model_runs/v2'，base_model='deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'，launch=false。不要解释。",
+      "expected_action": "backup_model_train",
+      "expected_args": {
+        "training_dir": "./training_runs/v2",
+        "output_dir": "./model_runs/v2",
+        "base_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+        "launch": false
+      },
+      "max_new_tokens": 180
+    },
+    {
+      "case_id": "action_evidence_ledger_v2",
+      "category": "action_protocol",
+      "prompt": "把 product_runs 和 learning_runs 汇总成证据账本，输出到 evidence_ledger.json。只返回动作 JSON。",
+      "expected_action": "evidence_ledger",
+      "expected_args": {
+        "roots": [
+          "./product_runs",
+          "./learning_runs"
+        ],
+        "output_path": "evidence_ledger.json"
+      },
+      "max_new_tokens": 160
+    },
+    {
+      "case_id": "action_model_route_plan_v2",
+      "category": "action_protocol",
+      "prompt": "给一个长上下文 RAG 请求做模型路由：goal='长上下文 RAG 请求'，require_json=true，max_output_tokens=2048。只输出 JSON。",
+      "expected_action": "model_route_plan",
+      "expected_args": {
+        "goal": "长上下文 RAG 请求",
+        "require_json": true,
+        "max_output_tokens": 2048
+      },
+      "max_new_tokens": 160
+    },
+    {
+      "case_id": "action_finish_v2",
+      "category": "action_protocol",
+      "prompt": "当前任务已经结束，请安全收束并写明 reason='done'。只输出一行 JSON。",
+      "expected_action": "finish",
+      "expected_args": {
+        "reason": "done"
+      },
+      "max_new_tokens": 96
+    },
+    {
+      "case_id": "grounding_stack_v2",
+      "category": "grounded_answer",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。只能依据证据回答，并在句末保留 [E1]。证据 [E1]：Stack = `Spring Boot + Vue`。问题：该方案使用什么技术栈？",
+      "required_terms": [
+        "Spring Boot",
+        "Vue"
+      ],
+      "required_citations": [
+        "[E1]"
+      ],
+      "forbidden_terms": [
+        "React",
+        "Django"
+      ],
+      "max_new_tokens": 220
+    },
+    {
+      "case_id": "grounding_role_v2",
+      "category": "grounded_answer",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。证据 [E1]：系统角色包括 HR_ADMIN、MANAGER、EMPLOYEE，其中演示账号 admin 的角色是 HR_ADMIN。问题：admin 的角色是什么？句末保留 [E1]。",
+      "required_terms": [
+        "HR_ADMIN"
+      ],
+      "required_citations": [
+        "[E1]"
+      ],
+      "forbidden_terms": [
+        "SUPER_ADMIN"
+      ],
+      "max_new_tokens": 220
+    },
+    {
+      "case_id": "grounding_endpoints_v2",
+      "category": "grounded_answer",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。证据 [E1]：新增员工使用 POST /employees，删除员工使用 DELETE /employees/{id}。问题：分别列出新增和删除接口。句末保留 [E1]。",
+      "required_terms": [
+        "POST /employees",
+        "DELETE /employees/{id}"
+      ],
+      "required_citations": [
+        "[E1]"
+      ],
+      "forbidden_terms": [
+        "PATCH /employees",
+        "GET /delete"
+      ],
+      "max_new_tokens": 240
+    },
+    {
+      "case_id": "grounding_permissions_v2",
+      "category": "grounded_answer",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。证据 [E1]：权限包括 employee:read、employee:write、audit:read。问题：列出两个员工相关权限。句末保留 [E1]。",
+      "required_terms": [
+        "employee:read",
+        "employee:write"
+      ],
+      "required_citations": [
+        "[E1]"
+      ],
+      "forbidden_terms": [
+        "finance:write"
+      ],
+      "max_new_tokens": 240
+    },
+    {
+      "case_id": "reuse_surface_v2",
+      "category": "solution_reuse",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。复用笔记：成熟软件方案至少保留 README、API contract、data schema、tests、preview。问题：最少要保留哪些交付物？",
+      "required_terms": [
+        "README",
+        "API contract",
+        "data schema",
+        "tests",
+        "preview"
+      ],
+      "forbidden_terms": [
+        "blockchain"
+      ],
+      "max_new_tokens": 260
+    },
+    {
+      "case_id": "reuse_incremental_v2",
+      "category": "solution_reuse",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。复用笔记：Prefer incremental improvement over replacing mature artifacts. 问题：升级成熟方案时优先怎么做？",
+      "required_terms": [
+        "incremental improvement"
+      ],
+      "forbidden_terms": [
+        "整体替换"
+      ],
+      "max_new_tokens": 220
+    },
+    {
+      "case_id": "reuse_auth_upgrade_v2",
+      "category": "solution_reuse",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。升级笔记：Replace demo token with JWT or server session. Store users, roles and permissions in database tables. Add route guards and backend permission interceptors. 问题：给出两个正式生产环境的权限升级动作。",
+      "required_terms": [
+        "JWT",
+        "database",
+        "route guards",
+        "permission interceptors"
+      ],
+      "forbidden_terms": [
+        "明文密码"
+      ],
+      "max_new_tokens": 280
+    },
+    {
+      "case_id": "reuse_evidence_v2",
+      "category": "solution_reuse",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。复用笔记：A reusable solution should keep manifests, evaluation reports and evidence ledger so later runs can be audited. 问题：为了后续可审计，应保留哪三类材料？",
+      "required_terms": [
+        "manifests",
+        "evaluation reports",
+        "evidence ledger"
+      ],
+      "forbidden_terms": [
+        "只保留截图"
+      ],
+      "max_new_tokens": 260
+    }
+  ]
+}

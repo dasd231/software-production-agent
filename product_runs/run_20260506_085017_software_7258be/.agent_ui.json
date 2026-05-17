@@ -1,0 +1,6 @@
+{
+  "goal": "给我一个无敌华丽的网页，我不喜欢目前这个交互页面，最好动态梵高星空的",
+  "mode": "frontend_sandbox",
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}

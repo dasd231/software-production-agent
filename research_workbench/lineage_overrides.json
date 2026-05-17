@@ -1,0 +1,35 @@
+{
+  "schema": "lineage_backfill_overrides.v1",
+  "evaluation_links": [
+    {
+      "evaluation_run": "qwen25coder_tuned_protocol_20260516_benchv2",
+      "model_run": "backup_qwen_protocol_20260516",
+      "baseline_evaluation_run": "qwen25coder_base_20260516_benchv2",
+      "note": "Legacy Qwen protocol adapter evaluation"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_protocol_20260516_benchv2_schema",
+      "model_run": "backup_qwen_protocol_20260516",
+      "baseline_evaluation_run": "qwen25coder_base_20260516_benchv2_schema",
+      "note": "Legacy Qwen protocol adapter evaluation"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_hardmix_20260516_benchv2_schema",
+      "model_run": "backup_qwen_protocol_hardmix_20260516",
+      "baseline_evaluation_run": "qwen25coder_base_20260516_benchv2_schema",
+      "note": "Legacy Qwen hardmix adapter evaluation"
+    },
+    {
+      "evaluation_run": "qwen25coder_tuned_hardmix_20260516_benchv3",
+      "model_run": "backup_qwen_protocol_hardmix_20260516",
+      "baseline_evaluation_run": "qwen25coder_base_20260516_benchv3",
+      "note": "Legacy Qwen hardmix adapter evaluation"
+    },
+    {
+      "evaluation_run": "tuned_protocol_20260516_benchv2",
+      "model_run": "backup_protocol_mix_20260516",
+      "baseline_evaluation_run": "base_20260516_benchv2",
+      "note": "Legacy DeepSeek protocol adapter evaluation"
+    }
+  ]
+}

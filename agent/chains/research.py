@@ -1,0 +1,393 @@
+"""Research sub-chain: local solution library + RAG + Web + optional LLM synthesis."""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable
+
+from agent.evidence.arbiter import arbitrate_evidence
+from agent.evaluation.research import evaluate_research_synthesis
+from agent.learning.web_search import search_web
+from agent.llm.providers import create_openai_compatible_client, resolve_llm_provider
+from agent.rag.unified import retrieve_unified_snippets
+from agent.runtime.manifest import build_run_manifest
+
+
+@dataclass(frozen=True)
+class ResearchChainInput:
+    query: str
+    workspace: Path
+    solution_dirs: tuple[Path, ...] = ()
+    learning_dirs: tuple[str, ...] = ()
+    top_k: int = 4
+    use_web: bool = False
+    web_provider: str = "duckduckgo"
+    use_llm: bool = False
+    llm_provider: str = "openai"
+    llm_model: str | None = None
+
+
+@dataclass(frozen=True)
+class ResearchChainResult:
+    query: str
+    answer: str
+    solution_hits: list[dict[str, Any]] = field(default_factory=list)
+    rag_hints: list[dict[str, Any]] = field(default_factory=list)
+    web_results: list[dict[str, Any]] = field(default_factory=list)
+    trace: dict[str, Any] = field(default_factory=dict)
+    evaluation: dict[str, Any] = field(default_factory=dict)
+    manifest: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "query": self.query,
+            "answer": self.answer,
+            "solution_hits": self.solution_hits,
+            "rag_hints": self.rag_hints,
+            "web_results": self.web_results,
+            "trace": self.trace,
+            "evaluation": self.evaluation,
+            "manifest": self.manifest,
+        }
+
+
+def _project_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _tokens(text: str) -> set[str]:
+    return {
+        t.lower()
+        for t in re.findall(r"[A-Za-z_][A-Za-z0-9_]{1,}|[\u4e00-\u9fff]{2,}", text)
+        if len(t) >= 2
+    }
+
+
+def _safe_read(path: Path, max_chars: int = 6000) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")[:max_chars]
+    except OSError:
+        return ""
+
+
+def _default_solution_dirs(workspace: Path) -> tuple[Path, ...]:
+    dirs: list[Path] = []
+    for candidate in (workspace, workspace.parent, _project_root() / "product_runs"):
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        if resolved not in dirs and resolved.exists():
+            dirs.append(resolved)
+    return tuple(dirs)
+
+
+def _manifest_paths(solution_dirs: tuple[Path, ...], *, max_manifests: int = 120) -> list[Path]:
+    paths: list[Path] = []
+    for root in solution_dirs:
+        if not root.exists():
+            continue
+        if root.is_file() and root.name == "solution_manifest.json":
+            paths.append(root)
+            continue
+        direct = root / "solution_manifest.json"
+        if direct.exists():
+            paths.append(direct)
+        for p in root.glob("*/solution_manifest.json"):
+            paths.append(p)
+            if len(paths) >= max_manifests:
+                break
+        if len(paths) >= max_manifests:
+            break
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for path in paths:
+        key = str(path.resolve())
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(path)
+    return deduped[:max_manifests]
+
+
+def _load_solution_hit(path: Path, query_tokens: set[str]) -> dict[str, Any] | None:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    run_dir = path.parent
+    backup = run_dir / "docs" / "SOLUTION_BACKUP.md"
+    backup_text = _safe_read(backup, max_chars=5000)
+    tags = raw.get("retrieval_tags") if isinstance(raw.get("retrieval_tags"), list) else []
+    artifacts = raw.get("artifact_hints") if isinstance(raw.get("artifact_hints"), list) else []
+    haystack = " ".join(
+        [
+            str(raw.get("goal", "")),
+            str(raw.get("stack", "")),
+            str(raw.get("template", "")),
+            " ".join(str(x) for x in tags),
+            backup_text,
+        ]
+    )
+    hit_tokens = sorted(_tokens(haystack) & query_tokens)
+    score = len(hit_tokens) * 5
+    if query_tokens and not hit_tokens:
+        return None
+    score += 2 if backup_text else 0
+    score += min(len(tags), 6)
+    return {
+        "source": "solution_library",
+        "score": score,
+        "manifest": str(path),
+        "run_dir": str(run_dir),
+        "run_id": run_dir.name,
+        "goal": str(raw.get("goal", "")),
+        "stack": str(raw.get("stack", "")),
+        "template": str(raw.get("template", "")),
+        "retrieval_tags": [str(x) for x in tags[:12]],
+        "artifact_hints": [str(x) for x in artifacts[:12]],
+        "matched_tokens": hit_tokens[:12],
+        "backup_path": str(backup) if backup.exists() else "",
+        "backup_preview": backup_text[:700],
+    }
+
+
+def search_solution_library(
+    query: str,
+    *,
+    workspace: Path,
+    solution_dirs: tuple[Path, ...] = (),
+    top_k: int = 4,
+) -> list[dict[str, Any]]:
+    roots = solution_dirs or _default_solution_dirs(workspace)
+    query_tokens = _tokens(query)
+    hits: list[dict[str, Any]] = []
+    for manifest in _manifest_paths(roots):
+        hit = _load_solution_hit(manifest, query_tokens)
+        if hit:
+            hits.append(hit)
+    hits.sort(key=lambda row: (-int(row.get("score", 0)), str(row.get("run_id", ""))))
+    return hits[: max(int(top_k), 1)]
+
+
+def _format_web_results(items: list[Any]) -> list[dict[str, Any]]:
+    return [
+        {"title": r.title, "url": r.url, "snippet": r.snippet, "source": r.source}
+        for r in items
+    ]
+
+
+def _clip(value: Any, limit: int) -> str:
+    text = str(value or "").strip()
+    return text[:limit]
+
+
+def _extractive_answer(
+    query: str,
+    *,
+    solution_hits: list[dict[str, Any]],
+    rag_hints: list[dict[str, Any]],
+    web_results: list[dict[str, Any]],
+    evidence_policy: dict[str, Any] | None = None,
+) -> str:
+    lines = [f"问题：{query}", "", "本地优先结论："]
+    if solution_hits:
+        lines.append("可复用方案库命中：")
+        for i, row in enumerate(solution_hits, 1):
+            tags = ", ".join(row.get("retrieval_tags", [])[:5])
+            lines.append(
+                f"- [S{i}] {row.get('run_id')} | {row.get('stack')} | {row.get('template')} | tags: {tags}"
+            )
+    else:
+        lines.append("- 未命中本地方案库。")
+    if rag_hints:
+        lines.append("")
+        lines.append("本地/RAG 证据：")
+        for i, row in enumerate(rag_hints, 1):
+            path = row.get("path", "")
+            src = row.get("source", "local_workspace")
+            lines.append(f"- [R{i}] {src} {path}:{row.get('line_start')}-{row.get('line_end')}")
+    if web_results:
+        lines.append("")
+        lines.append("Web 补充：")
+        for i, row in enumerate(web_results, 1):
+            lines.append(f"- [W{i}] {row.get('title')} {row.get('url')}")
+    if evidence_policy:
+        lines.append("")
+        lines.append(f"证据仲裁：{evidence_policy.get('decision', 'local_first')}。")
+        conflicts = evidence_policy.get("conflicts") if isinstance(evidence_policy.get("conflicts"), list) else []
+        if conflicts:
+            lines.append("发现来源冲突，必须人工复核后再进入实现。")
+    lines.append("")
+    lines.append("建议：优先复用 [S] 方案结构和 [R] 本地证据；只有本地证据不足或涉及最新外部 API 时，再参考 [W]。")
+    return "\n".join(lines)
+
+
+def _llm_synthesis(
+    query: str,
+    *,
+    solution_hits: list[dict[str, Any]],
+    rag_hints: list[dict[str, Any]],
+    web_results: list[dict[str, Any]],
+    provider: str,
+    model: str | None,
+) -> tuple[str, dict[str, Any]]:
+    try:
+        resolved = resolve_llm_provider(provider, model)
+        client = create_openai_compatible_client(resolved, timeout=90.0, max_retries=1)
+    except Exception as exc:
+        return "", {"llm_ok": False, "llm_error": str(exc)[:240]}
+
+    blocks: list[str] = []
+    for i, row in enumerate(solution_hits, 1):
+        blocks.append(
+            "\n".join(
+                [
+                    f"[S{i}] run={row.get('run_id')} stack={row.get('stack')} template={row.get('template')}",
+                    f"goal={_clip(row.get('goal'), 260)}",
+                    f"tags={', '.join(row.get('retrieval_tags', [])[:8])}",
+                    f"backup={_clip(row.get('backup_preview'), 500)}",
+                ]
+            )
+        )
+    for i, row in enumerate(rag_hints, 1):
+        blocks.append(
+            f"[R{i}] source={row.get('source')} path={row.get('path')} lines={row.get('line_start')}-{row.get('line_end')}\n"
+            + _clip(row.get("preview"), 500)
+        )
+    for i, row in enumerate(web_results, 1):
+        blocks.append(
+            f"[W{i}] {row.get('title')}\n{row.get('url')}\n{_clip(row.get('snippet'), 500)}"
+        )
+    prompt = (
+        "需求/问题：\n"
+        + query.strip()
+        + "\n\n请综合本地方案库、本地/RAG证据和Web补充，输出可执行方案。"
+        "必须优先使用本地方案库；事实性判断要带 [S]/[R]/[W] 引用；"
+        "证据不足时明确说明，不要编造库、路径、版本或 API。\n\n"
+        + "\n\n".join(blocks)
+    )
+    try:
+        completion = client.chat.completions.create(
+            model=resolved.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是软件生产研究分链，只根据给定证据做方案综合，输出简洁、可执行、带引用。",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+        text = (completion.choices[0].message.content or "").strip()
+        return text, {"llm_ok": bool(text), "llm_provider": resolved.name, "llm_model": resolved.model}
+    except Exception as exc:
+        return "", {"llm_ok": False, "llm_error": str(exc)[:240]}
+
+
+def run_research_chain(
+    inp: ResearchChainInput,
+    *,
+    web_opener: Callable | None = None,
+) -> ResearchChainResult:
+    query = inp.query.strip()
+    top_k = max(int(inp.top_k), 1)
+    solution_hits = search_solution_library(
+        query,
+        workspace=inp.workspace,
+        solution_dirs=inp.solution_dirs,
+        top_k=top_k,
+    )
+    rag_result = retrieve_unified_snippets(
+        inp.workspace,
+        query,
+        top_k=top_k,
+        learning_dirs=inp.learning_dirs,
+        learning_top_k=top_k,
+        use_learning_bm25=True,
+    )
+    web_results: list[dict[str, Any]] = []
+    if inp.use_web:
+        web_results = _format_web_results(
+            search_web(query, top_k=top_k, provider=inp.web_provider, opener=web_opener)
+        )
+    evidence_policy = arbitrate_evidence(
+        solution_hits=solution_hits,
+        rag_hints=rag_result.hints[:top_k],
+        web_results=web_results,
+    )
+    llm_trace: dict[str, Any] = {"llm_ok": False}
+    answer = ""
+    if inp.use_llm:
+        answer, llm_trace = _llm_synthesis(
+            query,
+            solution_hits=solution_hits,
+            rag_hints=rag_result.hints[:top_k],
+            web_results=web_results,
+            provider=inp.llm_provider,
+            model=inp.llm_model,
+        )
+    if not answer:
+        answer = _extractive_answer(
+            query,
+            solution_hits=solution_hits,
+            rag_hints=rag_result.hints[:top_k],
+            web_results=web_results,
+            evidence_policy=evidence_policy,
+        )
+    trace = {
+        "solution_dirs": [str(x) for x in (inp.solution_dirs or _default_solution_dirs(inp.workspace))],
+        "solution_hits": len(solution_hits),
+        "rag": rag_result.summary,
+        "web_enabled": bool(inp.use_web),
+        "web_results": len(web_results),
+        "evidence_policy": evidence_policy,
+        **llm_trace,
+    }
+    evaluation = evaluate_research_synthesis(
+        query=query,
+        answer=answer,
+        solution_hits=solution_hits,
+        rag_hints=rag_result.hints[:top_k],
+        web_results=web_results,
+        trace=trace,
+    ).to_dict()
+    trace["evaluation_score"] = evaluation.get("overall_score")
+    trace["evaluation_grade"] = evaluation.get("grade")
+    manifest = build_run_manifest(
+        kind="research_synthesize",
+        input_summary={
+            "query": query,
+            "workspace": str(inp.workspace),
+            "solution_dirs": [str(path) for path in inp.solution_dirs],
+            "learning_dirs": list(inp.learning_dirs),
+            "top_k": top_k,
+            "use_web": inp.use_web,
+            "use_llm": inp.use_llm,
+        },
+        files={},
+        evaluation=evaluation,
+        source_refs=[
+            {"type": "solution", "path": row.get("manifest", ""), "score": row.get("score")}
+            for row in solution_hits
+        ]
+        + [{"type": "rag", "path": row.get("path", ""), "source": row.get("source")} for row in rag_result.hints[:top_k]]
+        + [{"type": "web", "url": row.get("url", ""), "title": row.get("title", "")} for row in web_results],
+        risks=["web_evidence_requires_verification"] if web_results else [],
+    )
+    return ResearchChainResult(
+        query=query,
+        answer=answer,
+        solution_hits=solution_hits,
+        rag_hints=rag_result.hints[:top_k],
+        web_results=web_results,
+        trace=trace,
+        evaluation=evaluation,
+        manifest=manifest,
+    )

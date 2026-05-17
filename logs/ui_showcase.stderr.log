@@ -1,0 +1,24 @@
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:7860
+Press CTRL+C to quit
+127.0.0.1 - - [15/May/2026 21:03:19] "GET /innovation HTTP/1.1" 302 -
+127.0.0.1 - - [15/May/2026 21:03:19] "GET /login?next=/innovation HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:03:20] "POST /login HTTP/1.1" 302 -
+127.0.0.1 - - [15/May/2026 21:03:21] "GET /innovation HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:04:02] "GET /resources HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:05:06] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:05:09] "GET /resources HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:05:13] "GET /intent HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:05:15] "GET /innovation HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:08:03] "GET /resources HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:08:40] "GET /intent HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:08:42] "GET /innovation HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:08:58] "GET /intent HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:09:01] "POST /intent HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:09:06] "POST /intent HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:09:20] "GET / HTTP/1.1" 200 -
+21:09:30 INFO [agent.production.loop] finished at iteration 23 reason=offline spring-vue prototype generated
+127.0.0.1 - - [15/May/2026 21:09:30] "POST /run HTTP/1.1" 302 -
+127.0.0.1 - - [15/May/2026 21:09:30] "GET /runs/run_20260515_210923_software_e86f28 HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:09:30] "GET /runs/run_20260515_210923_software_e86f28/preview HTTP/1.1" 200 -
+127.0.0.1 - - [15/May/2026 21:25:33] "GET /runs/run_20260515_210923_software_e86f28/preview HTTP/1.1" 200 -

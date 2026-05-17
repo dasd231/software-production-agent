@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Compile
+        run: python -m py_compile agent/platform/api.py agent/enterprise/readiness.py agent/scheduler/routing.py agent/scheduler/admission.py agent/core/protocol.py agent/core/executor.py
+      - name: Test
+        run: python -m pytest -q
+      - name: Production static gates
+        run: |
+          python - <<'PY'
+          from agent.enterprise.readiness import build_enterprise_readiness_report
+          report = build_enterprise_readiness_report()
+          print(report["summary"])
+          if report["summary"]["release_blocked"]:
+              raise SystemExit(report["summary"]["blockers"])
+          PY

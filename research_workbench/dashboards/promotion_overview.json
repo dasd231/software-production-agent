@@ -1,0 +1,133 @@
+{
+  "schema": "research_promotion_overview.v1",
+  "generated_at": "2026-05-17T04:57:59+00:00",
+  "summary": {
+    "total": 5,
+    "passed": 0,
+    "blocked": 5
+  },
+  "rows": [
+    {
+      "name": "qwen25coder_tuned_hardmix_20260516_benchv2_schema",
+      "label": "qwen25coder_tuned_hardmix_benchv2_schema",
+      "model_version": "backup-6cc03ce09f7d72204aba",
+      "benchmark_id": "backup_model_eval.v2.json",
+      "status": "blocked",
+      "failed_checks": [
+        "overall_delta_vs_baseline",
+        "stage_floor:model_eval.action_protocol",
+        "stage_regression:model_eval.grounded_answer"
+      ],
+      "recommended_next_step": "adjust_data_or_training_then_re_evaluate",
+      "recommended_actions": [
+        "increase_action_protocol_supervision",
+        "rebalance_grounded_answer_supervision",
+        "run_regression_focused_ablation",
+        "compare_against_baseline_before_more_training"
+      ]
+    },
+    {
+      "name": "qwen25coder_tuned_hardmix_20260516_benchv3",
+      "label": "qwen25coder_tuned_hardmix_benchv3",
+      "model_version": "backup-6cc03ce09f7d72204aba",
+      "benchmark_id": "backup_model_eval.v3.json",
+      "status": "blocked",
+      "failed_checks": [
+        "overall_delta_vs_baseline",
+        "stage_regression:model_eval.action_protocol",
+        "stage_floor:model_eval.grounded_answer",
+        "stage_regression:model_eval.grounded_answer"
+      ],
+      "recommended_next_step": "adjust_data_or_training_then_re_evaluate",
+      "recommended_actions": [
+        "rebalance_grounded_answer_supervision",
+        "run_regression_focused_ablation",
+        "compare_against_baseline_before_more_training"
+      ]
+    },
+    {
+      "name": "qwen25coder_tuned_protocol_20260516_benchv2",
+      "label": "qwen25coder_tuned_protocol_benchv2",
+      "model_version": "backup-08e1a18c01536ed4f030",
+      "benchmark_id": "backup_model_eval.v2.json",
+      "status": "blocked",
+      "failed_checks": [
+        "overall_floor",
+        "stage_floor:model_eval.action_protocol",
+        "stage_regression:model_eval.grounded_answer",
+        "stage_floor:model_eval.solution_reuse"
+      ],
+      "recommended_next_step": "adjust_data_or_training_then_re_evaluate",
+      "recommended_actions": [
+        "increase_action_protocol_supervision",
+        "rebalance_grounded_answer_supervision",
+        "increase_solution_reuse_supervision",
+        "run_regression_focused_ablation",
+        "raise_candidate_overall_quality"
+      ]
+    },
+    {
+      "name": "qwen25coder_tuned_protocol_20260516_benchv2_schema",
+      "label": "qwen25coder_tuned_protocol_benchv2_schema",
+      "model_version": "backup-08e1a18c01536ed4f030",
+      "benchmark_id": "backup_model_eval.v2.json",
+      "status": "blocked",
+      "failed_checks": [
+        "stage_floor:model_eval.action_protocol",
+        "stage_regression:model_eval.grounded_answer",
+        "stage_floor:model_eval.solution_reuse"
+      ],
+      "recommended_next_step": "adjust_data_or_training_then_re_evaluate",
+      "recommended_actions": [
+        "increase_action_protocol_supervision",
+        "rebalance_grounded_answer_supervision",
+        "increase_solution_reuse_supervision",
+        "run_regression_focused_ablation"
+      ]
+    },
+    {
+      "name": "tuned_protocol_20260516_benchv2",
+      "label": "tuned_protocol_benchv2",
+      "model_version": "backup-f4a25b2403a8832a2c01",
+      "benchmark_id": "backup_model_eval.v2.json",
+      "status": "blocked",
+      "failed_checks": [
+        "stage_floor:model_eval.action_protocol"
+      ],
+      "recommended_next_step": "adjust_data_or_training_then_re_evaluate",
+      "recommended_actions": [
+        "increase_action_protocol_supervision"
+      ]
+    }
+  ],
+  "failed_check_counts": [
+    {
+      "check": "stage_floor:model_eval.action_protocol",
+      "count": 4
+    },
+    {
+      "check": "stage_regression:model_eval.grounded_answer",
+      "count": 4
+    },
+    {
+      "check": "overall_delta_vs_baseline",
+      "count": 2
+    },
+    {
+      "check": "stage_floor:model_eval.solution_reuse",
+      "count": 2
+    },
+    {
+      "check": "overall_floor",
+      "count": 1
+    },
+    {
+      "check": "stage_floor:model_eval.grounded_answer",
+      "count": 1
+    },
+    {
+      "check": "stage_regression:model_eval.action_protocol",
+      "count": 1
+    }
+  ]
+}

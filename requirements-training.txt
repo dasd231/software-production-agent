@@ -1,0 +1,10 @@
+# Non-PyTorch training stack.
+# Install CUDA-enabled torch/torchvision/torchaudio first; see scripts/setup_training_env.ps1.
+transformers==5.8.1
+datasets==4.8.5
+peft==0.19.1
+trl==1.4.0
+accelerate==1.13.0
+sentencepiece==0.2.1
+safetensors==0.7.0
+pydantic>=2.6.0

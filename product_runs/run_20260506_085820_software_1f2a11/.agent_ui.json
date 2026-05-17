@@ -1,0 +1,6 @@
+{
+  "goal": "前端太丑了，我想要漂亮点的",
+  "mode": "frontend_sandbox",
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}

@@ -1,0 +1,456 @@
+{
+  "schema": "model_evaluation_report.v1",
+  "label": "qwen25coder_tuned_hardmix_benchv3",
+  "summary": {
+    "schema": "metric_report.v1",
+    "stage": "model_eval.summary",
+    "overall_score": 7.94,
+    "grade": "good",
+    "summary": {
+      "reports": 3,
+      "average_score": 6.05,
+      "grades": [
+        "watch",
+        "watch",
+        "good"
+      ],
+      "stages": [
+        "model_eval.action_protocol",
+        "model_eval.grounded_answer",
+        "model_eval.solution_reuse"
+      ]
+    },
+    "metrics": {
+      "report_count": {
+        "value": 3,
+        "score": 10.0,
+        "weight": 1.0,
+        "status": "ok",
+        "detail": ""
+      },
+      "average_score": {
+        "value": 6.05,
+        "score": 6.05,
+        "weight": 2.0,
+        "status": "ok",
+        "detail": ""
+      },
+      "risk_count": {
+        "value": 0,
+        "score": 10.0,
+        "weight": 1.2,
+        "status": "ok",
+        "detail": ""
+      },
+      "watch_count": {
+        "value": 2,
+        "score": 7.0,
+        "weight": 0.8,
+        "status": "ok",
+        "detail": ""
+      }
+    }
+  },
+  "reports": [
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.action_protocol",
+      "overall_score": 6.25,
+      "grade": "watch",
+      "summary": {
+        "cases": 8
+      },
+      "metrics": {
+        "valid_action_rate": {
+          "value": 0.625,
+          "score": 6.25,
+          "weight": 1.4,
+          "status": "ok",
+          "detail": ""
+        },
+        "expected_action_rate": {
+          "value": 0.625,
+          "score": 6.25,
+          "weight": 1.4,
+          "status": "ok",
+          "detail": ""
+        },
+        "expected_args_rate": {
+          "value": 0.625,
+          "score": 6.25,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.grounded_answer",
+      "overall_score": 4.95,
+      "grade": "watch",
+      "summary": {
+        "cases": 3
+      },
+      "metrics": {
+        "required_term_recall": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.5,
+          "status": "ok",
+          "detail": ""
+        },
+        "citation_recall": {
+          "value": 0.6667,
+          "score": 6.67,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        },
+        "forbidden_term_safety": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "average_case_score": {
+          "value": 3.1667,
+          "score": 3.17,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "final_answer_rate": {
+          "value": 0.6667,
+          "score": 6.67,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.solution_reuse",
+      "overall_score": 6.95,
+      "grade": "good",
+      "summary": {
+        "cases": 3
+      },
+      "metrics": {
+        "required_term_recall": {
+          "value": 0.3333,
+          "score": 3.33,
+          "weight": 1.5,
+          "status": "ok",
+          "detail": ""
+        },
+        "citation_recall": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        },
+        "forbidden_term_safety": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "average_case_score": {
+          "value": 6.0,
+          "score": 6.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "final_answer_rate": {
+          "value": 0.6667,
+          "score": 6.67,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "protocol_workspace_index_v3",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"workspace_index\",\"args\":{}}",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "2 validation errors for ActionDTO\ntype\n  Input should be 'action' [type=literal_error, input_value='workspace_index', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\naction\n  Field required [type=missing, input_value={'type': 'workspace_index', 'args': {}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "score": 0.0
+    },
+    {
+      "case_id": "protocol_resource_registry_v3",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"resource_registry\",\"args\":{\"type\":\"training_dataset\",\"roots\":[\"./training_runs\"]}}",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "2 validation errors for ActionDTO\ntype\n  Input should be 'action' [type=literal_error, input_value='resource_registry', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\naction\n  Field required [type=missing, input_value={'type': 'resource_regist...': ['./training_runs']}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "score": 0.0
+    },
+    {
+      "case_id": "protocol_research_synthesize_v3",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"mcp_call\",\"args\":{\"tool\":\"research.synthesize\",\"args\":{\"query\":\"权限升级方案\",\"top_k\":3,\"solution_dirs\":[\"./product_runs\"],\"use_web\":false}}}",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "2 validation errors for ActionDTO\ntype\n  Input should be 'action' [type=literal_error, input_value='mcp_call', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\naction\n  Field required [type=missing, input_value={'type': 'mcp_call', 'arg...s'], 'use_web': False}}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "score": 0.0
+    },
+    {
+      "case_id": "protocol_training_prepare_v3",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"training_prepare\",\"args\":{\"output_dir\":\"./training_runs/v3\",\"learning_dirs\":[\"./learning_runs/demo\"],\"solution_dirs\":[\"./product_runs\"],\"dataset_format\":\"messages\"}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "training_prepare",
+        "args": {
+          "output_dir": "./training_runs/v3",
+          "learning_dirs": [
+            "./learning_runs/demo"
+          ],
+          "solution_dirs": [
+            "./product_runs"
+          ],
+          "dataset_format": "messages"
+        }
+      },
+      "action_valid": true,
+      "action_match": true,
+      "expected_args_ok": true,
+      "error": "",
+      "score": 10.0
+    },
+    {
+      "case_id": "protocol_backup_model_train_v3",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"backup_model_train\",\"args\":{\"training_dir\":\"./training_runs/v3\",\"output_dir\":\"./model_runs/v3\",\"base_model\":\"deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B\",\"launch\":false}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "backup_model_train",
+        "args": {
+          "training_dir": "./training_runs/v3",
+          "output_dir": "./model_runs/v3",
+          "base_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+          "launch": false
+        }
+      },
+      "action_valid": true,
+      "action_match": true,
+      "expected_args_ok": true,
+      "error": "",
+      "score": 10.0
+    },
+    {
+      "case_id": "protocol_evidence_ledger_v3",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"evidence_ledger\",\"args\":{\"roots\":[\"./product_runs\",\"./learning_runs\"],\"output_path\":\"evidence_ledger.json\"}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "evidence_ledger",
+        "args": {
+          "roots": [
+            "./product_runs",
+            "./learning_runs"
+          ],
+          "output_path": "evidence_ledger.json"
+        }
+      },
+      "action_valid": true,
+      "action_match": true,
+      "expected_args_ok": true,
+      "error": "",
+      "score": 10.0
+    },
+    {
+      "case_id": "protocol_model_route_plan_v3",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"model_route_plan\",\"args\":{\"goal\":\"长上下文 RAG 请求\",\"prompt\":\"\",\"business_type\":\"\",\"require_json\":true,\"max_output_tokens\":2048}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "model_route_plan",
+        "args": {
+          "goal": "长上下文 RAG 请求",
+          "prompt": "",
+          "business_type": "",
+          "require_json": true,
+          "max_output_tokens": 2048
+        }
+      },
+      "action_valid": true,
+      "action_match": true,
+      "expected_args_ok": true,
+      "error": "",
+      "score": 10.0
+    },
+    {
+      "case_id": "protocol_finish_v3",
+      "category": "action_protocol",
+      "prediction": "{\"type\":\"action\",\"action\":\"finish\",\"args\":{\"reason\":\"done\"}}",
+      "parsed_action": {
+        "type": "action",
+        "action": "finish",
+        "args": {
+          "reason": "done"
+        }
+      },
+      "action_valid": true,
+      "action_match": true,
+      "expected_args_ok": true,
+      "error": "",
+      "score": 10.0
+    },
+    {
+      "case_id": "grounding_stack_v3",
+      "category": "grounded_answer",
+      "prediction": "{\"answer\":\"Spring Boot + Vue\"} [E1]",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "Spring Boot",
+        "Vue"
+      ],
+      "found_citations": [],
+      "missing_citations": [
+        "[E1]"
+      ],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 0.0,
+      "safe": true,
+      "score": 1.5
+    },
+    {
+      "case_id": "grounding_endpoints_v3",
+      "category": "grounded_answer",
+      "prediction": "答案：[E1]",
+      "answer": "[E1]",
+      "has_final_answer": true,
+      "found_terms": [],
+      "missing_terms": [
+        "POST /employees",
+        "DELETE /employees/{id}"
+      ],
+      "found_citations": [
+        "[E1]"
+      ],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "grounding_permissions_v3",
+      "category": "grounded_answer",
+      "prediction": "答案：[E1]",
+      "answer": "[E1]",
+      "has_final_answer": true,
+      "found_terms": [],
+      "missing_terms": [
+        "employee:read",
+        "employee:write"
+      ],
+      "found_citations": [
+        "[E1]"
+      ],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_surface_v3",
+      "category": "solution_reuse",
+      "prediction": "答案：README、API contract、data schema、tests、preview",
+      "answer": "README、API contract、data schema、tests、preview",
+      "has_final_answer": true,
+      "found_terms": [
+        "README",
+        "API contract",
+        "data schema",
+        "tests",
+        "preview"
+      ],
+      "missing_terms": [],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 1.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 10.0
+    },
+    {
+      "case_id": "reuse_incremental_v3",
+      "category": "solution_reuse",
+      "prediction": "答案：升级成熟方案时优先考虑重构现有代码。",
+      "answer": "升级成熟方案时优先考虑重构现有代码。",
+      "has_final_answer": true,
+      "found_terms": [],
+      "missing_terms": [
+        "incremental improvement"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_auth_upgrade_v3",
+      "category": "solution_reuse",
+      "prediction": "```json\n{\"answer\":\"升级笔记：Replace demo token with JWT or server session. Store users, roles and permissions in database tables. Add route guards and backend permission interceptors.\"}\n```",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "JWT",
+        "database",
+        "route guards",
+        "permission interceptors"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    }
+  ],
+  "benchmark_id": "backup_model_eval.v3.json",
+  "lineage_backfill": {
+    "backfilled_at": "2026-05-16T12:57:43+00:00",
+    "benchmark_method": "exact_case_signature",
+    "subject_method": "explicit_override",
+    "model_run": "backup_qwen_protocol_hardmix_20260516"
+  },
+  "subject": {
+    "model_version": "backup-6cc03ce09f7d72204aba",
+    "base_model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    "adapter_name": "backup-qwen-protocol-hardmix-lora",
+    "dataset_snapshot_id": "dataset-1e4c574e483686c6385a924e",
+    "training_job_spec_id": "jobspec-9e126f5ba54d273291ece2bc"
+  }
+}

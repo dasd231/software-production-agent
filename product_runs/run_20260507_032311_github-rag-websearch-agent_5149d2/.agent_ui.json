@@ -1,0 +1,7 @@
+{
+  "goal": "本地模式接管：加入 GitHub 项目搜索、RAG、WebSearch、沙箱测试和最后 Agent 编排",
+  "mode": "codex_handoff",
+  "provider": "codex",
+  "model": "codex-handoff",
+  "created_at": "2026-05-07T03:23:11"
+}

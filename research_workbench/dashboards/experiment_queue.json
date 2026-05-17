@@ -1,0 +1,79 @@
+{
+  "schema": "research_experiment_queue.v1",
+  "generated_at": "2026-05-17T04:57:59+00:00",
+  "summary": {
+    "models": 5,
+    "action_counts": {
+      "apply_remediation_then_retrain": 3,
+      "run_benchmark_evaluation": 1,
+      "execute_training_job": 1
+    }
+  },
+  "rows": [
+    {
+      "model_run": "backup_qwen_grounding_rebalanced_20260516",
+      "model_version": "backup-9a99a769dbbecdf10410",
+      "dataset_id": "dataset-0f1cc25c95e3a85ab41e3b3c",
+      "job_status": "queued",
+      "rollout_stage": "candidate",
+      "evaluation_count": 0,
+      "latest_promotion_status": "",
+      "task_balance_status": "ok",
+      "min_task_share": 0.0625,
+      "next_action": "execute_training_job",
+      "reason": "training_job_not_completed"
+    },
+    {
+      "model_run": "backup_quality_20260515",
+      "model_version": "backup-0f098e6989aa068e720f",
+      "dataset_id": "dataset-6f447ebebbe5f1e5d3ad24c9",
+      "job_status": "completed",
+      "rollout_stage": "trained",
+      "evaluation_count": 0,
+      "latest_promotion_status": "",
+      "task_balance_status": "watch",
+      "min_task_share": 0.0145,
+      "next_action": "run_benchmark_evaluation",
+      "reason": "trained_without_precisely_linked_evaluation"
+    },
+    {
+      "model_run": "backup_protocol_mix_20260516",
+      "model_version": "backup-f4a25b2403a8832a2c01",
+      "dataset_id": "dataset-ccd957c9b2d5f2887280ff92",
+      "job_status": "completed",
+      "rollout_stage": "trained",
+      "evaluation_count": 1,
+      "latest_promotion_status": "blocked",
+      "task_balance_status": "watch",
+      "min_task_share": 0.011,
+      "next_action": "apply_remediation_then_retrain",
+      "reason": "promotion_blocked"
+    },
+    {
+      "model_run": "backup_qwen_protocol_20260516",
+      "model_version": "backup-08e1a18c01536ed4f030",
+      "dataset_id": "dataset-ccd957c9b2d5f2887280ff92",
+      "job_status": "completed",
+      "rollout_stage": "trained",
+      "evaluation_count": 2,
+      "latest_promotion_status": "blocked",
+      "task_balance_status": "watch",
+      "min_task_share": 0.011,
+      "next_action": "apply_remediation_then_retrain",
+      "reason": "promotion_blocked"
+    },
+    {
+      "model_run": "backup_qwen_protocol_hardmix_20260516",
+      "model_version": "backup-6cc03ce09f7d72204aba",
+      "dataset_id": "dataset-1e4c574e483686c6385a924e",
+      "job_status": "completed",
+      "rollout_stage": "trained",
+      "evaluation_count": 2,
+      "latest_promotion_status": "blocked",
+      "task_balance_status": "watch",
+      "min_task_share": 0.0097,
+      "next_action": "apply_remediation_then_retrain",
+      "reason": "promotion_blocked"
+    }
+  ]
+}

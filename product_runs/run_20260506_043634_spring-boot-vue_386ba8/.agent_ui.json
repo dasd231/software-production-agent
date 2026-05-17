@@ -1,0 +1,6 @@
+{
+  "goal": "Spring Boot + Vue 管理后台",
+  "mode": "demo",
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}

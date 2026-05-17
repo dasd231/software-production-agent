@@ -1,0 +1,7 @@
+{
+  "goal": "写一个人员管理系统",
+  "mode": "local_production",
+  "provider": "codex",
+  "model": "local-production-full-chain",
+  "created_at": "2026-05-07T03:53:19"
+}

@@ -1,0 +1,5 @@
+{
+  "type": "static_preview",
+  "entrypoint": "preview/index.html",
+  "security": "served by product UI with CSP sandbox headers"
+}

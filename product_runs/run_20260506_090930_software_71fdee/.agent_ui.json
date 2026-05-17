@@ -1,0 +1,6 @@
+{
+  "goal": "图书管理系统",
+  "mode": "frontend_sandbox",
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}

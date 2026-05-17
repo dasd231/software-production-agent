@@ -1,0 +1,7 @@
+{
+  "forbidden_substrings": [
+    "> /dev/sd",
+    "curl http://169.254",
+    "wget http://169.254"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "goal": "你这前端改成商城风格，现在太丑了",
+  "mode": "frontend_sandbox",
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}

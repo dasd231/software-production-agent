@@ -1,0 +1,4 @@
+Planner：根据 goal 与 project_state 产出下一阶段块：
+{"stage":"<planning|design|coding|testing|fixing>","tasks":[...],"meta":{}}
+要求：若 state.errors 非空，优先 fixing；若重复失败可进入 investigate；成功后可进入 review/qa/ship；不得写死全图 DAG。
+若输入含 context_digest（skill_hints/rag_hints/mcp_capabilities），优先在 tasks 中体现这些信息，避免无依据探索。

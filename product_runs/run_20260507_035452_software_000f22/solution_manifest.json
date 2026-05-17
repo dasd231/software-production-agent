@@ -1,0 +1,20 @@
+{
+  "schema": "solution_manifest.v1",
+  "template": "spring-vue-management",
+  "stack": "Spring Boot + Vue",
+  "goal": "写一个成熟的企业员工管理系统",
+  "retrieval_tags": [
+    "personnel-management",
+    "crud",
+    "api-contract",
+    "static-preview",
+    "delivery-checklist"
+  ],
+  "artifact_hints": [
+    "README.md",
+    "docs/PRODUCT_SPEC.md",
+    "docs/API_CONTRACT.md",
+    "docs/DATABASE_SCHEMA.md",
+    "preview/index.html"
+  ]
+}

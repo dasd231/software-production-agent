@@ -1,0 +1,6 @@
+{
+  "goal": "我想要一个支持拖拽看板、筛选和弹窗说明的前端交互",
+  "mode": "frontend_sandbox",
+  "provider": "groq",
+  "model": "openai/gpt-oss-20b"
+}

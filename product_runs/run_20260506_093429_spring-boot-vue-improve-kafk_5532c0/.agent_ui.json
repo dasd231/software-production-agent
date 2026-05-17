@@ -1,0 +1,10 @@
+{
+  "goal": "基于上一版软件方案继续改进，不要从零开始。\n\n上一版 run:\nrun_20260506_092226_spring-boot-vue-improve_ede9ce\n\n上一版原始需求:\n??Spring Boot+Vue?????????????????????????????\n\n本次改进要求:\n你这啥玩意，给我上点强度，上kafka、Cloud、redis、sentinel、nacos\n\n生产要求:\n- 保留上一版已有业务场景、数据模型、CRUD、文档、测试和预览。\n- 优先做增量改进，能复用就复用，不能覆盖掉与改进无关的成熟产物。\n- 如果是管理系统，继续保持产品规格、API 契约、数据库设计、测试和交付清单。\n- 产出必须仍然能通过结果页成熟度、ZIP 下载和沙盒预览验收。\n",
+  "mode": "demo",
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "created_at": "2026-05-06T09:34:29",
+  "source_run": "run_20260506_092226_spring-boot-vue-improve_ede9ce",
+  "improvement_goal": "你这啥玩意，给我上点强度，上kafka、Cloud、redis、sentinel、nacos",
+  "base_goal": "??Spring Boot+Vue?????????????????????????????"
+}

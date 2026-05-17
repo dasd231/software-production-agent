@@ -1,0 +1,69 @@
+{
+  "schema": "codex_handoff.v1",
+  "created_at": "2026-05-07T03:29:32",
+  "mode": "codex_handoff",
+  "execution_owner": "current Codex chat session",
+  "workspace": "E:\\Agent\\Demo1\\software-production-agent\\product_runs\\run_20260507_032932_improve_a63d97",
+  "goal": "基于上一版软件方案继续改进，不要从零开始。\n\n上一版 run:\nrun_20260507_032855_software_da4025\n\n上一版原始需求:\n写一个人员管理系统\n\n本次改进要求:\n不成熟\n\n生产要求:\n- 保留上一版已有业务场景、数据模型、CRUD、文档、测试和预览。\n- 优先做增量改进，能复用就复用，不能覆盖掉与改进无关的成熟产物。\n- 如果是管理系统，继续保持产品规格、API 契约、数据库设计、测试和交付清单。\n- 产出必须仍然能通过结果页成熟度、ZIP 下载和沙盒预览验收。\n",
+  "planner_stage": "coding",
+  "pipeline_layers": [
+    {
+      "id": "requirement.normalize",
+      "name": "需求澄清与验收标准",
+      "description": "抽取项目类型、核心实体、页面、API、数据模型、验收条件。"
+    },
+    {
+      "id": "architecture.plan",
+      "name": "架构方案",
+      "description": "确定前端、后端、存储、测试、沙盒预览和交付结构。"
+    },
+    {
+      "id": "implementation.generate",
+      "name": "软件生产",
+      "description": "在当前 run workspace 内生成或改进用户产物。"
+    },
+    {
+      "id": "sandbox.verify",
+      "name": "沙箱运行测试",
+      "description": "只在产物目录内运行可控 smoke check，不触碰平台源码。"
+    },
+    {
+      "id": "delivery.package",
+      "name": "交付封装",
+      "description": "更新 README、交付清单、预览入口和 ZIP 可下载产物。"
+    }
+  ],
+  "existing_artifacts": [
+    "codex_task.json",
+    "CODEX_TASK.md",
+    "docs/IMPROVEMENT_REQUEST.md",
+    "docs/LOCAL_CODEX_MODE.md",
+    "preview/index.html",
+    "README.md",
+    "sandbox_manifest.json"
+  ],
+  "acceptance_criteria": [
+    "所有用户可见产物必须写在本次 product_runs/<run_id> 工作区内。",
+    "不得修改 software-production-agent 平台源码，除非用户在 Codex 会话里明确要求。",
+    "需要生成 README、运行说明、验收清单和可下载产物。",
+    "如果是管理系统，必须包含业务场景、数据模型、CRUD、API 契约、测试说明和可预览界面。",
+    "运行测试或构建前先说明命令目的；失败时保留错误摘要和下一步修复建议。"
+  ],
+  "isolation_policy": {
+    "allowed_write_root": "E:\\Agent\\Demo1\\software-production-agent\\product_runs\\run_20260507_032932_improve_a63d97",
+    "protected_roots": [
+      "software-production-agent/",
+      "agent_算法学习/",
+      "ai-codegen-pipeline-/",
+      "模块_模型训练/"
+    ],
+    "requires_user_approval_for_platform_source_changes": true
+  },
+  "handoff_steps": [
+    "Open CODEX_TASK.md in this run.",
+    "Implement inside the run workspace only.",
+    "Run focused verification commands when practical.",
+    "Write RESULT_SUMMARY.md with changed files, test results and residual risks."
+  ],
+  "improvement_context": "# Improvement Request\n\n## Source Run\n\n`run_20260507_032855_software_da4025`\n\n## Base Goal\n\n```text\n写一个人员管理系统\n```\n\n## Improvement Goal\n\n```text\n不成熟\n```\n\n## Iteration Notes\n\n- Copied user artifact files from source run: `6`.\n- Internal `.agent_*` state/event/session files were not copied.\n- This run should be treated as a second production iteration over the previous solution.\n"
+}

@@ -1,0 +1,346 @@
+{
+  "schema": "model_evaluation_report.v1",
+  "label": "tuned",
+  "summary": {
+    "schema": "metric_report.v1",
+    "stage": "model_eval.summary",
+    "overall_score": 6.69,
+    "grade": "good",
+    "summary": {
+      "reports": 3,
+      "average_score": 4.13,
+      "grades": [
+        "risk",
+        "good",
+        "watch"
+      ],
+      "stages": [
+        "model_eval.action_protocol",
+        "model_eval.grounded_answer",
+        "model_eval.solution_reuse"
+      ]
+    },
+    "metrics": {
+      "report_count": {
+        "value": 3,
+        "score": 10.0,
+        "weight": 1.0,
+        "status": "ok",
+        "detail": ""
+      },
+      "average_score": {
+        "value": 4.13,
+        "score": 4.13,
+        "weight": 2.0,
+        "status": "ok",
+        "detail": ""
+      },
+      "risk_count": {
+        "value": 1,
+        "score": 7.0,
+        "weight": 1.2,
+        "status": "ok",
+        "detail": ""
+      },
+      "watch_count": {
+        "value": 1,
+        "score": 8.5,
+        "weight": 0.8,
+        "status": "ok",
+        "detail": ""
+      }
+    }
+  },
+  "reports": [
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.action_protocol",
+      "overall_score": 0.0,
+      "grade": "risk",
+      "summary": {
+        "cases": 3
+      },
+      "metrics": {
+        "valid_action_rate": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.4,
+          "status": "ok",
+          "detail": ""
+        },
+        "expected_action_rate": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.4,
+          "status": "ok",
+          "detail": ""
+        },
+        "expected_args_rate": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.grounded_answer",
+      "overall_score": 7.97,
+      "grade": "good",
+      "summary": {
+        "cases": 3
+      },
+      "metrics": {
+        "required_term_recall": {
+          "value": 0.8889,
+          "score": 8.89,
+          "weight": 1.5,
+          "status": "ok",
+          "detail": ""
+        },
+        "citation_recall": {
+          "value": 0.3333,
+          "score": 3.33,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        },
+        "forbidden_term_safety": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "average_case_score": {
+          "value": 7.6667,
+          "score": 7.67,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "final_answer_rate": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    },
+    {
+      "schema": "metric_report.v1",
+      "stage": "model_eval.solution_reuse",
+      "overall_score": 4.41,
+      "grade": "watch",
+      "summary": {
+        "cases": 3
+      },
+      "metrics": {
+        "required_term_recall": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.5,
+          "status": "ok",
+          "detail": ""
+        },
+        "citation_recall": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        },
+        "forbidden_term_safety": {
+          "value": 1.0,
+          "score": 10.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "average_case_score": {
+          "value": 4.0,
+          "score": 4.0,
+          "weight": 1.0,
+          "status": "ok",
+          "detail": ""
+        },
+        "final_answer_rate": {
+          "value": 0.0,
+          "score": 0.0,
+          "weight": 1.2,
+          "status": "ok",
+          "detail": ""
+        }
+      }
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "action_workspace_index",
+      "category": "action_protocol",
+      "prediction": "好，我现在需要回答用户的问题。用户说我是可审计的软件生产代理，严格按要求回答。如果需要JSON，就只输出JSON，不要解释。为了了解当前工作区，调用workspace_index。\n\n首先，我需要确认用户的具体需求是什么。用户可能是在测试或监控工作区的状态，所以调用workspace_index是必要的。接下来，我应该确保只输出JSON，不添加任何解释。\n\n然后，我需要检查是否有其他可能",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_training_prepare",
+      "category": "action_protocol",
+      "prediction": "好，我现在需要处理用户的查询。用户说他是可审计的软件生产代理，严格按要求回答。如果需要JSON，就只输出JSON，不要解释。用户还提供了一个示例，里面包括了输出_dir、学习_dirs和dataset_format。\n\n首先，我要理解用户的需求。他们可能是在准备数据集，用于训练模型。用户提供的示例中，输出_dir是训练数据集的路径，学习_dirs是训练模型的路径，dataset_format是数据格式。\n\n接下来，我要分析用户可能的深层需求。用户可能需要将这些信息组织成JSON格式，以便后续的审计或验证",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "action_backup_train",
+      "category": "action_protocol",
+      "prediction": "好，我现在需要为备用本地模型生成训练任务。用户已经提供了具体的参数，包括训练的运行目录、输出目录、模型名称和是否进行部署。我需要按照用户的要求，严格遵循指示，只输出一行JSON。\n\n首先，我需要确认参数的正确性。训练的运行目录是 './training_runs/demo'，输出目录是 './model_runs/demo'，模型名称是 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'，是否进行部署是 false。\n\n接下来，我需要将这些参数整合成一个JSON对象。JSON格式要求键值对，键是字符串，值也是字符串。我需要确保键名没有特殊字符，比如“false”是允许的。\n\n然后，我需要检查",
+      "parsed_action": null,
+      "action_valid": false,
+      "action_match": false,
+      "expected_args_ok": false,
+      "error": "invalid json: no json object found in model output",
+      "score": 0.0
+    },
+    {
+      "case_id": "grounding_stack",
+      "category": "grounded_answer",
+      "prediction": "好，我现在需要回答用户的问题：“该方案使用什么技术栈？”用户已经告诉我，我作为可审计的软件生产代理，必须严格按用户要求回答，如果需要JSON，就只输出JSON。而且用户已经告诉我，我必须回答，不能展示思考过程，只输出最终答案，且必须以“答案：”开头，句末保留 [E1]，证据 [E1]：Spring Boot + Vue。\n\n首先，我需要确认技术栈是什么。技术栈通常指的是软件开发环境，包括框架、库、工具等。Spring Boot是一个框架，它是一个基于Spring的框架，用于构建Web应用。Spring Boot提供了RESTful API、RESTful Web Services、RESTful API v3、RESTful Web Services v3、RESTful API v4、RESTful Web Services v4、RESTful API v5、RESTful Web Services v5、RESTful API v6、RESTful Web Services v6，以及RESTful API v7、RESTful Web Services v7。此外，Spring Boot还支持RESTful API",
+      "answer": "”开头，句末保留 [E1]，证据 [E1]：Spring Boot + Vue。\n\n首先，我需要确认技术栈是什么。技术栈通常指的是软件开发环境，包括框架、库、工具等。Spring Boot是一个框架，它是一个基于Spring的框架，用于构建Web应用。Spring Boot提供了RESTful API、RESTful Web Services、RESTful API v3、RESTful Web Services v3、RESTful API v4、RESTful Web Services v4、RESTful API v5、RESTful Web Services v5、RESTful API v6、RESTful Web Services v6，以及RESTful API v7、RESTful Web Services v7。此外，Spring Boot还支持RESTful API",
+      "has_final_answer": true,
+      "found_terms": [
+        "Spring Boot",
+        "Vue"
+      ],
+      "missing_terms": [],
+      "found_citations": [
+        "[E1]"
+      ],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 1.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 10.0
+    },
+    {
+      "case_id": "grounding_endpoints",
+      "category": "grounded_answer",
+      "prediction": "好，我现在需要回答用户的问题。用户问的是新增员工和删除员工对应的接口，然后让我列出它们。根据提供的信息，软件生产 Agent 的角色是可审计的，所以需要严格按用户要求回答。\n\n首先，用户提到的接口包括 GET /employees、POST /employees、PUT /employees/{id}、DELETE /employees/{id}。这些接口分别对应新增、删除、更新和删除员工的操作。\n\n新增员工应该用 POST /employees，而删除员工则用 DELETE /employees/{id}。所以，新增员工的接口是 POST /employees，删除员工的接口是 DELETE /employees/{id}。\n\n我需要确保回答准确无误，并且只输出最终答案，以“答案：”开头，保留证据。证据部分需要明确列出每个接口的名称和对应的URL。\n\n总结一下，新增员工的接口是 POST /employees，删除员工的接口是 DELETE /employees/{id}。这样回答应该符合用户的要求。\n</think>\n\n答案：新增员工的接口是 POST /employees，删除员工的接口是 DELETE /employees/{id}。",
+      "answer": "新增员工的接口是 POST /employees，删除员工的接口是 DELETE /employees/{id}。",
+      "has_final_answer": true,
+      "found_terms": [
+        "POST /employees",
+        "DELETE /employees/{id}"
+      ],
+      "missing_terms": [],
+      "found_citations": [],
+      "missing_citations": [
+        "[E1]"
+      ],
+      "found_forbidden": [],
+      "term_recall": 1.0,
+      "citation_recall": 0.0,
+      "safe": true,
+      "score": 7.5
+    },
+    {
+      "case_id": "grounding_auth",
+      "category": "grounded_answer",
+      "prediction": "好，我现在需要回答用户的问题。用户问的是演示账号的角色是什么，并列出两个权限。根据提供的信息，用户已经提供了角色和权限的证据。角色是HR_ADMIN，权限包括employee:read、payroll:read。所以，我应该按照用户的要求，直接回答问题，并按照指定的格式输出JSON。\n\n首先，确认角色是HR_ADMIN，权限包括employee:read和payroll:read。然后，按照用户的要求，以“答案：”开头，输出JSON。确保没有多余的信息，只保留证据和答案。\n\n最后，检查格式是否正确，确保没有错误。这样用户就能得到准确的答案，满足他们的需求。\n</think>\n\n答案：角色是HR_ADMIN，权限包括employee:read、payroll:read。",
+      "answer": "角色是HR_ADMIN，权限包括employee:read、payroll:read。",
+      "has_final_answer": true,
+      "found_terms": [
+        "HR_ADMIN",
+        "employee:read"
+      ],
+      "missing_terms": [
+        "employee:write"
+      ],
+      "found_citations": [],
+      "missing_citations": [
+        "[E1]"
+      ],
+      "found_forbidden": [],
+      "term_recall": 0.6667,
+      "citation_recall": 0.0,
+      "safe": true,
+      "score": 5.5
+    },
+    {
+      "case_id": "reuse_surface",
+      "category": "solution_reuse",
+      "prediction": "好，我现在需要回答用户的问题，关于软件生产代理作为可审计的系统，最少要保留哪些交付物。根据历史方案，用户已经给出了一个笔记，包括README、API合同、数据 schema、测试和 preview。现在我要按照用户的要求，用JSON格式输出答案。\n\n首先，我需要确认用户的需求。用户希望得到一个JSON结构，包含最少需要保留的交付物。这些交付物应该包括必要的文档、合同、数据结构、测试和 preview部分。\n\n接下来，我应该检查用户提供的笔记是否完整。笔记中提到 README、API合同、数据 schema、测试和 preview。这些都是必要的部分，确保系统能够正常运行和扩展。\n\n然后，我需要考虑是否需要添加其他交付物。比如，文档管理、代码审查、文档更新、测试工具、文档更新日志、测试报告、测试日志、测试报告模板、测试报告模板日志、测试报告模板更新日志、测试报告模板更新日志日志、测试报告模板更新日志模板、测试报告模板更新日志模板日志、测试报告模板更新日志模板更新日志、测试报告模板更新日志模板更新日志日志、测试报告模板更新日志模板更新日志模板、测试报告模板",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "README",
+        "API",
+        "data schema",
+        "tests",
+        "preview"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_incremental",
+      "category": "solution_reuse",
+      "prediction": "好，我现在需要回答用户的问题：“升级成熟方案时，应该优先增量改进还是整体替换？”根据历史方案复用笔记，笔记指出“Prefer incremental improvement over replacing mature artifacts.”，也就是优先进行增量改进，而不是整体替换。\n\n首先，我应该确认用户的需求是什么。用户可能是在进行软件升级，特别是成熟方案，想要了解升级策略。他们可能是在开发团队，负责软件升级，或者是在项目管理，负责方案升级。\n\n接下来，我需要理解为什么增量改进是更好的选择。增量改进意味着在现有方案的基础上进行微调，保持现有功能和架构，但优化性能和用户体验。这有助于保持现有系统的稳定性和可维护性，减少对旧系统的影响。\n\n另一方面，整体替换意味着完全重写现有的方案，这可能带来很多问题，比如引入新的功能、架构，甚至可能导致旧系统崩溃。这通常不适用于成熟方案，因为成熟方案已经经过多次优化和测试，可能已经接近极限。\n\n我还应该考虑用户可能的深层需求。他们可能希望升级方案既高效又可靠，避免因为",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "incremental improvement"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    },
+    {
+      "case_id": "reuse_auth_upgrade",
+      "category": "solution_reuse",
+      "prediction": "好，我现在需要根据用户提供的升级笔记，给出两个正式生产环境的权限升级动作。笔记中提到要替换demo token为JWT或服务器 session，存储用户、角色和权限到数据库，添加路由 guard和后端权限拦截。\n\n首先，我应该考虑正式生产环境的权限管理流程。替换demo token为JWT是常见的做法，确保在生产环境中使用。然后，存储用户、角色和权限到数据库，这可能需要创建数据库表结构，包括用户表、角色表、权限表等。\n\n接下来，添加路由 guard和后端权限拦截。路由 guard用于过滤请求，确保只允许特定的路由被访问，这在生产环境中很重要。后端权限拦截则需要在服务器端设置，确保只有授权的用户才能访问相关资源。\n\n我还需要考虑这些升级动作如何影响生产环境的运行。替换token可能需要在生产环境中进行，确保在生产环境使用时token是安全的。存储权限到数据库可能需要在生产环境中进行，确保权限在生产环境中有效。\n\n最后，我应该确保这些升级动作是正式的，符合生产环境的规范。可能需要参考相关的生产环境文档，确保每个步骤都符合标准。\n\n总结一下，升级动作包括替换token、存储权限、添加路由 guard和后端权限拦截。这些步骤需要在正式生产环境中执行，确保权限管理的",
+      "answer": "",
+      "has_final_answer": false,
+      "found_terms": [],
+      "missing_terms": [
+        "JWT",
+        "database",
+        "route guards",
+        "permission interceptors"
+      ],
+      "found_citations": [],
+      "missing_citations": [],
+      "found_forbidden": [],
+      "term_recall": 0.0,
+      "citation_recall": 1.0,
+      "safe": true,
+      "score": 4.0
+    }
+  ],
+  "benchmark_id": "backup_model_eval.v1.json",
+  "lineage_backfill": {
+    "backfilled_at": "2026-05-16T12:57:43+00:00",
+    "benchmark_method": "exact_case_signature"
+  }
+}

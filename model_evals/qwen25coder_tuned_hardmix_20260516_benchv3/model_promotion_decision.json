@@ -1,0 +1,124 @@
+{
+  "schema": "model_promotion_decision.v1",
+  "generated_at": "2026-05-16T13:04:03+00:00",
+  "passed": false,
+  "status": "blocked",
+  "candidate": {
+    "label": "qwen25coder_tuned_hardmix_benchv3",
+    "benchmark_id": "backup_model_eval.v3.json",
+    "model_version": "backup-6cc03ce09f7d72204aba",
+    "overall_score": 7.94,
+    "grade": "good",
+    "stage_scores": {
+      "model_eval.action_protocol": 6.25,
+      "model_eval.grounded_answer": 4.95,
+      "model_eval.solution_reuse": 6.95
+    }
+  },
+  "baseline": {
+    "label": "qwen25coder_base_benchv3",
+    "benchmark_id": "backup_model_eval.v3.json",
+    "overall_score": 8.41,
+    "stage_scores": {
+      "model_eval.action_protocol": 7.5,
+      "model_eval.grounded_answer": 7.32,
+      "model_eval.solution_reuse": 5.08
+    }
+  },
+  "policy": {
+    "require_same_benchmark": true,
+    "min_overall_score": 7.0,
+    "min_delta_vs_baseline": 0.0,
+    "min_stage_scores": {
+      "model_eval.action_protocol": 6.0,
+      "model_eval.grounded_answer": 6.0,
+      "model_eval.solution_reuse": 6.0
+    },
+    "max_stage_regression": 0.0
+  },
+  "checks": [
+    {
+      "name": "benchmark_match",
+      "passed": true,
+      "detail": "candidate and baseline must use the same benchmark",
+      "actual": "backup_model_eval.v3.json",
+      "expected": "backup_model_eval.v3.json"
+    },
+    {
+      "name": "overall_floor",
+      "passed": true,
+      "detail": "candidate overall score must clear the minimum floor",
+      "actual": 7.94,
+      "expected": 7.0
+    },
+    {
+      "name": "overall_delta_vs_baseline",
+      "passed": false,
+      "detail": "candidate must not underperform the baseline beyond policy",
+      "actual": -0.47,
+      "expected": 0.0
+    },
+    {
+      "name": "candidate_subject_matches_model_version",
+      "passed": true,
+      "detail": "candidate report must point at the intended model version",
+      "actual": "backup-6cc03ce09f7d72204aba",
+      "expected": "backup-6cc03ce09f7d72204aba"
+    },
+    {
+      "name": "stage_floor:model_eval.action_protocol",
+      "passed": true,
+      "detail": "candidate stage score must clear the minimum floor",
+      "actual": 6.25,
+      "expected": 6.0
+    },
+    {
+      "name": "stage_regression:model_eval.action_protocol",
+      "passed": false,
+      "detail": "candidate stage score must stay within the allowed regression budget",
+      "actual": -1.25,
+      "expected": ">= -0.0"
+    },
+    {
+      "name": "stage_floor:model_eval.grounded_answer",
+      "passed": false,
+      "detail": "candidate stage score must clear the minimum floor",
+      "actual": 4.95,
+      "expected": 6.0
+    },
+    {
+      "name": "stage_regression:model_eval.grounded_answer",
+      "passed": false,
+      "detail": "candidate stage score must stay within the allowed regression budget",
+      "actual": -2.37,
+      "expected": ">= -0.0"
+    },
+    {
+      "name": "stage_floor:model_eval.solution_reuse",
+      "passed": true,
+      "detail": "candidate stage score must clear the minimum floor",
+      "actual": 6.95,
+      "expected": 6.0
+    },
+    {
+      "name": "stage_regression:model_eval.solution_reuse",
+      "passed": true,
+      "detail": "candidate stage score must stay within the allowed regression budget",
+      "actual": 1.87,
+      "expected": ">= -0.0"
+    }
+  ],
+  "recommended_next_step": "adjust_data_or_training_then_re_evaluate",
+  "recommended_actions": [
+    "rebalance_grounded_answer_supervision",
+    "run_regression_focused_ablation",
+    "compare_against_baseline_before_more_training"
+  ],
+  "model_version_manifest": {
+    "model_version": "backup-6cc03ce09f7d72204aba",
+    "base_model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    "adapter_name": "backup-qwen-protocol-hardmix-lora",
+    "dataset_snapshot_id": "dataset-1e4c574e483686c6385a924e",
+    "training_job_spec_id": "jobspec-9e126f5ba54d273291ece2bc"
+  }
+}

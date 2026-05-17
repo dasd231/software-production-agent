@@ -1,0 +1,231 @@
+{
+  "schema": "research_experiment_comparison.v1",
+  "generated_at": "2026-05-17T04:57:59+00:00",
+  "groups": [
+    {
+      "benchmark": "backup_model_eval.v1.json",
+      "baseline": {
+        "name": "base_20260516",
+        "label": "base",
+        "overall_score": 7.22
+      },
+      "best": {
+        "name": "tuned_20260516",
+        "label": "tuned",
+        "overall_score": 7.29
+      },
+      "rows": [
+        {
+          "name": "tuned_20260516",
+          "label": "tuned",
+          "overall_score": 7.29,
+          "grade": "good",
+          "delta_vs_baseline": 0.07,
+          "stage_scores": {
+            "model_eval.action_protocol": 0.0,
+            "model_eval.grounded_answer": 8.51,
+            "model_eval.solution_reuse": 6.58
+          }
+        },
+        {
+          "name": "base_20260516",
+          "label": "base",
+          "overall_score": 7.22,
+          "grade": "good",
+          "delta_vs_baseline": 0.0,
+          "stage_scores": {
+            "model_eval.action_protocol": 0.0,
+            "model_eval.grounded_answer": 10.0,
+            "model_eval.solution_reuse": 6.36
+          }
+        },
+        {
+          "name": "base_20260516_v2",
+          "label": "base",
+          "overall_score": 6.83,
+          "grade": "good",
+          "delta_vs_baseline": -0.39,
+          "stage_scores": {
+            "model_eval.action_protocol": 0.0,
+            "model_eval.grounded_answer": 7.17,
+            "model_eval.solution_reuse": 6.24
+          }
+        },
+        {
+          "name": "tuned_20260516_v2",
+          "label": "tuned",
+          "overall_score": 6.69,
+          "grade": "good",
+          "delta_vs_baseline": -0.53,
+          "stage_scores": {
+            "model_eval.action_protocol": 0.0,
+            "model_eval.grounded_answer": 7.97,
+            "model_eval.solution_reuse": 4.41
+          }
+        }
+      ]
+    },
+    {
+      "benchmark": "backup_model_eval.v2.json",
+      "baseline": {
+        "name": "qwen25coder_base_20260516_benchv2_schema",
+        "label": "qwen25coder_base_benchv2_schema",
+        "overall_score": 8.02
+      },
+      "best": {
+        "name": "qwen25coder_tuned_protocol_20260516_benchv2_schema",
+        "label": "qwen25coder_tuned_protocol_benchv2_schema",
+        "overall_score": 8.02
+      },
+      "rows": [
+        {
+          "name": "qwen25coder_tuned_protocol_20260516_benchv2_schema",
+          "label": "qwen25coder_tuned_protocol_benchv2_schema",
+          "overall_score": 8.02,
+          "grade": "excellent",
+          "delta_vs_baseline": 0.0,
+          "stage_scores": {
+            "model_eval.action_protocol": 5.88,
+            "model_eval.grounded_answer": 7.1,
+            "model_eval.solution_reuse": 5.81
+          }
+        },
+        {
+          "name": "qwen25coder_base_20260516_benchv2_schema",
+          "label": "qwen25coder_base_benchv2_schema",
+          "overall_score": 8.02,
+          "grade": "excellent",
+          "delta_vs_baseline": 0.0,
+          "stage_scores": {
+            "model_eval.action_protocol": 5.81,
+            "model_eval.grounded_answer": 7.99,
+            "model_eval.solution_reuse": 4.92
+          }
+        },
+        {
+          "name": "qwen25coder_tuned_hardmix_20260516_benchv2_schema",
+          "label": "qwen25coder_tuned_hardmix_benchv2_schema",
+          "overall_score": 7.73,
+          "grade": "good",
+          "delta_vs_baseline": -0.29,
+          "stage_scores": {
+            "model_eval.action_protocol": 5.88,
+            "model_eval.grounded_answer": 6.21,
+            "model_eval.solution_reuse": 6.31
+          }
+        },
+        {
+          "name": "tuned_protocol_20260516_benchv2",
+          "label": "tuned_protocol_benchv2",
+          "overall_score": 7.16,
+          "grade": "good",
+          "delta_vs_baseline": -0.86,
+          "stage_scores": {
+            "model_eval.action_protocol": 0.0,
+            "model_eval.grounded_answer": 7.27,
+            "model_eval.solution_reuse": 6.82
+          }
+        },
+        {
+          "name": "qwen25coder_tuned_protocol_20260516_benchv2",
+          "label": "qwen25coder_tuned_protocol_benchv2",
+          "overall_score": 6.76,
+          "grade": "good",
+          "delta_vs_baseline": -1.26,
+          "stage_scores": {
+            "model_eval.action_protocol": 0.0,
+            "model_eval.grounded_answer": 7.1,
+            "model_eval.solution_reuse": 5.81
+          }
+        },
+        {
+          "name": "qwen25coder_base_20260516_benchv2",
+          "label": "qwen25coder_base_benchv2",
+          "overall_score": 6.76,
+          "grade": "good",
+          "delta_vs_baseline": -1.26,
+          "stage_scores": {
+            "model_eval.action_protocol": 0.0,
+            "model_eval.grounded_answer": 7.99,
+            "model_eval.solution_reuse": 4.92
+          }
+        },
+        {
+          "name": "tuned_old_20260516_benchv2",
+          "label": "tuned_old_benchv2",
+          "overall_score": 6.39,
+          "grade": "watch",
+          "delta_vs_baseline": -1.63,
+          "stage_scores": {
+            "model_eval.action_protocol": 0.0,
+            "model_eval.grounded_answer": 6.1,
+            "model_eval.solution_reuse": 5.81
+          }
+        },
+        {
+          "name": "base_20260516_benchv2_schema",
+          "label": "base_benchv2_schema",
+          "overall_score": 6.16,
+          "grade": "watch",
+          "delta_vs_baseline": -1.86,
+          "stage_scores": {
+            "model_eval.action_protocol": 0.0,
+            "model_eval.grounded_answer": 5.25,
+            "model_eval.solution_reuse": 4.92
+          }
+        },
+        {
+          "name": "base_20260516_benchv2",
+          "label": "base_benchv2",
+          "overall_score": 6.16,
+          "grade": "watch",
+          "delta_vs_baseline": -1.86,
+          "stage_scores": {
+            "model_eval.action_protocol": 0.0,
+            "model_eval.grounded_answer": 5.25,
+            "model_eval.solution_reuse": 4.92
+          }
+        }
+      ]
+    },
+    {
+      "benchmark": "backup_model_eval.v3.json",
+      "baseline": {
+        "name": "qwen25coder_base_20260516_benchv3",
+        "label": "qwen25coder_base_benchv3",
+        "overall_score": 8.41
+      },
+      "best": {
+        "name": "qwen25coder_base_20260516_benchv3",
+        "label": "qwen25coder_base_benchv3",
+        "overall_score": 8.41
+      },
+      "rows": [
+        {
+          "name": "qwen25coder_base_20260516_benchv3",
+          "label": "qwen25coder_base_benchv3",
+          "overall_score": 8.41,
+          "grade": "excellent",
+          "delta_vs_baseline": 0.0,
+          "stage_scores": {
+            "model_eval.action_protocol": 7.5,
+            "model_eval.grounded_answer": 7.32,
+            "model_eval.solution_reuse": 5.08
+          }
+        },
+        {
+          "name": "qwen25coder_tuned_hardmix_20260516_benchv3",
+          "label": "qwen25coder_tuned_hardmix_benchv3",
+          "overall_score": 7.94,
+          "grade": "good",
+          "delta_vs_baseline": -0.47,
+          "stage_scores": {
+            "model_eval.action_protocol": 6.25,
+            "model_eval.grounded_answer": 4.95,
+            "model_eval.solution_reuse": 6.95
+          }
+        }
+      ]
+    }
+  ]
+}

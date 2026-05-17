@@ -1,0 +1,6 @@
+{
+  "goal": "加一下增删改查",
+  "mode": "demo",
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}

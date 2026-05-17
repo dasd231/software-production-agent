@@ -1,0 +1,41 @@
+{
+  "schema": "research_distributed_dispatch_candidates.v1",
+  "generated_at": "2026-05-17T04:57:59+00:00",
+  "summary": {
+    "dispatchable": 2,
+    "workload_counts": {
+      "training_dispatch": 1,
+      "benchmark_evaluation": 1
+    }
+  },
+  "rows": [
+    {
+      "model_run": "backup_qwen_grounding_rebalanced_20260516",
+      "next_action": "execute_training_job",
+      "reason": "training_job_not_completed",
+      "workload": "training_dispatch",
+      "queue": "training",
+      "priority": "high",
+      "resources": {
+        "cpu": 4,
+        "gpu": 1,
+        "memory_gb": 16
+      },
+      "eligible": true
+    },
+    {
+      "model_run": "backup_quality_20260515",
+      "next_action": "run_benchmark_evaluation",
+      "reason": "trained_without_precisely_linked_evaluation",
+      "workload": "benchmark_evaluation",
+      "queue": "evaluation",
+      "priority": "high",
+      "resources": {
+        "cpu": 2,
+        "gpu": 1,
+        "memory_gb": 12
+      },
+      "eligible": true
+    }
+  ]
+}

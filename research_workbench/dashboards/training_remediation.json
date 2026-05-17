@@ -1,0 +1,95 @@
+{
+  "schema": "research_training_remediation.v1",
+  "generated_at": "2026-05-17T04:57:59+00:00",
+  "summary": {
+    "models_with_recommendations": 3,
+    "action_counts": {
+      "increase_action_protocol_supervision": 3,
+      "increase_solution_reuse_supervision": 1,
+      "raise_candidate_overall_quality": 1,
+      "rebalance_grounded_answer_supervision": 2,
+      "run_regression_focused_ablation": 2,
+      "compare_against_baseline_before_more_training": 1
+    }
+  },
+  "rows": [
+    {
+      "model_run": "backup_qwen_protocol_20260516",
+      "model_version": "backup-08e1a18c01536ed4f030",
+      "dataset_id": "dataset-ccd957c9b2d5f2887280ff92",
+      "actions": [
+        "increase_action_protocol_supervision",
+        "increase_solution_reuse_supervision",
+        "raise_candidate_overall_quality",
+        "rebalance_grounded_answer_supervision",
+        "run_regression_focused_ablation"
+      ],
+      "task_support": {
+        "action_protocol_sft": 22,
+        "rag_grounded_answer": 1,
+        "solution_reuse_sft": 7
+      },
+      "min_task_share": 0.011,
+      "task_balance_status": "watch",
+      "rarest_tasks": [
+        "rag_grounded_answer"
+      ],
+      "underrepresented_tasks": [
+        {
+          "task": "rag_grounded_answer",
+          "count": 1,
+          "relative_to_largest_family": 0.0323
+        },
+        {
+          "task": "solution_reuse_sft",
+          "count": 7,
+          "relative_to_largest_family": 0.2258
+        }
+      ]
+    },
+    {
+      "model_run": "backup_qwen_protocol_hardmix_20260516",
+      "model_version": "backup-6cc03ce09f7d72204aba",
+      "dataset_id": "dataset-1e4c574e483686c6385a924e",
+      "actions": [
+        "compare_against_baseline_before_more_training",
+        "increase_action_protocol_supervision",
+        "rebalance_grounded_answer_supervision",
+        "run_regression_focused_ablation"
+      ],
+      "task_support": {
+        "action_protocol_sft": 34,
+        "rag_grounded_answer": 1
+      },
+      "min_task_share": 0.0097,
+      "task_balance_status": "watch",
+      "rarest_tasks": [
+        "rag_grounded_answer"
+      ],
+      "underrepresented_tasks": [
+        {
+          "task": "rag_grounded_answer",
+          "count": 1,
+          "relative_to_largest_family": 0.0294
+        }
+      ]
+    },
+    {
+      "model_run": "backup_protocol_mix_20260516",
+      "model_version": "backup-f4a25b2403a8832a2c01",
+      "dataset_id": "dataset-ccd957c9b2d5f2887280ff92",
+      "actions": [
+        "increase_action_protocol_supervision"
+      ],
+      "task_support": {
+        "action_protocol_sft": 22
+      },
+      "min_task_share": 0.011,
+      "task_balance_status": "watch",
+      "rarest_tasks": [
+        "rag_grounded_answer"
+      ],
+      "underrepresented_tasks": []
+    }
+  ]
+}

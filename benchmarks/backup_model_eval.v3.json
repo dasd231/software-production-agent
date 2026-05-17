@@ -1,0 +1,201 @@
+{
+  "schema": "backup_model_benchmark.v3",
+  "description": "protocol-pure benchmark: action prompts explicitly name the desired action; tool-selection is intentionally kept out of this slice",
+  "cases": [
+    {
+      "case_id": "protocol_workspace_index_v3",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。请调用 workspace_index。",
+      "expected_action": "workspace_index",
+      "expected_args": {},
+      "max_new_tokens": 96
+    },
+    {
+      "case_id": "protocol_resource_registry_v3",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。请调用 resource_registry，参数：type='training_dataset'，roots=['./training_runs']。",
+      "expected_action": "resource_registry",
+      "expected_args": {
+        "type": "training_dataset",
+        "roots": [
+          "./training_runs"
+        ]
+      },
+      "max_new_tokens": 128
+    },
+    {
+      "case_id": "protocol_research_synthesize_v3",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。请调用 research_synthesize，参数：query='权限升级方案'，top_k=3，solution_dirs=['./product_runs']，use_web=false。",
+      "expected_action": "research_synthesize",
+      "expected_args": {
+        "query": "权限升级方案",
+        "top_k": 3,
+        "solution_dirs": [
+          "./product_runs"
+        ],
+        "use_web": false
+      },
+      "max_new_tokens": 160
+    },
+    {
+      "case_id": "protocol_training_prepare_v3",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。请调用 training_prepare，参数：output_dir='./training_runs/v3'，learning_dirs=['./learning_runs/demo']，solution_dirs=['./product_runs']，dataset_format='messages'。",
+      "expected_action": "training_prepare",
+      "expected_args": {
+        "output_dir": "./training_runs/v3",
+        "learning_dirs": [
+          "./learning_runs/demo"
+        ],
+        "solution_dirs": [
+          "./product_runs"
+        ],
+        "dataset_format": "messages"
+      },
+      "max_new_tokens": 160
+    },
+    {
+      "case_id": "protocol_backup_model_train_v3",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。请调用 backup_model_train，参数：training_dir='./training_runs/v3'，output_dir='./model_runs/v3'，base_model='deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'，launch=false。",
+      "expected_action": "backup_model_train",
+      "expected_args": {
+        "training_dir": "./training_runs/v3",
+        "output_dir": "./model_runs/v3",
+        "base_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+        "launch": false
+      },
+      "max_new_tokens": 180
+    },
+    {
+      "case_id": "protocol_evidence_ledger_v3",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。请调用 evidence_ledger，参数：roots=['./product_runs','./learning_runs']，output_path='evidence_ledger.json'。",
+      "expected_action": "evidence_ledger",
+      "expected_args": {
+        "roots": [
+          "./product_runs",
+          "./learning_runs"
+        ],
+        "output_path": "evidence_ledger.json"
+      },
+      "max_new_tokens": 160
+    },
+    {
+      "case_id": "protocol_model_route_plan_v3",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。请调用 model_route_plan，参数：goal='长上下文 RAG 请求'，require_json=true，max_output_tokens=2048。",
+      "expected_action": "model_route_plan",
+      "expected_args": {
+        "goal": "长上下文 RAG 请求",
+        "require_json": true,
+        "max_output_tokens": 2048
+      },
+      "max_new_tokens": 160
+    },
+    {
+      "case_id": "protocol_finish_v3",
+      "category": "action_protocol",
+      "prompt": "只输出一行 JSON，不要解释。请调用 finish，参数：reason='done'。",
+      "expected_action": "finish",
+      "expected_args": {
+        "reason": "done"
+      },
+      "max_new_tokens": 96
+    },
+    {
+      "case_id": "grounding_stack_v3",
+      "category": "grounded_answer",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。只能依据证据回答，并在句末保留 [E1]。证据 [E1]：Stack = `Spring Boot + Vue`。问题：该方案使用什么技术栈？",
+      "required_terms": [
+        "Spring Boot",
+        "Vue"
+      ],
+      "required_citations": [
+        "[E1]"
+      ],
+      "forbidden_terms": [
+        "React",
+        "Django"
+      ],
+      "max_new_tokens": 220
+    },
+    {
+      "case_id": "grounding_endpoints_v3",
+      "category": "grounded_answer",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。证据 [E1]：新增员工使用 POST /employees，删除员工使用 DELETE /employees/{id}。问题：分别列出新增和删除接口。句末保留 [E1]。",
+      "required_terms": [
+        "POST /employees",
+        "DELETE /employees/{id}"
+      ],
+      "required_citations": [
+        "[E1]"
+      ],
+      "forbidden_terms": [
+        "PATCH /employees",
+        "GET /delete"
+      ],
+      "max_new_tokens": 240
+    },
+    {
+      "case_id": "grounding_permissions_v3",
+      "category": "grounded_answer",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。证据 [E1]：权限包括 employee:read、employee:write、audit:read。问题：列出两个员工相关权限。句末保留 [E1]。",
+      "required_terms": [
+        "employee:read",
+        "employee:write"
+      ],
+      "required_citations": [
+        "[E1]"
+      ],
+      "forbidden_terms": [
+        "finance:write"
+      ],
+      "max_new_tokens": 240
+    },
+    {
+      "case_id": "reuse_surface_v3",
+      "category": "solution_reuse",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。复用笔记：成熟软件方案至少保留 README、API contract、data schema、tests、preview。问题：最少要保留哪些交付物？",
+      "required_terms": [
+        "README",
+        "API contract",
+        "data schema",
+        "tests",
+        "preview"
+      ],
+      "forbidden_terms": [
+        "blockchain"
+      ],
+      "max_new_tokens": 260
+    },
+    {
+      "case_id": "reuse_incremental_v3",
+      "category": "solution_reuse",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。复用笔记：Prefer incremental improvement over replacing mature artifacts. 问题：升级成熟方案时优先怎么做？",
+      "required_terms": [
+        "incremental improvement"
+      ],
+      "forbidden_terms": [
+        "整体替换"
+      ],
+      "max_new_tokens": 220
+    },
+    {
+      "case_id": "reuse_auth_upgrade_v3",
+      "category": "solution_reuse",
+      "prompt": "不要展示思考过程。只输出最终答案，且必须以“答案：”开头。升级笔记：Replace demo token with JWT or server session. Store users, roles and permissions in database tables. Add route guards and backend permission interceptors. 问题：给出两个正式生产环境的权限升级动作。",
+      "required_terms": [
+        "JWT",
+        "database",
+        "route guards",
+        "permission interceptors"
+      ],
+      "forbidden_terms": [
+        "明文密码"
+      ],
+      "max_new_tokens": 280
+    }
+  ]
+}

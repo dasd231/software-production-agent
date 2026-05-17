@@ -1,0 +1,5 @@
+{
+  "type": "static_preview",
+  "entrypoint": "preview/index.html",
+  "execution_policy": "preview only; generated app build scripts are not executed by agent tools"
+}
