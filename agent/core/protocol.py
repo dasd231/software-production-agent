@@ -76,6 +76,10 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "teacher_task_suite_plan",
         "distillation_plan_build",
         "distillation_dataset_manifest_build",
+        "teacher_prompt_batch_build",
+        "teacher_execution_plan_build",
+        "teacher_output_review_build",
+        "distillation_export_build",
         "industrial_maturity_plan",
         "enterprise_readiness_check",
         "workflow_validate",
@@ -329,6 +333,50 @@ class ActionDTO(BaseModel):
             value = ar.get("teacher_outputs")
             if not isinstance(value, list) or not all(isinstance(x, dict) for x in value):
                 raise ValueError("distillation_dataset_manifest_build teacher_outputs must be object array")
+        elif a == "teacher_prompt_batch_build":
+            if not isinstance(ar.get("distillation_plan"), dict):
+                raise ValueError("teacher_prompt_batch_build requires object distillation_plan")
+            value = ar.get("source_examples")
+            if not isinstance(value, list) or not all(isinstance(x, dict) for x in value):
+                raise ValueError("teacher_prompt_batch_build source_examples must be object array")
+            if "max_prompts" in ar:
+                value = ar.get("max_prompts")
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise ValueError("teacher_prompt_batch_build max_prompts must be non-negative integer")
+        elif a == "teacher_execution_plan_build":
+            if not isinstance(ar.get("distillation_plan"), dict):
+                raise ValueError("teacher_execution_plan_build requires object distillation_plan")
+            if not isinstance(ar.get("prompt_batch"), dict):
+                raise ValueError("teacher_execution_plan_build requires object prompt_batch")
+            if "mode" in ar and not isinstance(ar.get("mode"), str):
+                raise ValueError("teacher_execution_plan_build mode must be string")
+            if "allow_remote" in ar and not isinstance(ar.get("allow_remote"), bool):
+                raise ValueError("teacher_execution_plan_build allow_remote must be boolean")
+            if "max_prompts" in ar:
+                value = ar.get("max_prompts")
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise ValueError("teacher_execution_plan_build max_prompts must be non-negative integer")
+            if "max_output_tokens" in ar:
+                value = ar.get("max_output_tokens")
+                if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                    raise ValueError("teacher_execution_plan_build max_output_tokens must be positive integer")
+            if "temperature" in ar and (isinstance(ar.get("temperature"), bool) or not isinstance(ar.get("temperature"), (int, float))):
+                raise ValueError("teacher_execution_plan_build temperature must be number")
+        elif a == "teacher_output_review_build":
+            if not isinstance(ar.get("distillation_plan"), dict):
+                raise ValueError("teacher_output_review_build requires object distillation_plan")
+            if not isinstance(ar.get("prompt_batch"), dict):
+                raise ValueError("teacher_output_review_build requires object prompt_batch")
+            value = ar.get("teacher_outputs")
+            if not isinstance(value, list) or not all(isinstance(x, dict) for x in value):
+                raise ValueError("teacher_output_review_build teacher_outputs must be object array")
+        elif a == "distillation_export_build":
+            if "output_dir" not in ar or not isinstance(ar.get("output_dir"), str):
+                raise ValueError("distillation_export_build requires string output_dir")
+            if not isinstance(ar.get("distillation_plan"), dict):
+                raise ValueError("distillation_export_build requires object distillation_plan")
+            if not isinstance(ar.get("teacher_output_review"), dict):
+                raise ValueError("distillation_export_build requires object teacher_output_review")
         elif a == "industrial_maturity_plan":
             if "goal" not in ar or not isinstance(ar.get("goal"), str):
                 raise ValueError("industrial_maturity_plan requires string goal")

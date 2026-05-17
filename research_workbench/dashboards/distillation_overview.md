@@ -1,9 +1,10 @@
 # 蒸馏控制面
 
-生成时间：`2026-05-17T10:46:36+00:00`
+生成时间：`2026-05-17T11:01:00+00:00`
 
 - 教师模型：`3`
 - 教师任务：`5`
+- 中段阶段：`4`
 
 ## Teachers
 
@@ -23,7 +24,16 @@
 | `teacher_issue_to_code` | map natural-language issue to likely files and symbols | True | ranked_files_present, evidence_present, unsupported_claims_absent |
 | `teacher_change_impact` | predict impacted modules and tests | True | impact_set_present, test_coverage_present, evidence_present |
 
+## Distillation Pipeline
+
+| Stage | Purpose | Default Mode |
+| --- | --- | --- |
+| `teacher_prompt_batch` | turn governed source examples into evidence-bound teacher prompts | `safe_build_only` |
+| `teacher_execution_plan` | preview provider/model calls before any expensive execution | `dry_run` |
+| `teacher_output_review` | reject missing, mismatched or unsupported teacher outputs | `evidence_gate` |
+| `distillation_export` | emit training_prepare-compatible examples | `write_learning_dir` |
+
 ## 说明
 
-- 当前页面只展示蒸馏控制面目录，不代表已经触发真实教师调用。
-- 真实调用层应在 teacher registry 和 task suite 稳定后接入。
+- 当前默认路径仍然不会触发真实教师调用；execution plan 的默认 mode 是 dry_run。
+- prompt -> review -> export 已经接通，下一步再接真实 teacher runtime adapter 与多教师 consensus。

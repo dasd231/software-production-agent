@@ -176,7 +176,12 @@ def build_training_platform_blueprint() -> dict[str, Any]:
         "current_priority": {
             "route": "B",
             "plane": "distillation_plane",
-            "next_builds": ["teacher_registry", "teacher_task_suite", "distillation_plan"],
+            "next_builds": [
+                "teacher_prompt_batch",
+                "teacher_execution_plan",
+                "teacher_output_review",
+                "distillation_export",
+            ],
         },
     }
 

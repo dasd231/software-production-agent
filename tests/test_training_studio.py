@@ -33,6 +33,12 @@ def test_training_platform_blueprint_remembers_route_and_planes() -> None:
     planes = {row["id"]: row for row in blueprint["planes"]}
 
     assert blueprint["current_priority"]["route"] == "B"
+    assert blueprint["current_priority"]["next_builds"] == [
+        "teacher_prompt_batch",
+        "teacher_execution_plan",
+        "teacher_output_review",
+        "distillation_export",
+    ]
     assert blueprint["route_memory"] == [
         "A: build the platform top level first",
         "B: add distillation next",

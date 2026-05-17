@@ -85,6 +85,19 @@ Adjacent Enterprise Planes
 这两类对象不替代 `training_job_spec.json`。  
 前者回答“研究设计”，后者回答“执行契约”。这样可以避免把 teacher mix、task mix、实验假设和 runner 参数混在同一层里。
 
+如果一轮实验使用蒸馏，控制面还会额外经过一组显式对象：
+
+| 对象 | 作用 |
+| --- | --- |
+| `teacher_task_suite.v1` | 定义教师要教哪些能力 |
+| `distillation_plan.v1` | 定义教师配比、学生模型和接收门槛 |
+| `teacher_prompt_batch.v1` | 把源样本转成带证据的教师 prompt |
+| `teacher_execution_plan.v1` | 在默认 `dry_run` 下预览教师调用 |
+| `teacher_output_review.v1` | 依据 prompt 证据审查教师输出 |
+| `distillation_export_manifest.v1` | 把通过审查的输出导回 `training_prepare` |
+
+这让“蒸馏”保持为可检查的训练设计，而不是一段隐藏在脚本里的 API 调用。
+
 `backup_model_train` 当前仍保留兼容用的 `backup_training_spec.json`，同时新增两类通用产物：
 
 | 文件 | 作用 |
@@ -152,6 +165,7 @@ TrainingRunner
 ```text
 learning run
   -> quality reports
+  -> optional distillation prompt/review/export
   -> training_prepare
   -> dataset_snapshot_manifest.json
   -> backup_model_train

@@ -65,7 +65,11 @@ from agent.evidence.ledger import build_evidence_ledger
 from agent.enterprise.stack import build_enterprise_stack_plan
 from agent.distillation.catalog import list_teacher_models, list_teacher_tasks
 from agent.distillation.datasets import build_distillation_dataset_manifest
+from agent.distillation.execution import build_teacher_execution_plan
+from agent.distillation.export import export_distillation_training_examples
 from agent.distillation.plans import build_distillation_plan, build_teacher_task_suite
+from agent.distillation.prompts import build_teacher_prompt_batch
+from agent.distillation.review import review_teacher_outputs
 from agent.distributed.plans import build_distributed_platform_plan
 from agent.distributed.dispatch import build_distributed_job_plan
 from agent.distributed.workloads import list_distributed_workloads
@@ -626,6 +630,48 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             teacher_outputs=[dict(item) for item in args.get("teacher_outputs", []) if isinstance(item, dict)],
         )
         return {"ok": bool(manifest.get("validation", {}).get("ok")), "action": name, "manifest": manifest}
+
+    if name == "teacher_prompt_batch_build":
+        batch = build_teacher_prompt_batch(
+            distillation_plan=dict(_require(args, "distillation_plan")),
+            source_examples=[dict(item) for item in args.get("source_examples", []) if isinstance(item, dict)],
+            max_prompts=int(args.get("max_prompts", 0)),
+        )
+        return {"ok": bool(batch.get("validation", {}).get("ok")), "action": name, "batch": batch}
+
+    if name == "teacher_execution_plan_build":
+        plan = build_teacher_execution_plan(
+            distillation_plan=dict(_require(args, "distillation_plan")),
+            prompt_batch=dict(_require(args, "prompt_batch")),
+            mode=str(args.get("mode", "dry_run") or "dry_run"),
+            allow_remote=bool(args.get("allow_remote", False)),
+            max_prompts=int(args.get("max_prompts", 0)),
+            max_output_tokens=int(args.get("max_output_tokens", 1024)),
+            temperature=float(args.get("temperature", 0.0)),
+        )
+        return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
+
+    if name == "teacher_output_review_build":
+        review = review_teacher_outputs(
+            distillation_plan=dict(_require(args, "distillation_plan")),
+            prompt_batch=dict(_require(args, "prompt_batch")),
+            teacher_outputs=[dict(item) for item in args.get("teacher_outputs", []) if isinstance(item, dict)],
+        )
+        return {"ok": bool(review.get("validation", {}).get("ok")), "action": name, "review": review}
+
+    if name == "distillation_export_build":
+        output_dir_raw = Path(str(_require(args, "output_dir")))
+        output_dir = output_dir_raw if output_dir_raw.is_absolute() else (workspace / output_dir_raw)
+        result = export_distillation_training_examples(
+            output_dir=output_dir,
+            distillation_plan=dict(_require(args, "distillation_plan")),
+            teacher_output_review=dict(_require(args, "teacher_output_review")),
+        )
+        return {
+            "ok": bool(result.get("counts", {}).get("training_examples", 0)),
+            "action": name,
+            **result,
+        }
 
     if name == "industrial_maturity_plan":
         plan = build_industrial_maturity_plan(

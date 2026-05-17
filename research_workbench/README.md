@@ -88,7 +88,7 @@ research_workbench/
 | 看当前哪些真实待办可包装成分布式 job | `dashboards/distributed_dispatch_candidates.md` |
 | 看项目大模型的语料、任务和阶段路线 | `dashboards/project_model_program.md` |
 | 看四大训练 Plane、路线记忆和可调旋钮 | `dashboards/training_platform_blueprint.md` |
-| 看蒸馏教师与教师任务目录 | `dashboards/distillation_overview.md` |
+| 看蒸馏教师、教师任务和中段执行链 | `dashboards/distillation_overview.md` |
 | 看下一轮训练修复建议 | `dashboards/training_remediation.md` |
 | 看训练证据谱系 | `dashboards/training_lineage.md` |
 | 记论文 | `literature/paper_reading_log.csv` |

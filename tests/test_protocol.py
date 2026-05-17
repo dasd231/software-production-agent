@@ -185,6 +185,17 @@ def test_industrial_maturity_plan_valid() -> None:
     assert d["action"] == "industrial_maturity_plan"
 
 
+def test_distillation_execution_actions_valid() -> None:
+    samples = [
+        '{"type":"action","action":"teacher_prompt_batch_build","args":{"distillation_plan":{},"source_examples":[],"max_prompts":0}}',
+        '{"type":"action","action":"teacher_execution_plan_build","args":{"distillation_plan":{},"prompt_batch":{},"mode":"dry_run","allow_remote":false,"max_prompts":0,"max_output_tokens":1024,"temperature":0.0}}',
+        '{"type":"action","action":"teacher_output_review_build","args":{"distillation_plan":{},"prompt_batch":{},"teacher_outputs":[]}}',
+        '{"type":"action","action":"distillation_export_build","args":{"output_dir":"./distill","distillation_plan":{},"teacher_output_review":{}}}',
+    ]
+    for line in samples:
+        assert parse_and_validate_action_line(line)["type"] == "action"
+
+
 def test_industrial_maturity_plan_requires_goal() -> None:
     with pytest.raises(ProtocolError, match="requires string goal"):
         parse_and_validate_action_line('{"type":"action","action":"industrial_maturity_plan","args":{"scale":"listed"}}')

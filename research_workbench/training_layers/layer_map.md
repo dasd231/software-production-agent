@@ -24,6 +24,7 @@
     │   ├── training_recipe
     │   ├── training_knobs
     │   ├── ablation_plan
+    │   ├── distillation_plan / teacher_output_review
     │   └── experiment_card
     │
     ├── 模型层
@@ -75,6 +76,7 @@
 | `training_recipe` | 解释一轮训练的基座、目标、数据/任务/教师配比、方法与评测 |
 | `training_knobs` | 暴露研究者可直接调整的旋钮 |
 | `ablation_plan` | 约束 variant 相对 baseline 的差异，支撑论文实验 |
+| `distillation_plan / teacher_output_review` | 让教师监督的来源、接收门槛和证据审查保持透明 |
 | `experiment_card` | 预留：把研究问题、假设和结论收束成完整实验卡 |
 
 ## 4. 模型层

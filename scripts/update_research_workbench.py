@@ -643,12 +643,35 @@ def _distillation_overview() -> dict[str, Any]:
         "summary": {
             "teachers": len(teachers),
             "teacher_tasks": len(tasks),
+            "pipeline_stages": 4,
         },
         "teachers": teachers,
         "tasks": tasks,
+        "pipeline": [
+            {
+                "id": "teacher_prompt_batch",
+                "purpose": "turn governed source examples into evidence-bound teacher prompts",
+                "default_mode": "safe_build_only",
+            },
+            {
+                "id": "teacher_execution_plan",
+                "purpose": "preview provider/model calls before any expensive execution",
+                "default_mode": "dry_run",
+            },
+            {
+                "id": "teacher_output_review",
+                "purpose": "reject missing, mismatched or unsupported teacher outputs",
+                "default_mode": "evidence_gate",
+            },
+            {
+                "id": "distillation_export",
+                "purpose": "emit training_prepare-compatible examples",
+                "default_mode": "write_learning_dir",
+            },
+        ],
         "notes": [
-            "当前页面只展示蒸馏控制面目录，不代表已经触发真实教师调用。",
-            "真实调用层应在 teacher registry 和 task suite 稳定后接入。",
+            "当前默认路径仍然不会触发真实教师调用；execution plan 的默认 mode 是 dry_run。",
+            "prompt -> review -> export 已经接通，下一步再接真实 teacher runtime adapter 与多教师 consensus。",
         ],
     }
 
@@ -1366,6 +1389,7 @@ def _distillation_overview_to_markdown(payload: dict[str, Any]) -> str:
         "",
         f"- 教师模型：`{summary.get('teachers', 0)}`",
         f"- 教师任务：`{summary.get('teacher_tasks', 0)}`",
+        f"- 中段阶段：`{summary.get('pipeline_stages', 0)}`",
         "",
         "## Teachers",
         "",
@@ -1390,6 +1414,19 @@ def _distillation_overview_to_markdown(payload: dict[str, Any]) -> str:
         lines.append(
             f"| `{row.get('id', '')}` | {row.get('capability', '')} | {row.get('requires_evidence', '')} | "
             f"{', '.join(row.get('quality_checks', []))} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Distillation Pipeline",
+            "",
+            "| Stage | Purpose | Default Mode |",
+            "| --- | --- | --- |",
+        ]
+    )
+    for row in payload.get("pipeline", []):
+        lines.append(
+            f"| `{row.get('id', '')}` | {row.get('purpose', '')} | `{row.get('default_mode', '')}` |"
         )
     lines.extend(["", "## 说明", ""])
     lines.extend(f"- {note}" for note in payload.get("notes", []))

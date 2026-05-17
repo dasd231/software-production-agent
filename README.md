@@ -288,6 +288,7 @@ OPENAI_PLANNER_MODEL=gpt-4o-mini
 - **`training_recipe_plan`**：生成研究者可读的 `training_recipe.v1`，显式描述基座、目标、task/data/teacher mix、方法、评测集和可调旋钮。
 - **`ablation_plan_build`**：从 baseline recipe 生成 `ablation_plan.v1`，标出各 variant 相对基线改了哪些路径、主指标和成功标准。
 - **`teacher_registry` / `teacher_task_suite_plan` / `distillation_plan_build` / `distillation_dataset_manifest_build`**：查看教师目录、生成教师任务套件、定义蒸馏计划，并把教师输出汇总成可审计蒸馏数据 manifest。
+- **`teacher_prompt_batch_build` / `teacher_execution_plan_build` / `teacher_output_review_build` / `distillation_export_build`**：把蒸馏从“图纸”推进到 dry-run 优先的中段链路：构造教师 prompt、预览调用计划、按证据审查教师输出，再导出 `training_prepare` 可直接消费的训练样本目录。
 - **`industrial_maturity_plan`**：面向安全关键/工业级 CTO 审查输出成熟度评分、证据包、非协商门禁和 30/90/180/365 天路线。
 - **`enterprise_readiness_check`**：运行企业上线静态门禁，检查 FastAPI/ASGI、vLLM/SGLang、非 Flask/Ollama、K8s、HPA、PDB、NetworkPolicy、CI 和文档基线。
 - **`workflow_validate`**：校验轻量 `workflow.v1` JSON 的节点、边、未知分链、环路、权限和是否联网/写文件；只校验，不执行。

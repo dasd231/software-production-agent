@@ -1,9 +1,10 @@
 {
   "schema": "research_distillation_overview.v1",
-  "generated_at": "2026-05-17T10:46:36+00:00",
+  "generated_at": "2026-05-17T11:01:00+00:00",
   "summary": {
     "teachers": 3,
-    "teacher_tasks": 5
+    "teacher_tasks": 5,
+    "pipeline_stages": 4
   },
   "teachers": [
     {
@@ -130,8 +131,30 @@
       ]
     }
   ],
+  "pipeline": [
+    {
+      "id": "teacher_prompt_batch",
+      "purpose": "turn governed source examples into evidence-bound teacher prompts",
+      "default_mode": "safe_build_only"
+    },
+    {
+      "id": "teacher_execution_plan",
+      "purpose": "preview provider/model calls before any expensive execution",
+      "default_mode": "dry_run"
+    },
+    {
+      "id": "teacher_output_review",
+      "purpose": "reject missing, mismatched or unsupported teacher outputs",
+      "default_mode": "evidence_gate"
+    },
+    {
+      "id": "distillation_export",
+      "purpose": "emit training_prepare-compatible examples",
+      "default_mode": "write_learning_dir"
+    }
+  ],
   "notes": [
-    "当前页面只展示蒸馏控制面目录，不代表已经触发真实教师调用。",
-    "真实调用层应在 teacher registry 和 task suite 稳定后接入。"
+    "当前默认路径仍然不会触发真实教师调用；execution plan 的默认 mode 是 dry_run。",
+    "prompt -> review -> export 已经接通，下一步再接真实 teacher runtime adapter 与多教师 consensus。"
   ]
 }

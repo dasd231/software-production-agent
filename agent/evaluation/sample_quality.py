@@ -20,6 +20,8 @@ EVIDENCE_REQUIRED_TASKS = {
     "evidence_retrieval",
     "repo_grounded_qa",
     "architecture_summary",
+    "issue_to_code_localization",
+    "change_impact_reasoning",
 }
 
 REJECTION_PRIORITY = (

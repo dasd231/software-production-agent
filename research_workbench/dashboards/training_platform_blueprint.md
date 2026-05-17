@@ -1,11 +1,11 @@
 # 训练平台蓝图
 
-生成时间：`2026-05-17T10:46:36+00:00`
+生成时间：`2026-05-17T11:01:00+00:00`
 
 - 北极星：Transparent, adjustable and research-comparable training for project-level models.
 - 当前路线：`B`
 - 当前 Plane：`distillation_plane`
-- 下一批建设：teacher_registry, teacher_task_suite, distillation_plan
+- 下一批建设：teacher_prompt_batch, teacher_execution_plan, teacher_output_review, distillation_export
 
 ## 路线记忆
 
