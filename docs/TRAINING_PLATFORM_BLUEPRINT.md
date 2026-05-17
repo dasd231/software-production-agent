@@ -43,7 +43,8 @@ Training Platform
 2. **B：再做蒸馏链**；
 3. **C：最后把论文级比较系统做厚**。
 
-本轮正在执行的是 A。
+当前已经从 A 进入 B。  
+A 已经完成了 `training_recipe` 与 `ablation_plan` 的首批基础设施；B 开始补 teacher registry、teacher task suite 与 distillation plan。
 
 ## 3. 为什么需要 Training Studio
 

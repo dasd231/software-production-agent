@@ -18,6 +18,7 @@
 | [`docs/BACKUP_MODEL_TRAINING.md`](docs/BACKUP_MODEL_TRAINING.md) | 高质量样本到备用本地模型训练任务的链路说明 |
 | [`docs/TRAINING_ARCHITECTURE.md`](docs/TRAINING_ARCHITECTURE.md) | 本地控制面、Linux 执行面、数据快照和分布式扩展训练架构 |
 | [`docs/TRAINING_PLATFORM_BLUEPRINT.md`](docs/TRAINING_PLATFORM_BLUEPRINT.md) | 蒸馏、语料、训练工作室和 benchmark/论文四大训练 Plane |
+| [`docs/DISTILLATION_ARCHITECTURE.md`](docs/DISTILLATION_ARCHITECTURE.md) | 教师注册表、教师任务套件、蒸馏计划与蒸馏数据 manifest |
 | [`docs/DISTRIBUTED_PLATFORM_ARCHITECTURE.md`](docs/DISTRIBUTED_PLATFORM_ARCHITECTURE.md) | Ray-first 执行面、Spark/Flink 数据面与企业化演进路线 |
 | [`docs/PROJECT_MODEL_ARCHITECTURE.md`](docs/PROJECT_MODEL_ARCHITECTURE.md) | 项目大模型的数据源、任务、训练阶段和评测路线 |
 | [`docs/MODEL_EVALUATION.md`](docs/MODEL_EVALUATION.md) | 备用模型基座/adapter 对照评测 |
@@ -192,6 +193,7 @@ pip install -r requirements-serving.txt
 | **微调训练分链** | `agent/chains/training.py`：从学习库 `training_examples.jsonl`、方案备份和内置 `action_protocol_sft` 协议样本生成 SFT 数据集，完成去重、样本质量复审、train/eval 切分、messages/alpaca 导出和 DeepSeek LoRA/QLoRA 训练计划 |
 | **备用模型训练任务** | `agent/chains/model_training.py`：在数据质量、治理和环境门禁通过后生成备用本地模型训练 spec、标准 `training_job_spec`、job 生命周期清单、版本清单、启动命令和可审计 manifest |
 | **训练工作室** | `agent/training/studio.py`：把研究者可读的 `training_recipe`、可解释旋钮和 `ablation_plan` 放在执行 spec 之上，让“怎么训、为什么这样训、只改了什么”可以被直接查看和比较 |
+| **蒸馏控制面** | `agent/distillation/`：先固定 teacher registry、teacher task suite、distillation plan 和 dataset manifest，再接真实教师调用，避免把高成本 API 与研究设计耦死 |
 | **备用模型评测** | `agent/evaluation/model_benchmark.py` + `agent/training/backup_eval.py`：从协议遵循、证据忠实和方案复用三个维度，对基座模型与 LoRA adapter 做可复现对照 |
 | **GitHub 前后端爬取画像** | `agent/chains/github_crawler.py`：搜索/复制常规前后端项目，按可扩展架构规则识别 Spring/Vue、React、Node、Python API 等，打标签、质量评分，并把高质量项目导出成本地方案备份 |
 | **MCP 适配层** | 提供 `mcp_capabilities` 与 `invoke_mcp_tool` 骨架，带参数归一化和结构化错误返回，可平滑扩展到真实 MCP |
@@ -285,6 +287,7 @@ OPENAI_PLANNER_MODEL=gpt-4o-mini
 - **`training_platform_blueprint`**：查看蒸馏、互联网语料、训练工作室、benchmark/论文四大 Plane，以及当前固定路线 A→B→C。
 - **`training_recipe_plan`**：生成研究者可读的 `training_recipe.v1`，显式描述基座、目标、task/data/teacher mix、方法、评测集和可调旋钮。
 - **`ablation_plan_build`**：从 baseline recipe 生成 `ablation_plan.v1`，标出各 variant 相对基线改了哪些路径、主指标和成功标准。
+- **`teacher_registry` / `teacher_task_suite_plan` / `distillation_plan_build` / `distillation_dataset_manifest_build`**：查看教师目录、生成教师任务套件、定义蒸馏计划，并把教师输出汇总成可审计蒸馏数据 manifest。
 - **`industrial_maturity_plan`**：面向安全关键/工业级 CTO 审查输出成熟度评分、证据包、非协商门禁和 30/90/180/365 天路线。
 - **`enterprise_readiness_check`**：运行企业上线静态门禁，检查 FastAPI/ASGI、vLLM/SGLang、非 Flask/Ollama、K8s、HPA、PDB、NetworkPolicy、CI 和文档基线。
 - **`workflow_validate`**：校验轻量 `workflow.v1` JSON 的节点、边、未知分链、环路、权限和是否联网/写文件；只校验，不执行。

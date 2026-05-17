@@ -46,6 +46,8 @@ research_workbench/
 │   ├── project_model_program.json
 │   ├── training_platform_blueprint.md
 │   ├── training_platform_blueprint.json
+│   ├── distillation_overview.md
+│   ├── distillation_overview.json
 │   ├── training_remediation.md
 │   ├── training_remediation.json
 │   ├── training_lineage.md
@@ -86,6 +88,7 @@ research_workbench/
 | 看当前哪些真实待办可包装成分布式 job | `dashboards/distributed_dispatch_candidates.md` |
 | 看项目大模型的语料、任务和阶段路线 | `dashboards/project_model_program.md` |
 | 看四大训练 Plane、路线记忆和可调旋钮 | `dashboards/training_platform_blueprint.md` |
+| 看蒸馏教师与教师任务目录 | `dashboards/distillation_overview.md` |
 | 看下一轮训练修复建议 | `dashboards/training_remediation.md` |
 | 看训练证据谱系 | `dashboards/training_lineage.md` |
 | 记论文 | `literature/paper_reading_log.csv` |
@@ -128,6 +131,8 @@ python scripts/update_research_workbench.py
 - `dashboards/project_model_program.md`
 - `dashboards/training_platform_blueprint.json`
 - `dashboards/training_platform_blueprint.md`
+- `dashboards/distillation_overview.json`
+- `dashboards/distillation_overview.md`
 - `dashboards/training_remediation.json`
 - `dashboards/training_remediation.md`
 - `dashboards/training_lineage.json`

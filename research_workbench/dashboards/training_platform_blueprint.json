@@ -1,6 +1,6 @@
 {
   "schema": "research_training_platform_blueprint.v1",
-  "generated_at": "2026-05-17T10:18:32+00:00",
+  "generated_at": "2026-05-17T10:46:36+00:00",
   "north_star": "Transparent, adjustable and research-comparable training for project-level models.",
   "route_memory": [
     "A: build the platform top level first",
@@ -40,7 +40,7 @@
         "distillation datasets",
         "teacher output quality gates"
       ],
-      "current_state": "planned_next"
+      "current_state": "active_build"
     },
     {
       "id": "corpus_intelligence_plane",
@@ -197,11 +197,12 @@
     }
   ],
   "current_priority": {
-    "route": "A",
-    "plane": "training_studio_plane",
+    "route": "B",
+    "plane": "distillation_plane",
     "next_builds": [
-      "training_recipe",
-      "ablation_plan"
+      "teacher_registry",
+      "teacher_task_suite",
+      "distillation_plan"
     ]
   }
 }

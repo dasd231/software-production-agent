@@ -1,0 +1,137 @@
+{
+  "schema": "research_distillation_overview.v1",
+  "generated_at": "2026-05-17T10:46:36+00:00",
+  "summary": {
+    "teachers": 3,
+    "teacher_tasks": 5
+  },
+  "teachers": [
+    {
+      "schema": "teacher_model_spec.v1",
+      "id": "openai_reasoning_teacher",
+      "label": "OpenAI reasoning teacher",
+      "provider": "openai",
+      "model": "gpt-4.1",
+      "role": "reasoning_teacher",
+      "strengths": [
+        "architecture_summary",
+        "change_impact_reasoning",
+        "repo_grounded_qa"
+      ],
+      "context_window": 128000,
+      "cost_tier": "high",
+      "availability": "configured_when_api_key_present",
+      "usage_policy": "operator_selected_remote_teacher"
+    },
+    {
+      "schema": "teacher_model_spec.v1",
+      "id": "deepseek_reasoning_teacher",
+      "label": "DeepSeek reasoning teacher",
+      "provider": "deepseek",
+      "model": "deepseek-reasoner",
+      "role": "reasoning_teacher",
+      "strengths": [
+        "repo_grounded_qa",
+        "issue_to_code_localization",
+        "architecture_summary"
+      ],
+      "context_window": 64000,
+      "cost_tier": "medium",
+      "availability": "configured_when_api_key_present",
+      "usage_policy": "operator_selected_remote_teacher"
+    },
+    {
+      "schema": "teacher_model_spec.v1",
+      "id": "local_main_teacher",
+      "label": "Local main teacher",
+      "provider": "main_deepseek",
+      "model": "deepseek-v4-pro",
+      "role": "local_teacher",
+      "strengths": [
+        "repo_grounded_qa",
+        "symbol_grounding",
+        "action_protocol_sft"
+      ],
+      "context_window": 32768,
+      "cost_tier": "low",
+      "availability": "local_runtime_probe_required",
+      "usage_policy": "preferred_for_private_or_low_cost_runs"
+    }
+  ],
+  "tasks": [
+    {
+      "schema": "teacher_task_spec.v1",
+      "id": "teacher_repo_grounded_qa",
+      "label": "Repository-grounded QA",
+      "capability": "answer project questions from supplied evidence",
+      "prompt_contract": "question + evidence bundle -> answer with citations only",
+      "expected_output": "concise answer plus exact evidence references",
+      "requires_evidence": true,
+      "quality_checks": [
+        "citation_present",
+        "answer_supported_by_evidence",
+        "no_unsupported_claims"
+      ]
+    },
+    {
+      "schema": "teacher_task_spec.v1",
+      "id": "teacher_architecture_summary",
+      "label": "Architecture summary",
+      "capability": "compress repository structure into faithful explanation",
+      "prompt_contract": "project map + docs + evidence -> architecture summary",
+      "expected_output": "faithful project summary with boundaries and entrypoints",
+      "requires_evidence": true,
+      "quality_checks": [
+        "coverage",
+        "faithfulness",
+        "citation_present"
+      ]
+    },
+    {
+      "schema": "teacher_task_spec.v1",
+      "id": "teacher_symbol_localization",
+      "label": "Symbol localization",
+      "capability": "resolve symbol to definition and rationale",
+      "prompt_contract": "symbol query + symbol index + evidence -> path and line answer",
+      "expected_output": "definition path, line and short rationale",
+      "requires_evidence": true,
+      "quality_checks": [
+        "path_match",
+        "line_match",
+        "citation_present"
+      ]
+    },
+    {
+      "schema": "teacher_task_spec.v1",
+      "id": "teacher_issue_to_code",
+      "label": "Issue-to-code localization",
+      "capability": "map natural-language issue to likely files and symbols",
+      "prompt_contract": "issue + repo memory -> ranked files with reasons",
+      "expected_output": "ranked localization answer",
+      "requires_evidence": true,
+      "quality_checks": [
+        "ranked_files_present",
+        "evidence_present",
+        "unsupported_claims_absent"
+      ]
+    },
+    {
+      "schema": "teacher_task_spec.v1",
+      "id": "teacher_change_impact",
+      "label": "Change impact reasoning",
+      "capability": "predict impacted modules and tests",
+      "prompt_contract": "change request + repo graph + tests -> impact explanation",
+      "expected_output": "affected modules, tests and justification",
+      "requires_evidence": true,
+      "quality_checks": [
+        "impact_set_present",
+        "test_coverage_present",
+        "evidence_present"
+      ]
+    }
+  ],
+  "notes": [
+    "当前页面只展示蒸馏控制面目录，不代表已经触发真实教师调用。",
+    "真实调用层应在 teacher registry 和 task suite 稳定后接入。"
+  ]
+}

@@ -63,6 +63,9 @@ from agent.chains.research import ResearchChainInput, run_research_chain
 from agent.chains.training import TrainingPrepareInput, prepare_fine_tuning_dataset
 from agent.evidence.ledger import build_evidence_ledger
 from agent.enterprise.stack import build_enterprise_stack_plan
+from agent.distillation.catalog import list_teacher_models, list_teacher_tasks
+from agent.distillation.datasets import build_distillation_dataset_manifest
+from agent.distillation.plans import build_distillation_plan, build_teacher_task_suite
 from agent.distributed.plans import build_distributed_platform_plan
 from agent.distributed.dispatch import build_distributed_job_plan
 from agent.distributed.workloads import list_distributed_workloads
@@ -583,6 +586,46 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             success_criteria=_string_tuple_arg(args, "success_criteria"),
         )
         return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
+
+    if name == "teacher_registry":
+        return {
+            "ok": True,
+            "action": name,
+            "teachers": list_teacher_models(),
+            "tasks": list_teacher_tasks(),
+        }
+
+    if name == "teacher_task_suite_plan":
+        suite = build_teacher_task_suite(
+            name=str(_require(args, "name")),
+            task_mix=args.get("task_mix") if isinstance(args.get("task_mix"), dict) else None,
+            evidence_policy=str(args.get("evidence_policy", "required") or "required"),
+        )
+        return {"ok": bool(suite.get("validation", {}).get("ok")), "action": name, "suite": suite}
+
+    if name == "distillation_plan_build":
+        plan = build_distillation_plan(
+            name=str(_require(args, "name")),
+            student_model=str(_require(args, "student_model")),
+            teacher_mix=args.get("teacher_mix") if isinstance(args.get("teacher_mix"), dict) else {},
+            task_suite=dict(_require(args, "task_suite")),
+            target_recipe_id=str(args.get("target_recipe_id", "") or ""),
+            consensus_policy=str(args.get("consensus_policy", "single_teacher") or "single_teacher"),
+            output_policy=str(args.get("output_policy", "concise_grounded_answer") or "concise_grounded_answer"),
+            acceptance_thresholds=(
+                args.get("acceptance_thresholds")
+                if isinstance(args.get("acceptance_thresholds"), dict)
+                else None
+            ),
+        )
+        return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
+
+    if name == "distillation_dataset_manifest_build":
+        manifest = build_distillation_dataset_manifest(
+            distillation_plan=dict(_require(args, "distillation_plan")),
+            teacher_outputs=[dict(item) for item in args.get("teacher_outputs", []) if isinstance(item, dict)],
+        )
+        return {"ok": bool(manifest.get("validation", {}).get("ok")), "action": name, "manifest": manifest}
 
     if name == "industrial_maturity_plan":
         plan = build_industrial_maturity_plan(

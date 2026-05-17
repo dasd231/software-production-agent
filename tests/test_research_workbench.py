@@ -8,6 +8,7 @@ from scripts.update_research_workbench import (
     _platform_evolution,
     _project_model_program_overview,
     _training_platform_blueprint_overview,
+    _distillation_overview,
     _experiment_queue,
     _promotion_overview,
     _task_balance_snapshot,
@@ -335,5 +336,13 @@ def test_training_platform_blueprint_overview_keeps_route_memory() -> None:
     overview = _training_platform_blueprint_overview()
 
     assert overview["schema"] == "research_training_platform_blueprint.v1"
-    assert overview["current_priority"]["route"] == "A"
+    assert overview["current_priority"]["route"] == "B"
     assert len(overview["planes"]) == 4
+
+
+def test_distillation_overview_exposes_teacher_catalog() -> None:
+    overview = _distillation_overview()
+
+    assert overview["schema"] == "research_distillation_overview.v1"
+    assert overview["summary"]["teachers"] >= 3
+    assert overview["summary"]["teacher_tasks"] >= 5

@@ -18,6 +18,7 @@ from agent.distributed.plans import build_distributed_platform_plan
 from agent.distributed.workloads import list_distributed_workloads
 from agent.project_model.program import build_project_model_program
 from agent.training.studio import build_training_platform_blueprint
+from agent.distillation.catalog import list_teacher_models, list_teacher_tasks
 
 
 def _now() -> str:
@@ -630,6 +631,25 @@ def _training_platform_blueprint_overview() -> dict[str, Any]:
         "planes": blueprint.get("planes", []),
         "knobs": blueprint.get("knobs", []),
         "current_priority": blueprint.get("current_priority", {}),
+    }
+
+
+def _distillation_overview() -> dict[str, Any]:
+    teachers = list_teacher_models()
+    tasks = list_teacher_tasks()
+    return {
+        "schema": "research_distillation_overview.v1",
+        "generated_at": _now(),
+        "summary": {
+            "teachers": len(teachers),
+            "teacher_tasks": len(tasks),
+        },
+        "teachers": teachers,
+        "tasks": tasks,
+        "notes": [
+            "当前页面只展示蒸馏控制面目录，不代表已经触发真实教师调用。",
+            "真实调用层应在 teacher registry 和 task suite 稳定后接入。",
+        ],
     }
 
 
@@ -1337,6 +1357,46 @@ def _training_platform_blueprint_overview_to_markdown(payload: dict[str, Any]) -
     return "\n".join(lines)
 
 
+def _distillation_overview_to_markdown(payload: dict[str, Any]) -> str:
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    lines = [
+        "# 蒸馏控制面",
+        "",
+        f"生成时间：`{payload['generated_at']}`",
+        "",
+        f"- 教师模型：`{summary.get('teachers', 0)}`",
+        f"- 教师任务：`{summary.get('teacher_tasks', 0)}`",
+        "",
+        "## Teachers",
+        "",
+        "| Teacher | Provider | Model | Role | Strengths | Cost |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in payload.get("teachers", []):
+        lines.append(
+            f"| `{row.get('id', '')}` | {row.get('provider', '')} | `{row.get('model', '')}` | "
+            f"{row.get('role', '')} | {', '.join(row.get('strengths', []))} | {row.get('cost_tier', '')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Teacher Tasks",
+            "",
+            "| Task | Capability | Requires Evidence | Quality Checks |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for row in payload.get("tasks", []):
+        lines.append(
+            f"| `{row.get('id', '')}` | {row.get('capability', '')} | {row.get('requires_evidence', '')} | "
+            f"{', '.join(row.get('quality_checks', []))} |"
+        )
+    lines.extend(["", "## 说明", ""])
+    lines.extend(f"- {note}" for note in payload.get("notes", []))
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _training_remediation_to_markdown(payload: dict[str, Any]) -> str:
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
     lines = [
@@ -1502,6 +1562,7 @@ def main() -> int:
     distributed_dispatch = _distributed_dispatch_candidates(experiment_queue)
     project_model_program = _project_model_program_overview()
     training_platform_blueprint = _training_platform_blueprint_overview()
+    distillation_overview = _distillation_overview()
     remediation = _training_remediation(
         payload["training_runs"],
         payload["model_runs"],
@@ -1539,6 +1600,8 @@ def main() -> int:
         "project_model_program.md": _project_model_program_overview_to_markdown(project_model_program),
         "training_platform_blueprint.json": json.dumps(training_platform_blueprint, ensure_ascii=False, indent=2),
         "training_platform_blueprint.md": _training_platform_blueprint_overview_to_markdown(training_platform_blueprint),
+        "distillation_overview.json": json.dumps(distillation_overview, ensure_ascii=False, indent=2),
+        "distillation_overview.md": _distillation_overview_to_markdown(distillation_overview),
         "training_remediation.json": json.dumps(remediation, ensure_ascii=False, indent=2),
         "training_remediation.md": _training_remediation_to_markdown(remediation),
         "training_lineage.json": json.dumps(lineage, ensure_ascii=False, indent=2),

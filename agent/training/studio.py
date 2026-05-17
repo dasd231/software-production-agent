@@ -32,7 +32,7 @@ def list_training_platform_planes() -> list[dict[str, Any]]:
                 "distillation datasets",
                 "teacher output quality gates",
             ],
-            "current_state": "planned_next",
+            "current_state": "active_build",
         },
         {
             "id": "corpus_intelligence_plane",
@@ -174,9 +174,9 @@ def build_training_platform_blueprint() -> dict[str, Any]:
         "planes": planes,
         "knobs": list_training_knobs(),
         "current_priority": {
-            "route": "A",
-            "plane": "training_studio_plane",
-            "next_builds": ["training_recipe", "ablation_plan"],
+            "route": "B",
+            "plane": "distillation_plane",
+            "next_builds": ["teacher_registry", "teacher_task_suite", "distillation_plan"],
         },
     }
 
@@ -206,8 +206,6 @@ def _recipe_validation(task_mix: dict[str, float], objective: str) -> dict[str, 
         blockers.append("task_mix_must_sum_to_1")
     if task_mix and min_task_share < 0.05:
         warnings.append("min_task_share_below_recommended_floor")
-    if objective.startswith("distillation") and not objective:
-        blockers.append("distillation_objective_invalid")
     return {
         "ok": not blockers,
         "task_mix_total": task_total,

@@ -72,6 +72,10 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "training_platform_blueprint",
         "training_recipe_plan",
         "ablation_plan_build",
+        "teacher_registry",
+        "teacher_task_suite_plan",
+        "distillation_plan_build",
+        "distillation_dataset_manifest_build",
         "industrial_maturity_plan",
         "enterprise_readiness_check",
         "workflow_validate",
@@ -295,6 +299,36 @@ class ActionDTO(BaseModel):
                 arr = ar.get(key)
                 if not isinstance(arr, list) or not all(isinstance(x, str) for x in arr):
                     raise ValueError(f"ablation_plan_build {key} must be string array")
+        elif a == "teacher_registry":
+            if ar:
+                for k in ar:
+                    raise ValueError(f"teacher_registry accepts no args keys; got {k!r}")
+        elif a == "teacher_task_suite_plan":
+            if "name" not in ar or not isinstance(ar.get("name"), str):
+                raise ValueError("teacher_task_suite_plan requires string name")
+            if "task_mix" in ar and not isinstance(ar.get("task_mix"), dict):
+                raise ValueError("teacher_task_suite_plan task_mix must be object")
+            if "evidence_policy" in ar and not isinstance(ar.get("evidence_policy"), str):
+                raise ValueError("teacher_task_suite_plan evidence_policy must be string")
+        elif a == "distillation_plan_build":
+            for key in ("name", "student_model"):
+                if key not in ar or not isinstance(ar.get(key), str):
+                    raise ValueError(f"distillation_plan_build requires string {key}")
+            if not isinstance(ar.get("teacher_mix"), dict):
+                raise ValueError("distillation_plan_build requires object teacher_mix")
+            if not isinstance(ar.get("task_suite"), dict):
+                raise ValueError("distillation_plan_build requires object task_suite")
+            for key in ("target_recipe_id", "consensus_policy", "output_policy"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"distillation_plan_build {key} must be string")
+            if "acceptance_thresholds" in ar and not isinstance(ar.get("acceptance_thresholds"), dict):
+                raise ValueError("distillation_plan_build acceptance_thresholds must be object")
+        elif a == "distillation_dataset_manifest_build":
+            if not isinstance(ar.get("distillation_plan"), dict):
+                raise ValueError("distillation_dataset_manifest_build requires object distillation_plan")
+            value = ar.get("teacher_outputs")
+            if not isinstance(value, list) or not all(isinstance(x, dict) for x in value):
+                raise ValueError("distillation_dataset_manifest_build teacher_outputs must be object array")
         elif a == "industrial_maturity_plan":
             if "goal" not in ar or not isinstance(ar.get("goal"), str):
                 raise ValueError("industrial_maturity_plan requires string goal")

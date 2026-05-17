@@ -1,6 +1,6 @@
 # 平台演进路线
 
-生成时间：`2026-05-17T10:18:32+00:00`
+生成时间：`2026-05-17T10:46:36+00:00`
 
 - 北极星：control-plane owned evidence, Ray-first execution, data-plane by workload
 

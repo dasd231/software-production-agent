@@ -32,13 +32,14 @@ def test_training_platform_blueprint_remembers_route_and_planes() -> None:
     blueprint = build_training_platform_blueprint()
     planes = {row["id"]: row for row in blueprint["planes"]}
 
-    assert blueprint["current_priority"]["route"] == "A"
+    assert blueprint["current_priority"]["route"] == "B"
     assert blueprint["route_memory"] == [
         "A: build the platform top level first",
         "B: add distillation next",
         "C: thicken paper-grade comparison after that",
     ]
     assert planes["training_studio_plane"]["current_state"] == "active_build"
+    assert planes["distillation_plane"]["current_state"] == "active_build"
 
 
 def test_training_recipe_is_human_facing_and_validated() -> None:
