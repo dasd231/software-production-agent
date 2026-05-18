@@ -16,16 +16,28 @@ from agent.chains.research_cache import (
     load_cached_payload,
     store_cached_payload,
 )
-from agent.chains.research_types import RAGHint, ResearchCachePayload, SolutionHit, WebResult
+from agent.chains.research_types import (
+    EvidencePolicy,
+    RAGHint,
+    ResearchCachePayload,
+    RetrievalFeedbackPolicy,
+    SolutionHit,
+    WebResult,
+)
 from agent.evidence.arbiter import arbitrate_evidence
-from agent.evaluation.feedback import append_research_feedback, build_solution_acceptance_index
+from agent.evaluation.feedback import (
+    append_research_feedback,
+    build_retrieval_feedback_policy,
+    build_solution_acceptance_index,
+    build_source_confidence_profile,
+)
 from agent.evaluation.research import evaluate_research_synthesis
-from agent.learning.vector_store import cosine_similarity, vectorize_text
 from agent.learning.web_search import search_web
 from agent.llm.providers import create_openai_compatible_client, resolve_llm_provider
 from agent.rag.unified import retrieve_unified_snippets
 from agent.runtime.manifest import build_run_manifest
 from agent.solution_library.manifest import is_solution_library_ready, normalise_solution_manifest
+from agent.solution_library.semantic_index import ensure_solution_semantic_index
 
 
 @dataclass(frozen=True)
@@ -190,13 +202,19 @@ def _hybrid_solution_score(
     tag_count: int,
     has_backup: bool,
     feedback_bonus: float,
+    semantic_similarity: float,
+    retrieval_policy: RetrievalFeedbackPolicy,
 ) -> dict[str, float]:
     keyword_overlap = len(hit_tokens) / max(len(query_tokens), 1) if query_tokens else 0.0
     keyword_points = min(len(hit_tokens) * 5.0, 20.0)
-    semantic_similarity = max(cosine_similarity(vectorize_text(query), vectorize_text(haystack)), 0.0) if query.strip() else 0.0
     semantic_points = semantic_similarity * 10.0
     evidence_bonus = (2.0 if has_backup else 0.0) + min(tag_count, 6)
-    total = keyword_points * 0.72 + semantic_points * 0.28 + evidence_bonus + feedback_bonus
+    total = (
+        keyword_points * retrieval_policy["keyword_weight"]
+        + semantic_points * retrieval_policy["semantic_weight"]
+        + evidence_bonus
+        + feedback_bonus
+    )
     return {
         "keyword_overlap": round(keyword_overlap, 4),
         "keyword_points": round(keyword_points, 4),
@@ -204,6 +222,8 @@ def _hybrid_solution_score(
         "semantic_points": round(semantic_points, 4),
         "evidence_bonus": round(evidence_bonus, 4),
         "feedback_bonus": round(feedback_bonus, 4),
+        "keyword_weight": retrieval_policy["keyword_weight"],
+        "semantic_weight": retrieval_policy["semantic_weight"],
         "hybrid_score": round(total, 4),
     }
 
@@ -214,6 +234,8 @@ def _load_solution_hit(
     query_tokens: set[str],
     *,
     acceptance_index: dict[str, dict[str, dict[str, Any]]],
+    semantic_similarity: float,
+    retrieval_policy: RetrievalFeedbackPolicy,
 ) -> SolutionHit | None:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -255,15 +277,21 @@ def _load_solution_hit(
         tag_count=len(tags),
         has_backup=bool(backup_text),
         feedback_bonus=feedback_bonus,
+        semantic_similarity=max(semantic_similarity, 0.0),
+        retrieval_policy=retrieval_policy,
     )
     # 先保留一个很小的语义兜底门槛。默认 hashing vector 仍然很轻，
     # 但接口已经把后续替换为 ST/Ollama embedding 的口子留出来了。
-    if query_tokens and not hit_tokens and score_breakdown["semantic_similarity"] < 0.18:
+    if (
+        query_tokens
+        and not hit_tokens
+        and score_breakdown["semantic_similarity"] < retrieval_policy["min_semantic_similarity"]
+    ):
         return None
     return {
         "source": "solution_library",
         "score": score_breakdown["hybrid_score"],
-        "retrieval_mode": "hybrid_keyword_vector",
+        "retrieval_mode": "hybrid_keyword_semantic_index",
         "score_breakdown": score_breakdown,
         "manifest": str(path),
         "run_dir": str(run_dir),
@@ -291,16 +319,57 @@ def search_solution_library(
     solution_dirs: tuple[Path, ...] = (),
     top_k: int = 4,
 ) -> list[SolutionHit]:
+    hits, _trace = _search_solution_library_bundle(
+        query,
+        workspace=workspace,
+        solution_dirs=solution_dirs,
+        top_k=top_k,
+    )
+    return hits
+
+
+def _search_solution_library_bundle(
+    query: str,
+    *,
+    workspace: Path,
+    solution_dirs: tuple[Path, ...] = (),
+    top_k: int = 4,
+) -> tuple[list[SolutionHit], dict[str, Any]]:
     roots = solution_dirs or _default_solution_dirs(workspace)
     query_tokens = _tokens(query)
-    acceptance_index = build_solution_acceptance_index(_acceptance_feedback_roots(workspace, roots))
+    feedback_roots = _acceptance_feedback_roots(workspace, roots)
+    acceptance_index = build_solution_acceptance_index(feedback_roots)
+    retrieval_policy = build_retrieval_feedback_policy(feedback_roots)
+    manifest_paths = _manifest_paths(roots, max_manifests=retrieval_policy["manifest_limit"])
+    semantic_index, semantic_trace = ensure_solution_semantic_index(workspace, manifest_paths)
+    semantic_hits = semantic_index.search(
+        query,
+        top_k=max(int(top_k), 1) * max(int(retrieval_policy["semantic_candidate_multiplier"]), 1),
+    )
+    semantic_scores = {
+        str(record.metadata.get("manifest", "") or record.record_id): round(float(score), 4)
+        for score, record in semantic_hits
+    }
     hits: list[SolutionHit] = []
-    for manifest in _manifest_paths(roots):
-        hit = _load_solution_hit(manifest, query, query_tokens, acceptance_index=acceptance_index)
+    for manifest in manifest_paths:
+        hit = _load_solution_hit(
+            manifest,
+            query,
+            query_tokens,
+            acceptance_index=acceptance_index,
+            semantic_similarity=float(semantic_scores.get(str(manifest), 0.0) or 0.0),
+            retrieval_policy=retrieval_policy,
+        )
         if hit:
             hits.append(hit)
     hits.sort(key=lambda row: (-float(row.get("score", 0.0) or 0.0), str(row.get("run_id", ""))))
-    return hits[: max(int(top_k), 1)]
+    return hits[: max(int(top_k), 1)], {
+        "mode": "hybrid_keyword_semantic_index_feedback",
+        "retrieval_policy": retrieval_policy,
+        "semantic_index": semantic_trace,
+        "semantic_candidates": len(semantic_hits),
+        "candidate_manifests": len(manifest_paths),
+    }
 
 
 def _format_web_results(items: list[Any]) -> list[WebResult]:
@@ -421,7 +490,7 @@ def _extractive_answer(
     solution_hits: list[SolutionHit],
     rag_hints: list[RAGHint],
     web_results: list[WebResult],
-    evidence_policy: dict[str, Any] | None = None,
+    evidence_policy: EvidencePolicy | None = None,
 ) -> str:
     lines = [f"问题：{query}", "", "本地优先结论："]
     if solution_hits:
@@ -516,10 +585,11 @@ def _finalise_research_result(
     top_k: int,
     answer: str,
     solution_hits: list[SolutionHit],
+    solution_retrieval: dict[str, Any],
     rag_hints: list[RAGHint],
     rag_summary: dict[str, Any],
     web_results: list[WebResult],
-    evidence_policy: dict[str, Any],
+    evidence_policy: EvidencePolicy,
     llm_trace: dict[str, Any],
     retrieval_trace: dict[str, Any],
     cache_trace: dict[str, Any],
@@ -527,6 +597,7 @@ def _finalise_research_result(
     trace = {
         "solution_dirs": [str(x) for x in (inp.solution_dirs or _default_solution_dirs(inp.workspace))],
         "solution_hits": len(solution_hits),
+        "solution_retrieval": solution_retrieval,
         "rag": rag_summary,
         "web_enabled": bool(inp.use_web),
         "web_results": len(web_results),
@@ -626,6 +697,7 @@ def run_research_chain(
                 top_k=top_k,
                 answer=payload["answer"],
                 solution_hits=payload["solution_hits"],
+                solution_retrieval=payload["solution_retrieval"],
                 rag_hints=payload["rag_hints"],
                 rag_summary=payload["rag_summary"],
                 web_results=payload["web_results"],
@@ -647,7 +719,7 @@ def run_research_chain(
         }
     with ThreadPoolExecutor(max_workers=3 if inp.use_web else 2) as pool:
         solution_future = pool.submit(
-            search_solution_library,
+            _search_solution_library_bundle,
             query,
             workspace=inp.workspace,
             solution_dirs=inp.solution_dirs,
@@ -667,14 +739,18 @@ def run_research_chain(
             if inp.use_web
             else None
         )
-        solution_hits = solution_future.result()
+        solution_hits, solution_retrieval = solution_future.result()
         rag_result = rag_future.result()
         web_results = _format_web_results(web_future.result()) if web_future else []
     rag_hints = rag_result.hints[:top_k]
+    confidence_profile = build_source_confidence_profile(
+        _acceptance_feedback_roots(inp.workspace, inp.solution_dirs or _default_solution_dirs(inp.workspace))
+    )
     evidence_policy = arbitrate_evidence(
         solution_hits=solution_hits,
         rag_hints=rag_hints,
         web_results=web_results,
+        confidence_profile=confidence_profile,
     )
     llm_trace: dict[str, Any] = {"llm_ok": False}
     answer = ""
@@ -702,6 +778,7 @@ def run_research_chain(
             "rag_hints": rag_hints,
             "rag_summary": rag_result.summary,
             "web_results": web_results,
+            "solution_retrieval": solution_retrieval,
             "evidence_policy": evidence_policy,
             "llm_trace": llm_trace,
         }
@@ -718,6 +795,7 @@ def run_research_chain(
         top_k=top_k,
         answer=answer,
         solution_hits=solution_hits,
+        solution_retrieval=solution_retrieval,
         rag_hints=rag_hints,
         rag_summary=rag_result.summary,
         web_results=web_results,

@@ -310,3 +310,24 @@ def test_evidence_arbiter_prefers_local_sources() -> None:
     assert out["conflict_details"][0]["left_source"] == "local_evidence"
     assert out["source_confidence"]["solution_library"]["basis"] == "accepted_or_curated_local_asset"
     assert out["decision_rationale"]
+
+
+def test_evidence_arbiter_uses_historical_confidence_profile() -> None:
+    out = arbitrate_evidence(
+        solution_hits=[{"stack": "Vue 3.5"}],
+        rag_hints=[],
+        web_results=[],
+        confidence_profile={
+            "solution_library": {
+                "score": 0.82,
+                "basis": "historical_success_rate_with_prior",
+                "history_samples": 12,
+                "successes": 9,
+            },
+            "local_rag": {"score": 0.7, "basis": "historical_success_rate_with_prior", "history_samples": 5, "successes": 3},
+            "web": {"score": 0.5, "basis": "historical_success_rate_with_prior", "history_samples": 4, "successes": 2},
+        },
+    )
+
+    assert out["source_confidence"]["solution_library"]["score"] == 0.82
+    assert out["source_confidence"]["local_rag"]["basis"] == "no_evidence"

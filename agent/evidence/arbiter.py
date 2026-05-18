@@ -6,7 +6,14 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from agent.chains.research_types import RAGHint, SolutionHit, WebResult
+from agent.chains.research_types import (
+    ConflictDetail,
+    EvidencePolicy,
+    RAGHint,
+    SolutionHit,
+    SourceConfidenceProfile,
+    WebResult,
+)
 
 _VERSION_RE = re.compile(r"\b(?:v|version\s*)?(\d+\.\d+(?:\.\d+)?)\b", re.IGNORECASE)
 
@@ -24,7 +31,8 @@ def arbitrate_evidence(
     solution_hits: list[SolutionHit],
     rag_hints: list[RAGHint],
     web_results: list[WebResult],
-) -> dict[str, Any]:
+    confidence_profile: SourceConfidenceProfile | None = None,
+) -> EvidencePolicy:
     local_count = len(solution_hits) + len(rag_hints)
     web_count = len(web_results)
     source_order = ["solution_library", "local_rag", "web"]
@@ -36,7 +44,7 @@ def arbitrate_evidence(
     local_versions = _versions(solution_hits + rag_hints, ("stack", "goal", "preview", "backup_preview"))
     web_versions = _versions(web_results, ("title", "snippet", "url"))
     conflicts = sorted(local_versions ^ web_versions) if local_versions and web_versions and local_versions != web_versions else []
-    conflict_details: list[dict[str, Any]] = []
+    conflict_details: list[ConflictDetail] = []
     if conflicts:
         conflict_details.append(
             {
@@ -50,22 +58,30 @@ def arbitrate_evidence(
                 "requires_manual_review": True,
             }
         )
-    source_confidence = {
+    profile = confidence_profile or {
         "solution_library": {
-            "score": 0.95 if solution_hits else 0.0,
-            "basis": "accepted_or_curated_local_asset" if solution_hits else "no_evidence",
+            "score": 0.95,
+            "basis": "accepted_or_curated_local_asset",
             "history_samples": 0,
+            "successes": 0,
         },
         "local_rag": {
-            "score": 0.9 if rag_hints else 0.0,
-            "basis": "workspace_or_learning_store_evidence" if rag_hints else "no_evidence",
+            "score": 0.9,
+            "basis": "workspace_or_learning_store_evidence",
             "history_samples": 0,
+            "successes": 0,
         },
         "web": {
-            "score": 0.65 if web_results else 0.0,
-            "basis": "external_supplement_requires_verification" if web_results else "no_evidence",
+            "score": 0.65,
+            "basis": "external_supplement_requires_verification",
             "history_samples": 0,
+            "successes": 0,
         },
+    }
+    source_confidence = {
+        "solution_library": profile["solution_library"] if solution_hits else {**profile["solution_library"], "score": 0.0, "basis": "no_evidence"},
+        "local_rag": profile["local_rag"] if rag_hints else {**profile["local_rag"], "score": 0.0, "basis": "no_evidence"},
+        "web": profile["web"] if web_results else {**profile["web"], "score": 0.0, "basis": "no_evidence"},
     }
     rationale = {
         "local_first": "只发现本地证据，直接按正式方案库优先。",

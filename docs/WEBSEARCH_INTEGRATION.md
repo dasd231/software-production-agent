@@ -40,7 +40,7 @@ WebSearch 功能已集成到软件生产 Agent 的默认生产环境中。Agent 
 
 ### research_synthesize Action
 
-**描述**: 本地方案库优先，正式方案库内部先做 `keyword + vector + acceptance feedback` 混合排序，再融合工作区/学习库 RAG、可选 Web Search 补充和可选 LLM 生成带引用方案。
+**描述**: 本地方案库优先，正式方案库内部先做 `keyword + persistent semantic index + acceptance feedback` 混合排序，再融合工作区/学习库 RAG、可选 Web Search 补充和可选 LLM 生成带引用方案。
 
 **协议**:
 ```json
@@ -70,6 +70,8 @@ WebSearch 功能已集成到软件生产 Agent 的默认生产环境中。Agent 
 ```
 
 生成离线复盘报告，查看低分 query、常见失败原因和下一步召回改进建议。证据仲裁不再只返回 `conflicts`，还会返回 `conflict_details`、`decision_rationale` 与 `source_confidence`，方便前端或论文实验解释“为什么这样判”。
+
+反馈报告里的 `retrieval_policy` 会真正回到下一轮检索：当低分样本长期表现为 `no_solution_hit` 时，系统会提高语义权重、放宽语义阈值、扩大候选 manifest 遍历范围；`source_confidence` 则由历史成功率加先验平滑得到，而不是固定手写常数。正式方案库文本和 `SOLUTION_BACKUP.md` 会落成 `.agent_cache/solution_semantic/vector_index.jsonl` 持久索引；默认后端是轻量 `hash`，可用 `AGENT_SOLUTION_EMBEDDING_BACKEND=sentence_transformer` 切换为更强本地 embedding。
 
 ## Agent 使用场景
 
@@ -171,7 +173,7 @@ python test_web_search.py
 2. **内容抓取**: 自动获取搜索结果的完整网页内容
 3. **结果排序**: 按相关性、新鲜度、信任度排序
 4. **缓存优化**: 缓存频繁搜索的结果
-5. **反馈闭环深化**: 现已落盘研究评分与方案验收事件，并把 acceptance feedback 作为透明 `feedback_bonus` 回写方案排序；下一步继续接交付结果和长期用户满意度
+5. **反馈闭环深化**: 研究评分、方案验收、retrieval policy 和历史 source confidence 已接入；下一步继续接更细的交付结果和长期用户满意度
 
 ## 故障排除
 

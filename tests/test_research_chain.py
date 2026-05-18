@@ -9,7 +9,9 @@ from agent.chains.research_cache import clear_l1_cache
 from agent.chains.research import _pack_llm_evidence
 from agent.evaluation.feedback import (
     append_solution_acceptance_feedback,
+    build_retrieval_feedback_policy,
     build_research_feedback_report,
+    build_source_confidence_profile,
 )
 
 
@@ -64,7 +66,7 @@ def test_search_solution_library_finds_manifest(tmp_path: Path) -> None:
     assert hits[0]["source"] == "solution_library"
     assert hits[0]["run_id"] == "run_demo"
     assert "crud" in hits[0]["retrieval_tags"]
-    assert hits[0]["retrieval_mode"] == "hybrid_keyword_vector"
+    assert hits[0]["retrieval_mode"] == "hybrid_keyword_semantic_index"
     assert hits[0]["score_breakdown"]["hybrid_score"] == hits[0]["score"]
 
 
@@ -237,6 +239,49 @@ def test_research_feedback_report_summarizes_low_score_queries(tmp_path: Path) -
     assert report["summary"]["research_events"] == 1
     assert report["summary"]["low_score_events"] == 1
     assert report["low_score_reason_counts"]["no_solution_hit"] == 1
+
+
+def test_feedback_policy_and_confidence_profile_adapt_from_history(tmp_path: Path) -> None:
+    feedback_dir = tmp_path / "ws" / ".agent_feedback"
+    feedback_dir.mkdir(parents=True)
+    rows = [
+        {
+            "evaluation_score": 4.0,
+            "solution_hit_count": 0,
+            "rag_hit_count": 1,
+            "web_hit_count": 1,
+        },
+        {
+            "evaluation_score": 5.0,
+            "solution_hit_count": 0,
+            "rag_hit_count": 1,
+            "web_hit_count": 0,
+        },
+        {
+            "evaluation_score": 6.0,
+            "solution_hit_count": 0,
+            "rag_hit_count": 0,
+            "web_hit_count": 1,
+        },
+        {
+            "evaluation_score": 9.0,
+            "solution_hit_count": 1,
+            "rag_hit_count": 1,
+            "web_hit_count": 0,
+        },
+    ]
+    (feedback_dir / "research_feedback.jsonl").write_text(
+        "\n".join(json.dumps(row) for row in rows) + "\n",
+        encoding="utf-8",
+    )
+
+    policy = build_retrieval_feedback_policy([tmp_path])
+    confidence = build_source_confidence_profile([tmp_path])
+
+    assert policy["reason"] == "high_solution_miss_rate"
+    assert policy["semantic_weight"] == 0.42
+    assert confidence["solution_library"]["history_samples"] == 1
+    assert confidence["solution_library"]["successes"] == 1
 
 
 def test_llm_evidence_packer_preserves_solution_priority_and_sanitizes_blocks() -> None:

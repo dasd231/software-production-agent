@@ -241,6 +241,10 @@ pip install -r requirements-serving.txt
 | `AGENT_LEARNING_RAG_DIRS` | 一个或多个学习链路 output 目录，Windows 用 `;` 分隔；目录内需有 `vector_index.jsonl` 和 `knowledge_cards.json` |
 | `AGENT_LEARNING_RAG_TOP_K` | 每个学习库额外召回片段数（默认 `2`） |
 | `AGENT_LEARNING_RAG_BM25` | 学习库补充召回是否启用 BM25/RRF 融合（默认 `1`） |
+| `AGENT_SOLUTION_EMBEDDING_BACKEND` | 正式方案库语义索引后端：`hash` 或 `sentence_transformer`（默认 `hash`） |
+| `AGENT_SOLUTION_ST_MODEL` | 方案库 `sentence_transformer` 模型名（默认 `sentence-transformers/all-MiniLM-L6-v2`） |
+| `AGENT_SOLUTION_EMBEDDING_DIMENSIONS` | `hash` 方案库向量维度（默认 `256`） |
+| `AGENT_SOLUTION_USE_FAISS` | `1` 时为方案库语义索引启用 FAISS（可选） |
 | `MODEL_SHORT_BASE_URL` | `short_pool` OpenAI-compatible endpoint（默认 `http://model-vllm-short:8000/v1`） |
 | `MODEL_LONG_BASE_URL` | `long_pool` OpenAI-compatible endpoint（默认 `http://model-vllm-long:8000/v1`） |
 | `MODEL_AGENT_BASE_URL` | `agent_pool` OpenAI-compatible endpoint（默认 `http://model-agent:8000/v1`） |
@@ -301,7 +305,7 @@ OPENAI_PLANNER_MODEL=gpt-4o-mini
 - **`evidence_ledger`**：汇总 `run_manifest.json`、`solution_manifest.json`、评价报告、治理报告和 agent events，生成可检索的证据账本。
 - **`solution_publish`**：把当前 run 发布为本地方案资产，落盘 `solution_manifest.v2`、`docs/SOLUTION_BACKUP.md` 和发布链路 `run_manifest.json`。
 - **`research_synthesize`**：本地方案库 + 本地/学习库 RAG + 可选 Web Search + 可选 LLM 综合；返回 `evaluation`，评价方案命中、RAG 命中、Web 补充、引用覆盖和本地优先度；每次运行还会把结果写入 `.agent_feedback/research_feedback.jsonl`。默认只对“本地、提取式”请求启用 L1/L2 缓存，缓存轨迹位于 `trace.cache`，Web/LLM 请求默认不缓存。
-- **`research_feedback_report`**：汇总长期研究反馈、低分 query 原因和下一步召回/证据改进建议，可选落盘 JSON 报告。
+- **`research_feedback_report`**：汇总长期研究反馈、低分 query 原因、可执行 retrieval policy 和历史 source confidence，可选落盘 JSON 报告。
 - **`training_prepare`**：准备模型微调/SFT 数据集与训练计划；默认注入动作协议专项样本，单独训练模型输出严格 action JSON；只写入数据文件和报告，不启动实际 GPU 训练；返回 `evaluation`、`governance`、`evaluation_summary` 并落盘 `run_manifest.json`。
 - **`backup_model_train`**：读取已审查训练集，复核数据门禁与训练环境，生成备用本地模型训练任务、版本清单、启动命令和 `run_manifest.json`；门禁未通过时明确阻塞而不是假装可训练。
 - **`github_crawl_profile`**：爬取或画像 GitHub/本地常规前后端项目，输出架构标签、质量分、训练标签、推荐路由和 `evaluation`，并将高质量项目导出为本地 `solution_manifest.json` / `SOLUTION_BACKUP.md` 与 `run_manifest.json`。
@@ -554,7 +558,7 @@ python scripts/update_research_workbench.py
 - `training.dataset_prepare`：样本量、引用率、任务多样性、平均输出长度、拒绝率、切分质量、格式合法性。
 - `training.dataset_governance`：密钥扫描、引用要求、重复率和人工复核门禁。
 
-研究分链还会输出 `trace.evidence_policy`，按“已验收方案库 > 本地/RAG > Web”的顺序做证据仲裁；Web 只作为补充，来源冲突会进入 `conflicts` 与 `conflict_details`，并附带 `decision_rationale`、`source_confidence`，不再只给黑盒结论。正式方案库只收用户在前端显式点击“满意并沉淀”后的资产，普通 run 产物默认不进入检索和训练来源；验收动作会写入 `.agent_feedback/solution_acceptance.jsonl`，而方案库排序会把这些接受事件作为透明的 `feedback_bonus` 回流。研究链的 `SolutionHit`、`RAGHint`、`WebResult` 已集中到 `agent/chains/research_types.py`，先把最容易漂移的宽松 dict 边界收紧。
+研究分链还会输出 `trace.evidence_policy`，按“已验收方案库 > 本地/RAG > Web”的顺序做证据仲裁；Web 只作为补充，来源冲突会进入 `conflicts` 与 `conflict_details`，并附带 `decision_rationale`、基于历史成败自动校准的 `source_confidence`，不再只给黑盒结论。正式方案库只收用户在前端显式点击“满意并沉淀”后的资产，普通 run 产物默认不进入检索和训练来源；验收动作会写入 `.agent_feedback/solution_acceptance.jsonl`，而方案库排序会把这些接受事件作为透明的 `feedback_bonus` 回流。方案库同时会把 `goal/stack/tags/SOLUTION_BACKUP.md` 建成持久语义索引 `.agent_cache/solution_semantic/*`；历史低分 query 会自动生成 retrieval policy，调节 keyword/semantic 权重、语义阈值和 manifest 遍历上限。研究链的 `SolutionHit`、`RAGHint`、`WebResult`、`EvidencePolicy` 等契约已集中到 `agent/chains/research_types.py`，把最容易漂移的宽松 dict 边界收紧。
 
 ### Model Plane / 本地大模型
 

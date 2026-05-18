@@ -62,7 +62,16 @@ def _cache_path(workspace: Path, key: str) -> Path:
 def _valid_payload(raw: Any) -> ResearchCachePayload | None:
     if not isinstance(raw, dict):
         return None
-    required = ("answer", "solution_hits", "rag_hints", "rag_summary", "web_results", "evidence_policy", "llm_trace")
+    required = (
+        "answer",
+        "solution_hits",
+        "rag_hints",
+        "rag_summary",
+        "web_results",
+        "solution_retrieval",
+        "evidence_policy",
+        "llm_trace",
+    )
     if not all(key in raw for key in required):
         return None
     if not isinstance(raw.get("answer"), str):
@@ -70,7 +79,7 @@ def _valid_payload(raw: Any) -> ResearchCachePayload | None:
     for key in ("solution_hits", "rag_hints", "web_results"):
         if not isinstance(raw.get(key), list):
             return None
-    for key in ("rag_summary", "evidence_policy", "llm_trace"):
+    for key in ("rag_summary", "solution_retrieval", "evidence_policy", "llm_trace"):
         if not isinstance(raw.get(key), dict):
             return None
     return cast(ResearchCachePayload, raw)

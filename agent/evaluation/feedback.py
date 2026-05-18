@@ -8,7 +8,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from agent.chains.research_types import RAGHint, SolutionHit, WebResult
+from agent.chains.research_types import (
+    RAGHint,
+    RetrievalFeedbackPolicy,
+    SolutionHit,
+    SourceConfidenceEntry,
+    SourceConfidenceProfile,
+    WebResult,
+)
 
 RESEARCH_FEEDBACK_SCHEMA = "research_feedback_event.v1"
 SOLUTION_ACCEPTANCE_SCHEMA = "solution_acceptance_event.v1"
@@ -188,6 +195,106 @@ def _low_score_reasons(row: dict[str, Any]) -> list[str]:
     return reasons
 
 
+def _research_rows(roots: Iterable[Path]) -> list[dict[str, Any]]:
+    return _load_jsonl(_iter_feedback_files(roots, "research_feedback.jsonl"))
+
+
+def build_retrieval_feedback_policy(
+    roots: Iterable[Path],
+    *,
+    low_score_threshold: float = 6.5,
+) -> RetrievalFeedbackPolicy:
+    """Turn historical misses into transparent, bounded retrieval adjustments."""
+
+    rows = _research_rows(roots)
+    low_rows = [row for row in rows if _score(row.get("evaluation_score")) < low_score_threshold]
+    miss_rows = [row for row in low_rows if int(row.get("solution_hit_count", 0) or 0) <= 0]
+    miss_rate = round(len(miss_rows) / len(low_rows), 4) if low_rows else 0.0
+    keyword_weight = 0.72
+    semantic_weight = 0.28
+    min_semantic_similarity = 0.18
+    semantic_candidate_multiplier = 3
+    manifest_limit = 120
+    reason = "baseline"
+    if len(low_rows) >= 3 and miss_rate >= 0.5:
+        keyword_weight = 0.58
+        semantic_weight = 0.42
+        min_semantic_similarity = 0.12
+        semantic_candidate_multiplier = 5
+        manifest_limit = 240
+        reason = "high_solution_miss_rate"
+    elif len(low_rows) >= 3 and miss_rate >= 0.25:
+        keyword_weight = 0.66
+        semantic_weight = 0.34
+        min_semantic_similarity = 0.15
+        semantic_candidate_multiplier = 4
+        manifest_limit = 180
+        reason = "moderate_solution_miss_rate"
+    return {
+        "keyword_weight": keyword_weight,
+        "semantic_weight": semantic_weight,
+        "min_semantic_similarity": min_semantic_similarity,
+        "semantic_candidate_multiplier": semantic_candidate_multiplier,
+        "manifest_limit": manifest_limit,
+        "reason": reason,
+        "history_samples": len(rows),
+        "low_score_samples": len(low_rows),
+        "no_solution_hit_rate": miss_rate,
+    }
+
+
+def _source_confidence_entry(
+    rows: list[dict[str, Any]],
+    *,
+    count_key: str,
+    prior: float,
+    threshold: float,
+    basis: str,
+) -> SourceConfidenceEntry:
+    relevant = [row for row in rows if int(row.get(count_key, 0) or 0) > 0]
+    successes = sum(1 for row in relevant if _score(row.get("evaluation_score")) >= threshold)
+    # Keep small histories from swinging the platform wildly: two pseudo-observations
+    # encode the hand-authored prior, then real outcomes take over gradually.
+    score = ((prior * 2.0) + successes) / (2.0 + len(relevant))
+    return {
+        "score": round(score, 4),
+        "basis": basis if relevant else "prior_only",
+        "history_samples": len(relevant),
+        "successes": successes,
+    }
+
+
+def build_source_confidence_profile(
+    roots: Iterable[Path],
+    *,
+    success_threshold: float = 6.5,
+) -> SourceConfidenceProfile:
+    rows = _research_rows(roots)
+    return {
+        "solution_library": _source_confidence_entry(
+            rows,
+            count_key="solution_hit_count",
+            prior=0.95,
+            threshold=success_threshold,
+            basis="historical_success_rate_with_prior",
+        ),
+        "local_rag": _source_confidence_entry(
+            rows,
+            count_key="rag_hit_count",
+            prior=0.9,
+            threshold=success_threshold,
+            basis="historical_success_rate_with_prior",
+        ),
+        "web": _source_confidence_entry(
+            rows,
+            count_key="web_hit_count",
+            prior=0.65,
+            threshold=success_threshold,
+            basis="historical_success_rate_with_prior",
+        ),
+    }
+
+
 def build_research_feedback_report(
     roots: Iterable[Path],
     *,
@@ -195,7 +302,7 @@ def build_research_feedback_report(
 ) -> dict[str, Any]:
     """Summarize persisted feedback into an operator-facing offline review report."""
 
-    research_rows = _load_jsonl(_iter_feedback_files(roots, "research_feedback.jsonl"))
+    research_rows = _research_rows(roots)
     acceptance_rows = _load_jsonl(_iter_feedback_files(roots, "solution_acceptance.jsonl"))
     low_rows = [row for row in research_rows if _score(row.get("evaluation_score")) < low_score_threshold]
     reason_counts: Counter[str] = Counter()
@@ -240,6 +347,8 @@ def build_research_feedback_report(
                 "action": "优先把高频 Web-only 问题沉淀为本地知识或验收方案。",
             }
         )
+    retrieval_policy = build_retrieval_feedback_policy(roots, low_score_threshold=low_score_threshold)
+    source_confidence = build_source_confidence_profile(roots, success_threshold=low_score_threshold)
     return {
         "schema": "research_feedback_report.v1",
         "summary": {
@@ -259,5 +368,7 @@ def build_research_feedback_report(
             }
             for row in low_rows[:20]
         ],
+        "retrieval_policy": retrieval_policy,
+        "source_confidence": source_confidence,
         "recommendations": recommendations,
     }

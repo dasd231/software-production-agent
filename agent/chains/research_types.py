@@ -12,7 +12,21 @@ class SolutionScoreBreakdown(TypedDict):
     semantic_points: float
     evidence_bonus: float
     feedback_bonus: float
+    keyword_weight: float
+    semantic_weight: float
     hybrid_score: float
+
+
+class RetrievalFeedbackPolicy(TypedDict):
+    keyword_weight: float
+    semantic_weight: float
+    min_semantic_similarity: float
+    semantic_candidate_multiplier: int
+    manifest_limit: int
+    reason: str
+    history_samples: int
+    low_score_samples: int
+    no_solution_hit_rate: float
 
 
 class SolutionHit(TypedDict):
@@ -68,5 +82,42 @@ class ResearchCachePayload(TypedDict):
     rag_hints: list[RAGHint]
     rag_summary: dict[str, Any]
     web_results: list[WebResult]
+    solution_retrieval: dict[str, Any]
     evidence_policy: dict[str, Any]
     llm_trace: dict[str, Any]
+
+
+class SourceConfidenceEntry(TypedDict):
+    score: float
+    basis: str
+    history_samples: int
+    successes: int
+
+
+class SourceConfidenceProfile(TypedDict):
+    solution_library: SourceConfidenceEntry
+    local_rag: SourceConfidenceEntry
+    web: SourceConfidenceEntry
+
+
+class ConflictDetail(TypedDict):
+    type: str
+    left_source: str
+    right_source: str
+    field: str
+    left_values: list[str]
+    right_values: list[str]
+    mismatch_values: list[str]
+    requires_manual_review: bool
+
+
+class EvidencePolicy(TypedDict):
+    source_order: list[str]
+    decision: str
+    local_evidence: int
+    web_evidence: int
+    conflicts: list[dict[str, Any]]
+    conflict_details: list[ConflictDetail]
+    source_confidence: SourceConfidenceProfile
+    decision_rationale: str
+    rules: list[str]
