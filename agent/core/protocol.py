@@ -68,6 +68,8 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "distributed_job_plan",
         "project_model_program_plan",
         "github_corpus_program_plan",
+        "github_corpus_scheduler_plan",
+        "github_corpus_scheduler_cycle",
         "github_query_plan_build",
         "github_candidate_rank",
         "corpus_feedback_plan",
@@ -302,6 +304,36 @@ class ActionDTO(BaseModel):
                 raise ValueError("corpus_feedback_plan downstream_metrics must be object")
             if "target_train_now_rate" in ar and not isinstance(ar.get("target_train_now_rate"), (int, float)):
                 raise ValueError("corpus_feedback_plan target_train_now_rate must be number")
+        elif a in {"github_corpus_scheduler_plan", "github_corpus_scheduler_cycle"}:
+            if "output_root" not in ar or not isinstance(ar.get("output_root"), str):
+                raise ValueError(f"{a} requires string output_root")
+            value = ar.get("seed_queries")
+            if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                raise ValueError(f"{a} requires seed_queries string array")
+            if "github" in ar and not isinstance(ar.get("github"), bool):
+                raise ValueError(f"{a} github must be boolean")
+            for key in ("local_repos", "allowed_licenses"):
+                if key in ar:
+                    value = ar.get(key)
+                    if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                        raise ValueError(f"{a} {key} must be string array")
+            if "web_results" in ar and not isinstance(ar.get("web_results"), list):
+                raise ValueError(f"{a} web_results must be array")
+            if "downstream_metrics" in ar and not isinstance(ar.get("downstream_metrics"), dict):
+                raise ValueError(f"{a} downstream_metrics must be object")
+            for key in ("interval_seconds", "repo_limit", "max_query_arms", "min_stars", "cpu_thread_budget", "max_cycles_retained"):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                        raise ValueError(f"{a} {key} must be non-negative integer")
+            if "quality_threshold" in ar:
+                value = ar.get("quality_threshold")
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                    raise ValueError(f"{a} quality_threshold must be finite number")
+            if "updated_after" in ar and not isinstance(ar.get("updated_after"), str):
+                raise ValueError(f"{a} updated_after must be string")
+            if "force" in ar and not isinstance(ar.get("force"), bool):
+                raise ValueError(f"{a} force must be boolean")
         elif a == "project_repo_memory_build":
             for key in ("repo_path", "output_dir"):
                 if key not in ar or not isinstance(ar.get(key), str):

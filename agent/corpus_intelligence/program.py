@@ -201,8 +201,8 @@ def build_github_corpus_program() -> dict[str, Any]:
             ],
         },
         "recommended_next_builds": [
-            "wire query_plan + ranker into the live crawler loop",
-            "persist route decisions and feedback reports as first-class artifacts",
+            "run the single-shot corpus scheduler under systemd timer or cron",
+            "persist multi-cycle query-arm rewards after enough crawl history exists",
             "add online query-arm rewards after enough crawl history exists",
             "upgrade benchmark lane from skeleton to paper-grade comparison",
         ],

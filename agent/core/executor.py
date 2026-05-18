@@ -64,6 +64,11 @@ from agent.chains.training import TrainingPrepareInput, prepare_fine_tuning_data
 from agent.corpus_intelligence.feedback import build_corpus_feedback_report
 from agent.corpus_intelligence.program import build_github_corpus_program
 from agent.corpus_intelligence.ranking import build_github_query_plan, rank_repo_profiles
+from agent.corpus_intelligence.scheduler import (
+    CorpusSchedulerConfig,
+    build_corpus_scheduler_plan,
+    run_corpus_scheduler_cycle,
+)
 from agent.evidence.ledger import build_evidence_ledger
 from agent.enterprise.stack import build_enterprise_stack_plan
 from agent.distillation.catalog import list_teacher_models, list_teacher_tasks
@@ -538,6 +543,40 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
 
     if name == "github_corpus_program_plan":
         return {"ok": True, "action": name, "plan": build_github_corpus_program()}
+
+    if name in {"github_corpus_scheduler_plan", "github_corpus_scheduler_cycle"}:
+        output_root_raw = Path(str(_require(args, "output_root")))
+        output_root = output_root_raw if output_root_raw.is_absolute() else (workspace / output_root_raw)
+        scheduler_config = CorpusSchedulerConfig(
+            output_root=output_root,
+            seed_queries=_string_tuple_arg(args, "seed_queries"),
+            local_repos=tuple(Path(x) for x in _string_tuple_arg(args, "local_repos")),
+            web_results=tuple(dict(item) for item in args.get("web_results", []) if isinstance(item, dict))
+            if isinstance(args.get("web_results"), list)
+            else (),
+            enable_github_network=bool(args.get("github", False)),
+            interval_seconds=max(int(args.get("interval_seconds", 3600)), 1),
+            repo_limit=max(int(args.get("repo_limit", 5)), 1),
+            max_query_arms=max(int(args.get("max_query_arms", 4)), 1),
+            min_stars=max(int(args.get("min_stars", 50)), 0),
+            allowed_licenses=_string_tuple_arg(args, "allowed_licenses"),
+            updated_after=str(args.get("updated_after", "")),
+            quality_threshold=float(args.get("quality_threshold", 6.5)),
+            downstream_metrics={
+                str(key): float(value)
+                for key, value in args.get("downstream_metrics", {}).items()
+                if isinstance(value, (int, float))
+            }
+            if isinstance(args.get("downstream_metrics"), dict)
+            else {},
+            cpu_thread_budget=max(int(args.get("cpu_thread_budget", 2)), 1),
+            max_cycles_retained=max(int(args.get("max_cycles_retained", 50)), 1),
+        )
+        if name == "github_corpus_scheduler_plan":
+            plan = build_corpus_scheduler_plan(scheduler_config)
+            return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
+        cycle = run_corpus_scheduler_cycle(scheduler_config, force=bool(args.get("force", False)))
+        return {"ok": bool(cycle.get("ran")) or cycle.get("status") == "skipped_cooldown", "action": name, "cycle": cycle}
 
     if name == "github_query_plan_build":
         plan = build_github_query_plan(

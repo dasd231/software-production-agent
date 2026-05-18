@@ -132,6 +132,22 @@ GitHub Search 更像结构化检索；WebSearch 更像外部世界对“什么�
 
 这让系统可以一直跑，但不会因为“持续爬取”就持续占 GPU。
 
+第一版运行形态刻意没有做成“永不退出的巨型 daemon”，而是：
+
+```text
+systemd timer / cron
+  -> github_corpus_scheduler_cycle
+  -> one bounded crawl cycle
+  -> scheduler_state.json + corpus_strategy.json
+  -> process exits
+```
+
+这样有三个好处：
+
+1. 每轮 `repo_limit`、`max_query_arms`、`cpu_thread_budget` 都是显式预算；
+2. 上一轮 strategy 会通过 `scheduler_state.json` 自动传给下一轮；
+3. 进程天然可停、可续、可审计，比共享服务器上的常驻死循环更稳。
+
 ## 8. 本轮落地
 
 这轮新增：
@@ -141,6 +157,7 @@ GitHub Search 更像结构化检索；WebSearch 更像外部世界对“什么�
 3. `github_repo_ranking.v1`：把推荐与分流做成可解释对象；
 4. `corpus_feedback_report.v1`：把模型反馈回流到语料层；
 5. `corpus_strategy.v1`：把反馈变成下一轮 query / ranking / routing 可直接消费的策略；
-6. crawler 侧写入 `query_plan.json`、`routing_report.json`、`feedback_report.json` 与 `corpus_strategy.json`，可以直接接常驻调度器。
+6. crawler 侧写入 `query_plan.json`、`routing_report.json`、`feedback_report.json` 与 `corpus_strategy.json`；
+7. `github_corpus_scheduler_plan/cycle` 提供单轮有界调度、状态续跑和 Linux timer 友好的运行形态。
 
 这意味着 GitHub 不再只是“数据来源”，而是正式成为训练系统的第一层智能入口。
