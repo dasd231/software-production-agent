@@ -94,6 +94,7 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "intent_compile",
         "workflow_dry_run",
         "evidence_ledger",
+        "research_feedback_report",
         "solution_publish",
         "research_synthesize",
         "training_prepare",
@@ -493,6 +494,17 @@ class ActionDTO(BaseModel):
                     raise ValueError("evidence_ledger roots must be string array")
             if "output_path" in ar and not isinstance(ar.get("output_path"), str):
                 raise ValueError("evidence_ledger output_path must be string")
+        elif a == "research_feedback_report":
+            if "roots" in ar:
+                value = ar.get("roots")
+                if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                    raise ValueError("research_feedback_report roots must be string array")
+            if "output_path" in ar and not isinstance(ar.get("output_path"), str):
+                raise ValueError("research_feedback_report output_path must be string")
+            if "low_score_threshold" in ar:
+                value = ar.get("low_score_threshold")
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                    raise ValueError("research_feedback_report low_score_threshold must be finite number")
         elif a == "solution_publish":
             for key in ("output_dir", "title", "source_type"):
                 if key in ar and not isinstance(ar.get(key), str):

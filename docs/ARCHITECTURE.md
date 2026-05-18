@@ -100,11 +100,11 @@ agent.main / agent.ui.app
 | Session | `agent/memory/session.py` | `.agent_session.jsonl` 会话审计与 prompt transcript 裁剪 |
 | Context | `agent/context/*` | digest 与旧兼容入口；新增上下文来源优先接入 `agent/chains/context.py` |
 | RAG | `agent/rag/local_index.py`, `agent/rag/unified.py` | 本地轻量检索与可选学习库融合检索 |
-| Research | `agent/chains/research.py` | 已验收正式方案库优先，融合 RAG、可选 Web 和可选 LLM 综合 |
-| Evidence | `agent/evidence/arbiter.py`, `agent/evidence/ledger.py` | 按 solution library -> local RAG -> Web 做证据仲裁；证据账本汇总 manifest、评价、治理和 agent events |
+| Research | `agent/chains/research.py` | 已验收正式方案库优先，方案库走混合检索，融合 RAG、可选 Web 和可选 LLM 综合 |
+| Evidence | `agent/evidence/arbiter.py`, `agent/evidence/ledger.py` | 按 solution library -> local RAG -> Web 做证据仲裁；输出 conflict details / rationale / source confidence；证据账本汇总 manifest、评价、治理和 agent events |
 | Training | `agent/chains/training.py`, `agent/chains/model_training.py` | 从 learning run 与方案库准备微调/SFT 数据集，输出 train/eval、质量报告、治理报告和训练计划；在门禁通过后生成备用本地模型训练 spec、版本清单和启动命令 |
 | GitHub Crawler | `agent/chains/github_crawler.py` | GitHub/本地 repo 爬取画像，按可扩展架构规则打标签、质量评分，并将高质量项目导出为本地方案库 |
-| Evaluation | `agent/evaluation/*` | 对 crawler/RAG/research/training 输出统一 `MetricReport`，包含 `overall_score`、`grade`、`summary` 和命名 metrics |
+| Evaluation | `agent/evaluation/*` | 对 crawler/RAG/research/training 输出统一 `MetricReport`；`feedback.py` 将研究评分和方案验收沉淀为 JSONL 闭环日志，并生成离线复盘报告 |
 | Innovation | `agent/innovation/radar.py` | 基于资源、工作流和评价产物生成创新雷达、差异化机会卡和推荐建设路线 |
 | MCP-like | `agent/mcp/adapter.py` | 本地 MCP-like 工具目录与统一调用入口 |
 | Tools | `agent/tools/*` | 文件、shell、git、workspace index 的低层能力 |

@@ -394,6 +394,29 @@ def test_research_synthesize_action(tmp_path: Path) -> None:
     assert r["manifest"]["kind"] == "research_synthesize"
 
 
+def test_research_feedback_report_action(tmp_path: Path) -> None:
+    w = tmp_path / "ws"
+    feedback_dir = w / ".agent_feedback"
+    feedback_dir.mkdir(parents=True)
+    (feedback_dir / "research_feedback.jsonl").write_text(
+        '{"schema":"research_feedback_event.v1","query":"q","evaluation_score":4.2,"evaluation_grade":"D","solution_hit_count":0,"rag_hit_count":0,"web_hit_count":1,"labels_missing":["W1"],"evidence_decision":"web_only_requires_verification","llm_ok":false}\n',
+        encoding="utf-8",
+    )
+
+    r = run_action(
+        w,
+        {
+            "type": "action",
+            "action": "research_feedback_report",
+            "args": {"roots": ["."], "output_path": "research_feedback_report.json"},
+        },
+    )
+
+    assert r["ok"] is True
+    assert r["report"]["summary"]["low_score_events"] == 1
+    assert (w / "research_feedback_report.json").exists()
+
+
 def test_training_prepare_action(tmp_path: Path) -> None:
     lim = ExecutionLimits()
     w = tmp_path / "ws"

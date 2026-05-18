@@ -251,6 +251,13 @@ def test_research_synthesize_valid() -> None:
     assert d["action"] == "research_synthesize"
 
 
+def test_research_feedback_report_valid() -> None:
+    d = parse_and_validate_action_line(
+        '{"type":"action","action":"research_feedback_report","args":{"roots":["."],"low_score_threshold":6.5,"output_path":"feedback.json"}}'
+    )
+    assert d["action"] == "research_feedback_report"
+
+
 def test_research_synthesize_rejects_bad_dirs() -> None:
     with pytest.raises(ProtocolError, match="solution_dirs must be string array"):
         parse_and_validate_action_line(

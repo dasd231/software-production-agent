@@ -40,7 +40,7 @@ WebSearch 功能已集成到软件生产 Agent 的默认生产环境中。Agent 
 
 ### research_synthesize Action
 
-**描述**: 本地方案库优先，融合工作区/学习库 RAG，可选 Web Search 补充，可选 LLM 生成带引用方案。
+**描述**: 本地方案库优先，正式方案库内部先做 `keyword + vector` 混合排序，再融合工作区/学习库 RAG、可选 Web Search 补充和可选 LLM 生成带引用方案。
 
 **协议**:
 ```json
@@ -55,6 +55,14 @@ WebSearch 功能已集成到软件生产 Agent 的默认生产环境中。Agent 
 4. LLM 综合：只根据上述证据输出方案，证据不足时明确说明
 
 默认 `use_web=false`、`use_llm=false`，因此离线可跑；需要外部信息或大模型综合时显式打开。
+
+每次 `research_synthesize` 还会把评价结果写入 `.agent_feedback/research_feedback.jsonl`；可以再用：
+
+```json
+{"type":"action","action":"research_feedback_report","args":{"roots":["."],"low_score_threshold":6.5,"output_path":"research_feedback_report.json"}}
+```
+
+生成离线复盘报告，查看低分 query、常见失败原因和下一步召回改进建议。证据仲裁不再只返回 `conflicts`，还会返回 `conflict_details`、`decision_rationale` 与 `source_confidence`，方便前端或论文实验解释“为什么这样判”。
 
 ## Agent 使用场景
 
@@ -156,7 +164,7 @@ python test_web_search.py
 2. **内容抓取**: 自动获取搜索结果的完整网页内容
 3. **结果排序**: 按相关性、新鲜度、信任度排序
 4. **缓存优化**: 缓存频繁搜索的结果
-5. **方案库评分**: 将用户反馈、交付结果和质量门禁结果反向写入方案库评分
+5. **反馈闭环深化**: 现已落盘研究评分与方案验收事件；下一步把长期用户反馈、交付结果和质量门禁结果继续反向写入方案库权重
 
 ## 故障排除
 

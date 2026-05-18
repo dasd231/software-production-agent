@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from agent.evidence.arbiter import arbitrate_evidence
+from agent.evaluation.feedback import append_research_feedback
 from agent.evaluation.research import evaluate_research_synthesis
+from agent.learning.vector_store import cosine_similarity, vectorize_text
 from agent.learning.web_search import search_web
 from agent.llm.providers import create_openai_compatible_client, resolve_llm_provider
 from agent.rag.unified import retrieve_unified_snippets
@@ -70,11 +72,19 @@ def _project_root() -> Path:
 
 
 def _tokens(text: str) -> set[str]:
-    return {
+    tokens = {
         t.lower()
         for t in re.findall(r"[A-Za-z_][A-Za-z0-9_]{1,}|[\u4e00-\u9fff]{2,}", text)
         if len(t) >= 2
     }
+    # 中文连续短语经常出现“员工管理” vs “员工管理系统”这类包含关系；
+    # 加入轻量 n-gram，可让正式方案库在不引入额外模型依赖时先获得更稳的召回。
+    for phrase in re.findall(r"[\u4e00-\u9fff]{2,}", text):
+        for n in (2, 3, 4):
+            if len(phrase) < n:
+                continue
+            tokens.update(phrase[i : i + n] for i in range(0, len(phrase) - n + 1))
+    return tokens
 
 
 def _safe_read(path: Path, max_chars: int = 6000) -> str:
@@ -128,7 +138,32 @@ def _manifest_paths(solution_dirs: tuple[Path, ...], *, max_manifests: int = 120
     return deduped[:max_manifests]
 
 
-def _load_solution_hit(path: Path, query_tokens: set[str]) -> dict[str, Any] | None:
+def _hybrid_solution_score(
+    *,
+    query: str,
+    query_tokens: set[str],
+    haystack: str,
+    hit_tokens: list[str],
+    tag_count: int,
+    has_backup: bool,
+) -> dict[str, float]:
+    keyword_overlap = len(hit_tokens) / max(len(query_tokens), 1) if query_tokens else 0.0
+    keyword_points = min(len(hit_tokens) * 5.0, 20.0)
+    semantic_similarity = max(cosine_similarity(vectorize_text(query), vectorize_text(haystack)), 0.0) if query.strip() else 0.0
+    semantic_points = semantic_similarity * 10.0
+    evidence_bonus = (2.0 if has_backup else 0.0) + min(tag_count, 6)
+    total = keyword_points * 0.72 + semantic_points * 0.28 + evidence_bonus
+    return {
+        "keyword_overlap": round(keyword_overlap, 4),
+        "keyword_points": round(keyword_points, 4),
+        "semantic_similarity": round(semantic_similarity, 4),
+        "semantic_points": round(semantic_points, 4),
+        "evidence_bonus": round(evidence_bonus, 4),
+        "hybrid_score": round(total, 4),
+    }
+
+
+def _load_solution_hit(path: Path, query: str, query_tokens: set[str]) -> dict[str, Any] | None:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -153,14 +188,23 @@ def _load_solution_hit(path: Path, query_tokens: set[str]) -> dict[str, Any] | N
         ]
     )
     hit_tokens = sorted(_tokens(haystack) & query_tokens)
-    score = len(hit_tokens) * 5
-    if query_tokens and not hit_tokens:
+    score_breakdown = _hybrid_solution_score(
+        query=query,
+        query_tokens=query_tokens,
+        haystack=haystack,
+        hit_tokens=hit_tokens,
+        tag_count=len(tags),
+        has_backup=bool(backup_text),
+    )
+    # 先保留一个很小的语义兜底门槛。默认 hashing vector 仍然很轻，
+    # 但接口已经把后续替换为 ST/Ollama embedding 的口子留出来了。
+    if query_tokens and not hit_tokens and score_breakdown["semantic_similarity"] < 0.18:
         return None
-    score += 2 if backup_text else 0
-    score += min(len(tags), 6)
     return {
         "source": "solution_library",
-        "score": score,
+        "score": score_breakdown["hybrid_score"],
+        "retrieval_mode": "hybrid_keyword_vector",
+        "score_breakdown": score_breakdown,
         "manifest": str(path),
         "run_dir": str(run_dir),
         "run_id": run_dir.name,
@@ -188,10 +232,10 @@ def search_solution_library(
     query_tokens = _tokens(query)
     hits: list[dict[str, Any]] = []
     for manifest in _manifest_paths(roots):
-        hit = _load_solution_hit(manifest, query_tokens)
+        hit = _load_solution_hit(manifest, query, query_tokens)
         if hit:
             hits.append(hit)
-    hits.sort(key=lambda row: (-int(row.get("score", 0)), str(row.get("run_id", ""))))
+    hits.sort(key=lambda row: (-float(row.get("score", 0.0) or 0.0), str(row.get("run_id", ""))))
     return hits[: max(int(top_k), 1)]
 
 
@@ -481,6 +525,16 @@ def run_research_chain(
     ).to_dict()
     trace["evaluation_score"] = evaluation.get("overall_score")
     trace["evaluation_grade"] = evaluation.get("grade")
+    feedback_path = append_research_feedback(
+        inp.workspace,
+        query=query,
+        evaluation=evaluation,
+        trace=trace,
+        solution_hits=solution_hits,
+        rag_hints=rag_result.hints[:top_k],
+        web_results=web_results,
+    )
+    trace["feedback_log"] = str(feedback_path)
     manifest = build_run_manifest(
         kind="research_synthesize",
         input_summary={
@@ -492,7 +546,7 @@ def run_research_chain(
             "use_web": inp.use_web,
             "use_llm": inp.use_llm,
         },
-        files={},
+        files={"feedback_log": str(feedback_path)},
         evaluation=evaluation,
         source_refs=[
             {"type": "solution", "path": row.get("manifest", ""), "score": row.get("score")}

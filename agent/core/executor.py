@@ -101,6 +101,7 @@ from agent.runtime.production_check import run_production_checks
 from agent.scheduler.admission import get_global_admission_controller
 from agent.scheduler.routing import build_model_route_plan
 from agent.solution_library.publish import publish_solution_from_run
+from agent.evaluation.feedback import build_research_feedback_report
 from agent.tools import file_tools
 from agent.tools import git_tools
 from agent.tools.workspace_index import build_workspace_index
@@ -788,6 +789,19 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             write_path=_optional_path_arg(workspace, args, "output_path"),
         )
         return {"ok": True, "action": name, "ledger": ledger}
+
+    if name == "research_feedback_report":
+        raw_roots = _path_tuple_arg(args, "roots")
+        roots = tuple(path if path.is_absolute() else (workspace / path) for path in raw_roots) or (workspace,)
+        report = build_research_feedback_report(
+            roots,
+            low_score_threshold=float(args.get("low_score_threshold", 6.5)),
+        )
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        if output_path:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {"ok": True, "action": name, "report": report, "output_path": str(output_path) if output_path else ""}
 
     if name == "solution_publish":
         result = publish_solution_from_run(

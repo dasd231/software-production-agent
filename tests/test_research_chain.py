@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from agent.chains.research import ResearchChainInput, run_research_chain, search_solution_library
 from agent.chains.research import _pack_llm_evidence
+from agent.evaluation.feedback import build_research_feedback_report
 
 
 class _FakeResponse:
@@ -59,6 +60,19 @@ def test_search_solution_library_finds_manifest(tmp_path: Path) -> None:
     assert hits[0]["source"] == "solution_library"
     assert hits[0]["run_id"] == "run_demo"
     assert "crud" in hits[0]["retrieval_tags"]
+    assert hits[0]["retrieval_mode"] == "hybrid_keyword_vector"
+    assert hits[0]["score_breakdown"]["hybrid_score"] == hits[0]["score"]
+
+
+def test_search_solution_library_matches_chinese_partial_phrase(tmp_path: Path) -> None:
+    _make_solution_run(tmp_path)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+
+    hits = search_solution_library("员工管理", workspace=ws, solution_dirs=(tmp_path,), top_k=2)
+
+    assert hits
+    assert "员工" in hits[0]["matched_tokens"]
 
 
 def test_search_solution_library_skips_unaccepted_candidates(tmp_path: Path) -> None:
@@ -104,6 +118,8 @@ def test_research_chain_combines_solution_rag_and_web(tmp_path: Path) -> None:
     assert out.trace["evaluation_score"] == out.evaluation["overall_score"]
     assert out.trace["evidence_policy"]["decision"] == "web_supplemental"
     assert out.trace["retrieval"]["parallel"] is True
+    assert Path(out.trace["feedback_log"]).exists()
+    assert out.manifest["files"]["feedback_log"] == out.trace["feedback_log"]
     assert out.manifest["kind"] == "research_synthesize"
 
 
@@ -126,6 +142,25 @@ def test_research_chain_llm_falls_back_without_key(tmp_path: Path) -> None:
     assert out.trace["llm_ok"] is False
     assert "可复用方案库命中" in out.answer
     assert out.evaluation["metrics"]["llm_synthesis"]["status"] == "failed"
+
+
+def test_research_feedback_report_summarizes_low_score_queries(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+
+    out = run_research_chain(
+        ResearchChainInput(
+            query="没有任何上下文的问题",
+            workspace=ws,
+            top_k=1,
+        )
+    )
+    report = build_research_feedback_report([tmp_path], low_score_threshold=9.5)
+
+    assert Path(out.trace["feedback_log"]).exists()
+    assert report["summary"]["research_events"] == 1
+    assert report["summary"]["low_score_events"] == 1
+    assert report["low_score_reason_counts"]["no_solution_hit"] == 1
 
 
 def test_llm_evidence_packer_preserves_solution_priority_and_sanitizes_blocks() -> None:

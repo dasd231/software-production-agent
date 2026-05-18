@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agent.evaluation.feedback import append_solution_acceptance_feedback
 from agent.runtime.manifest import build_run_manifest, write_run_manifest
 from agent.solution_library.manifest import normalise_solution_manifest
 
@@ -180,6 +181,8 @@ def publish_solution_from_run(
     )
     manifest_path = write_run_manifest(dest, run_manifest)
     files["run_manifest"] = str(manifest_path)
+    acceptance_feedback = append_solution_acceptance_feedback(root, published_dir=dest, manifest=manifest)
+    files["acceptance_feedback"] = str(acceptance_feedback)
     return {
         "schema": "solution_publish_result.v1",
         "ok": True,

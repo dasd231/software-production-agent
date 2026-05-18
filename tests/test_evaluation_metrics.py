@@ -307,3 +307,6 @@ def test_evidence_arbiter_prefers_local_sources() -> None:
     assert out["decision"] == "web_supplemental"
     assert out["source_order"][0] == "solution_library"
     assert out["conflicts"]
+    assert out["conflict_details"][0]["left_source"] == "local_evidence"
+    assert out["source_confidence"]["solution_library"]["basis"] == "accepted_or_curated_local_asset"
+    assert out["decision_rationale"]

@@ -101,6 +101,7 @@ def test_solution_publish_infers_stack_and_writes_asset(tmp_path: Path) -> None:
     assert out["manifest"]["stack"] == "Spring Boot + Vue"
     assert out["manifest"]["acceptance_status"] == "accepted"
     assert out["manifest"]["accepted_by"] == "operator"
+    assert Path(out["files"]["acceptance_feedback"]).exists()
     assert "auth" in out["manifest"]["retrieval_tags"]
     assert "workflow" in out["manifest"]["retrieval_tags"]
 

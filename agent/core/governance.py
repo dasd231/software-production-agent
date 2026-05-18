@@ -62,12 +62,13 @@ ACTION_GOVERNANCE: dict[str, ActionGovernanceSpec] = {
     "intent_compile": ActionGovernanceSpec(("workspace:read", "workflow:read"), "low"),
     "workflow_dry_run": ActionGovernanceSpec(("workspace:read", "workflow:read"), "low"),
     "evidence_ledger": ActionGovernanceSpec(("workspace:read", "evidence:write"), "medium"),
+    "research_feedback_report": ActionGovernanceSpec(("workspace:read",), "low"),
     "solution_publish": ActionGovernanceSpec(
         ("workspace:read", "solution:write"),
         "high",
         requires_confirmation=True,
     ),
-    "research_synthesize": ActionGovernanceSpec(("workspace:read", "solution:read"), "medium"),
+    "research_synthesize": ActionGovernanceSpec(("workspace:read", "solution:read", "evidence:write"), "medium"),
     "training_prepare": ActionGovernanceSpec(
         ("dataset:write",),
         "high",
