@@ -272,6 +272,8 @@ class ActionDTO(BaseModel):
                 raise ValueError("github_query_plan_build requires seed_queries string array")
             if "web_results" in ar and not isinstance(ar.get("web_results"), list):
                 raise ValueError("github_query_plan_build web_results must be array")
+            if "strategy" in ar and not isinstance(ar.get("strategy"), dict):
+                raise ValueError("github_query_plan_build strategy must be object")
             if "max_queries" in ar:
                 value = ar.get("max_queries")
                 if isinstance(value, bool) or not isinstance(value, int) or value < 1:
@@ -285,6 +287,8 @@ class ActionDTO(BaseModel):
                 raise ValueError("github_candidate_rank web_results must be array")
             if "feedback_by_tag" in ar and not isinstance(ar.get("feedback_by_tag"), dict):
                 raise ValueError("github_candidate_rank feedback_by_tag must be object")
+            if "strategy" in ar and not isinstance(ar.get("strategy"), dict):
+                raise ValueError("github_candidate_rank strategy must be object")
             if "allowed_licenses" in ar:
                 value = ar.get("allowed_licenses")
                 if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
@@ -591,12 +595,14 @@ class ActionDTO(BaseModel):
                 raise ValueError("github_crawl_profile query must be string")
             if "github" in ar and not isinstance(ar.get("github"), bool):
                 raise ValueError("github_crawl_profile github must be boolean")
-            for key in ("local_repos", "allowed_licenses"):
+            for key in ("local_repos", "allowed_licenses", "seed_queries"):
                 if key in ar:
                     value = ar.get(key)
                     if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
                         raise ValueError(f"github_crawl_profile {key} must be string array")
-            for key in ("repo_limit", "min_stars"):
+            if "web_results" in ar and not isinstance(ar.get("web_results"), list):
+                raise ValueError("github_crawl_profile web_results must be array")
+            for key in ("repo_limit", "min_stars", "max_query_arms"):
                 if key in ar:
                     value = ar.get(key)
                     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -607,6 +613,10 @@ class ActionDTO(BaseModel):
                     raise ValueError("github_crawl_profile quality_threshold must be finite number")
             if "updated_after" in ar and not isinstance(ar.get("updated_after"), str):
                 raise ValueError("github_crawl_profile updated_after must be string")
+            if "downstream_metrics" in ar and not isinstance(ar.get("downstream_metrics"), dict):
+                raise ValueError("github_crawl_profile downstream_metrics must be object")
+            if "strategy" in ar and not isinstance(ar.get("strategy"), dict):
+                raise ValueError("github_crawl_profile strategy must be object")
         return self
 
     def to_executor_dict(self) -> dict[str, Any]:

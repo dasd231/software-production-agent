@@ -9,6 +9,7 @@ from agent.chains.github_crawler import (
     detect_architecture,
 )
 from agent.chains.training import TrainingPrepareInput, prepare_fine_tuning_dataset
+from agent.learning.schemas import RepoCandidate
 from agent.learning.structure_parser import parse_structure
 
 
@@ -77,8 +78,10 @@ def test_crawl_frontend_backend_repos_exports_solution_backup(tmp_path: Path) ->
     assert profile["evaluation"]["stage"] == "crawler.repo_profile"
     assert result.evaluation["stage"] == "crawler.run"
     assert Path(result.files["evaluation_report"]).exists()
+    assert Path(result.files["query_plan"]).exists()
     assert Path(result.files["routing_report"]).exists()
     assert Path(result.files["feedback_report"]).exists()
+    assert Path(result.files["corpus_strategy"]).exists()
     assert Path(result.files["run_manifest"]).exists()
     assert result.exported_solutions
     solution_dir = Path(result.exported_solutions[0])
@@ -88,6 +91,50 @@ def test_crawl_frontend_backend_repos_exports_solution_backup(tmp_path: Path) ->
     assert "frontend-backend" in manifest["retrieval_tags"]
     assert manifest["schema_version"] == "solution_manifest.v2"
     assert manifest["training_eligible"] is True
+    strategy = json.loads(Path(result.files["corpus_strategy"]).read_text(encoding="utf-8"))
+    assert strategy["schema"] == "corpus_strategy.v1"
+
+
+def test_network_crawl_uses_bounded_strategy_driven_query_plan(tmp_path: Path, monkeypatch) -> None:
+    repo = _make_fullstack_repo(tmp_path)
+    calls: list[tuple[str, int]] = []
+
+    class _FakeSearchClient:
+        def search(self, query: str, per_page: int = 10) -> list[RepoCandidate]:
+            calls.append((query, per_page))
+            return [
+                RepoCandidate(
+                    full_name="org/fullstack-repo",
+                    html_url=f"file://{repo}",
+                    description="strategy test repo",
+                    stargazers_count=100,
+                    license_spdx="MIT",
+                    updated_at="2026-05-01T00:00:00+00:00",
+                    local_path=str(repo),
+                )
+            ]
+
+    monkeypatch.setattr("agent.chains.github_crawler.GitHubSearchClient", _FakeSearchClient)
+    result = crawl_frontend_backend_repos(
+        CrawlProfileInput(
+            query="spring vue",
+            output_dir=tmp_path / "network-crawl",
+            seed_queries=("spring vue",),
+            enable_github_network=True,
+            repo_limit=1,
+            max_query_arms=2,
+            min_stars=0,
+            allowed_licenses=("MIT",),
+            quality_threshold=0.0,
+            prior_strategy={"query": {"promoted_facets": ["tests"], "kind_score_adjustments": {"strategy_expansion": 2.0}}},
+        )
+    )
+
+    query_plan = json.loads(Path(result.files["query_plan"]).read_text(encoding="utf-8"))
+    assert len(calls) <= 2
+    assert any("tests" in query for query, _ in calls)
+    assert len(result.profiles) == 1
+    assert query_plan["algorithm"]["strategy_applied"] is True
 
 
 def test_crawled_solution_can_feed_training_prepare(tmp_path: Path) -> None:

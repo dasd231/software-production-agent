@@ -55,6 +55,7 @@ class RankingWeights:
 
 
 DEFAULT_WEIGHTS = RankingWeights()
+_GROUNDING_TAGS = {"docs", "tests", "entrypoints", "package_manifest", "frontend_backend_pair"}
 
 
 def _tokens(text: str) -> list[str]:
@@ -97,6 +98,7 @@ def build_github_query_plan(
     *,
     seed_queries: list[str] | tuple[str, ...],
     web_results: list[dict[str, Any]] | None = None,
+    strategy: dict[str, Any] | None = None,
     max_queries: int = 12,
 ) -> dict[str, Any]:
     """Build a diverse GitHub query plan from operator seeds plus WebSearch hints.
@@ -109,7 +111,33 @@ def build_github_query_plan(
 
     normalized_seeds = [str(query).strip() for query in seed_queries if str(query).strip()]
     web_rows = [row for row in (web_results or []) if isinstance(row, dict)]
-    facets = _query_facets(normalized_seeds, web_rows)
+    strategy_obj = strategy if isinstance(strategy, dict) else {}
+    query_strategy = strategy_obj.get("query") if isinstance(strategy_obj.get("query"), dict) else {}
+    score_adjustments = (
+        query_strategy.get("kind_score_adjustments")
+        if isinstance(query_strategy.get("kind_score_adjustments"), dict)
+        else {}
+    )
+    promoted_facets = (
+        [str(item).strip() for item in query_strategy.get("promoted_facets", []) if str(item).strip()]
+        if isinstance(query_strategy.get("promoted_facets"), list)
+        else []
+    )
+    suppressed_facets = (
+        {
+            str(item).strip().lower()
+            for item in query_strategy.get("suppressed_facets", [])
+            if str(item).strip()
+        }
+        if isinstance(query_strategy.get("suppressed_facets"), list)
+        else set()
+    )
+    web_facets = _query_facets(normalized_seeds, web_rows)
+    facets = [
+        facet
+        for facet in dict.fromkeys([*web_facets, *promoted_facets])
+        if facet.lower() not in suppressed_facets
+    ]
     candidates: list[dict[str, Any]] = []
     for query in normalized_seeds:
         candidates.append(
@@ -117,19 +145,22 @@ def build_github_query_plan(
                 "query": query,
                 "kind": "seed",
                 "source": "operator",
-                "base_score": 10.0,
+                "base_score": 10.0 + float(score_adjustments.get("seed", 0.0) or 0.0),
                 "tokens": sorted(set(_tokens(query))),
             }
         )
     for seed in normalized_seeds:
         for facet in facets[: max(int(max_queries), 1)]:
             query = f"{seed} {facet}".strip()
+            kind = "web_expansion" if facet in web_facets else "strategy_expansion"
+            source = "web_search" if kind == "web_expansion" else "feedback_strategy"
             candidates.append(
                 {
                     "query": query,
-                    "kind": "web_expansion",
-                    "source": "web_search",
-                    "base_score": 7.5,
+                    "kind": kind,
+                    "source": source,
+                    "base_score": (7.5 if kind == "web_expansion" else 8.0)
+                    + float(score_adjustments.get(kind, score_adjustments.get("web_expansion", 0.0)) or 0.0),
                     "tokens": sorted(set(_tokens(query))),
                     "facet": facet,
                 }
@@ -162,6 +193,9 @@ def build_github_query_plan(
             "seed_queries": len(normalized_seeds),
             "web_results": len(web_rows),
             "facet_count": len(facets),
+            "strategy_applied": bool(strategy_obj),
+            "promoted_facet_count": len(promoted_facets),
+            "suppressed_facet_count": len(suppressed_facets),
         },
         "queries": [{key: value for key, value in row.items() if key != "tokens"} for row in selected],
     }
@@ -292,6 +326,7 @@ def rank_repo_profiles(
     profiles: list[dict[str, Any]],
     web_results: list[dict[str, Any]] | None = None,
     feedback_by_tag: dict[str, float] | None = None,
+    strategy: dict[str, Any] | None = None,
     seen_full_names: set[str] | None = None,
     allowed_licenses: set[str] | None = None,
     min_quality: float = 6.5,
@@ -300,7 +335,32 @@ def rank_repo_profiles(
 ) -> dict[str, Any]:
     """Rank profiled repositories and explain their downstream routing."""
 
-    feedback = feedback_by_tag or {}
+    strategy_obj = strategy if isinstance(strategy, dict) else {}
+    ranking_strategy = strategy_obj.get("ranking") if isinstance(strategy_obj.get("ranking"), dict) else {}
+    routing_strategy = strategy_obj.get("routing") if isinstance(strategy_obj.get("routing"), dict) else {}
+    strategy_feedback = ranking_strategy.get("tag_utility") if isinstance(ranking_strategy.get("tag_utility"), dict) else {}
+    feedback = {
+        str(key): float(value)
+        for key, value in strategy_feedback.items()
+        if isinstance(value, (int, float))
+    }
+    feedback.update(
+        {
+            str(key): float(value)
+            for key, value in (feedback_by_tag or {}).items()
+            if isinstance(value, (int, float))
+        }
+    )
+    weight_map = weights.to_dict()
+    strategy_weights = ranking_strategy.get("weights") if isinstance(ranking_strategy.get("weights"), dict) else {}
+    if strategy_weights:
+        for key, value in strategy_weights.items():
+            if key in weight_map and isinstance(value, (int, float)):
+                weight_map[key] = max(float(value), 0.0)
+        total_weight = sum(weight_map.values())
+        if total_weight > 0:
+            weight_map = {key: round(value / total_weight, 4) for key, value in weight_map.items()}
+    effective_min_quality = float(min_quality) + float(routing_strategy.get("min_quality_delta", 0.0) or 0.0)
     seen = seen_full_names or set()
     allow = {item.lower() for item in (allowed_licenses or set()) if str(item).strip()}
     web_terms = {
@@ -330,16 +390,18 @@ def rank_repo_profiles(
             "novelty": novelty,
             "downstream_utility": _downstream_score(tags, feedback),
         }
-        if quality_score < min_quality:
+        if quality_score < effective_min_quality:
             gates.append("below_quality_threshold")
-        weighted_score = sum(components[name] * weight for name, weight in weights.to_dict().items())
+        if bool(routing_strategy.get("grounding_required")) and not (_GROUNDING_TAGS & set(tags)):
+            gates.append("insufficient_grounding_evidence")
+        weighted_score = sum(components[name] * weight for name, weight in weight_map.items())
         score = _bounded(weighted_score)
         routes, route_reasons = _route_row(
             score=score,
             quality=quality_score,
             novelty=novelty,
             gates=gates,
-            min_quality=min_quality,
+            min_quality=effective_min_quality,
         )
         rows.append(
             {
@@ -361,8 +423,15 @@ def rank_repo_profiles(
         "schema": "github_repo_ranking.v1",
         "algorithm": {
             "name": "transparent_multi_objective_ranker",
-            "weights": weights.to_dict(),
-            "hard_gates": ["missing_license", "license_not_allowlisted", "below_quality_threshold"],
+            "weights": weight_map,
+            "strategy_applied": bool(strategy_obj),
+            "min_quality": round(effective_min_quality, 4),
+            "hard_gates": [
+                "missing_license",
+                "license_not_allowlisted",
+                "below_quality_threshold",
+                "insufficient_grounding_evidence",
+            ],
         },
         "summary": {
             "candidates": len(rows),

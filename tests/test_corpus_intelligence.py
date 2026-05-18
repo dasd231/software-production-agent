@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from agent.core.executor import run_action
-from agent.corpus_intelligence.feedback import build_corpus_feedback_report
+from agent.corpus_intelligence.feedback import build_corpus_feedback_report, build_corpus_strategy
 from agent.corpus_intelligence.program import build_github_corpus_program
 from agent.corpus_intelligence.ranking import build_github_query_plan, rank_repo_profiles
 
@@ -55,6 +55,25 @@ def test_query_plan_uses_web_facets_and_diversifies() -> None:
     assert any(row["kind"] == "web_expansion" for row in plan["queries"])
 
 
+def test_query_plan_consumes_feedback_strategy_facets() -> None:
+    plan = build_github_query_plan(
+        seed_queries=["spring boot"],
+        strategy={
+            "schema": "corpus_strategy.v1",
+            "query": {
+                "kind_score_adjustments": {"strategy_expansion": 2.0},
+                "promoted_facets": ["tests"],
+                "suppressed_facets": [],
+            },
+        },
+        max_queries=3,
+    )
+
+    assert plan["algorithm"]["strategy_applied"] is True
+    assert any(row["kind"] == "strategy_expansion" for row in plan["queries"])
+    assert any("tests" in row["query"] for row in plan["queries"])
+
+
 def test_ranker_routes_high_quality_and_quarantines_bad_governance() -> None:
     ranking = rank_repo_profiles(
         query="spring boot backend",
@@ -71,6 +90,50 @@ def test_ranker_routes_high_quality_and_quarantines_bad_governance() -> None:
     assert "train_now" in rows["org/high-quality"]["routes"]
     assert rows["org/no-license"]["routes"] == ["quarantine"]
     assert "missing_license" in rows["org/no-license"]["gates"]
+
+
+def test_ranker_consumes_strategy_weights_tag_utility_and_routing_delta() -> None:
+    ranking = rank_repo_profiles(
+        query="spring boot backend",
+        profiles=[_profile("org/strategy", quality=6.7, tags=["docs"])],
+        strategy={
+            "schema": "corpus_strategy.v1",
+            "ranking": {
+                "weights": {
+                    "lexical_relevance": 0.1,
+                    "repo_quality": 0.2,
+                    "freshness": 0.1,
+                    "governance": 0.1,
+                    "novelty": 0.1,
+                    "downstream_utility": 0.4,
+                },
+                "tag_utility": {"docs": 9.0},
+            },
+            "routing": {"min_quality_delta": 0.4},
+        },
+        min_quality=6.5,
+        now=datetime(2026, 5, 18, tzinfo=timezone.utc),
+    )
+
+    row = ranking["rows"][0]
+    assert ranking["algorithm"]["strategy_applied"] is True
+    assert ranking["algorithm"]["weights"]["downstream_utility"] == 0.4
+    assert row["components"]["downstream_utility"] == 9.0
+    assert row["routes"] == ["quarantine"]
+    assert "below_quality_threshold" in row["gates"]
+
+
+def test_ranker_enforces_grounding_gate_from_strategy() -> None:
+    ranking = rank_repo_profiles(
+        query="spring boot backend",
+        profiles=[_profile("org/no-evidence", quality=8.0, tags=["backend"])],
+        strategy={"routing": {"grounding_required": True}},
+        now=datetime(2026, 5, 18, tzinfo=timezone.utc),
+    )
+
+    row = ranking["rows"][0]
+    assert row["routes"] == ["quarantine"]
+    assert "insufficient_grounding_evidence" in row["gates"]
 
 
 def test_feedback_recommends_more_exploration_when_distribution_collapses() -> None:
@@ -93,6 +156,27 @@ def test_feedback_recommends_more_exploration_when_distribution_collapses() -> N
     assert "oversample_evidence_rich_repos" in ids
 
 
+def test_feedback_emits_executable_strategy_for_next_round() -> None:
+    ranking = rank_repo_profiles(
+        query="spring boot",
+        profiles=[
+            _profile("org/a", quality=8.0, shape="backend", tags=["backend", "docs"]),
+            _profile("org/b", quality=4.0, shape="backend", tags=["backend"]),
+        ],
+        now=datetime(2026, 5, 18, tzinfo=timezone.utc),
+    )
+    strategy = build_corpus_strategy(
+        ranking=ranking,
+        downstream_metrics={"recall_at_5_delta": -0.2, "citation_precision_delta": -0.1},
+    )
+
+    assert strategy["schema"] == "corpus_strategy.v1"
+    assert "retrieval_repair" in strategy["mode"]
+    assert strategy["ranking"]["tag_utility"]["docs"] >= 8.5
+    assert strategy["routing"]["grounding_required"] is True
+    assert strategy["routing"]["min_quality_delta"] == 0.4
+
+
 def test_corpus_actions_return_control_plane_objects(tmp_path: Path) -> None:
     program = run_action(tmp_path, {"type": "action", "action": "github_corpus_program_plan", "args": {}})
     query_plan = run_action(
@@ -100,7 +184,12 @@ def test_corpus_actions_return_control_plane_objects(tmp_path: Path) -> None:
         {
             "type": "action",
             "action": "github_query_plan_build",
-            "args": {"seed_queries": ["spring boot vue"], "web_results": [], "max_queries": 3},
+            "args": {
+                "seed_queries": ["spring boot vue"],
+                "web_results": [],
+                "strategy": {"query": {"promoted_facets": ["tests"]}},
+                "max_queries": 3,
+            },
         },
     )
     ranking = run_action(
@@ -128,3 +217,4 @@ def test_corpus_actions_return_control_plane_objects(tmp_path: Path) -> None:
     assert query_plan["plan"]["schema"] == "github_query_plan.v1"
     assert ranking["ranking"]["schema"] == "github_repo_ranking.v1"
     assert feedback["feedback"]["schema"] == "corpus_feedback_report.v1"
+    assert feedback["feedback"]["strategy"]["schema"] == "corpus_strategy.v1"

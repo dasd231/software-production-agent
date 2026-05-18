@@ -46,7 +46,15 @@ operator seed queries
 - 只靠 WebSearch，又容易漂；
 - 先把“种子查询”和“网页启发词”混合，再做多样性控制，能同时保住 exploitation 与 exploration。
 
-后续有了足够历史后，再把 query arm 升级成按回报更新的 bandit / contextual bandit。
+当前已经补上第一层反馈控制面：
+
+- `corpus_feedback_report.v1` 不只给建议，还会产出 `corpus_strategy.v1`；
+- strategy 会把 `train_now_rate`、语料形状分布、`Recall@5` / citation precision 回归等信号转成下一轮可执行策略；
+- 下一轮 query plan 会读取 facet promotion / suppression 与 query-arm 调整；
+- crawler 本身会把 query plan 作为真实执行输入，并用 `max_query_arms` 限制网络查询上限；
+- 下一轮 ranking 会读取权重覆盖、标签 utility 与更严格的 routing threshold。
+
+它现在还是**透明控制器**，不是黑盒学习器。后续有了足够历史后，再把 query arm 升级成按回报更新的 bandit / contextual bandit。
 
 ## 3. 推荐与分流算法
 
@@ -70,6 +78,8 @@ operator seed queries
 - `quarantine`
 
 这就是系统里的“信息分流和推荐”层。
+
+如果上一轮反馈表明检索质量或引用精度下降，strategy 会显式提高 `docs/tests/entrypoints/package_manifest` 这类证据标签的 utility，重新归一化排序权重，并在必要时抬高下一轮最小质量门槛。这样“论文里解释得通”和“程序里真的会执行”是一回事。
 
 ## 4. 为什么要接 WebSearch
 
@@ -130,6 +140,7 @@ GitHub Search 更像结构化检索；WebSearch 更像外部世界对“什么�
 2. `github_query_plan.v1`：把 WebSearch 辅助发现变成显式对象；
 3. `github_repo_ranking.v1`：把推荐与分流做成可解释对象；
 4. `corpus_feedback_report.v1`：把模型反馈回流到语料层；
-5. crawler 侧开始写入路由结果，后续可以继续接常驻调度器。
+5. `corpus_strategy.v1`：把反馈变成下一轮 query / ranking / routing 可直接消费的策略；
+6. crawler 侧写入 `query_plan.json`、`routing_report.json`、`feedback_report.json` 与 `corpus_strategy.json`，可以直接接常驻调度器。
 
 这意味着 GitHub 不再只是“数据来源”，而是正式成为训练系统的第一层智能入口。

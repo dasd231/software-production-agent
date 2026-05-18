@@ -543,6 +543,7 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
         plan = build_github_query_plan(
             seed_queries=[str(item) for item in args.get("seed_queries", []) if str(item).strip()],
             web_results=args.get("web_results") if isinstance(args.get("web_results"), list) else [],
+            strategy=args.get("strategy") if isinstance(args.get("strategy"), dict) else {},
             max_queries=int(args.get("max_queries", 12)),
         )
         return {"ok": True, "action": name, "plan": plan}
@@ -553,6 +554,7 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             profiles=args.get("profiles") if isinstance(args.get("profiles"), list) else [],
             web_results=args.get("web_results") if isinstance(args.get("web_results"), list) else [],
             feedback_by_tag=args.get("feedback_by_tag") if isinstance(args.get("feedback_by_tag"), dict) else {},
+            strategy=args.get("strategy") if isinstance(args.get("strategy"), dict) else {},
             allowed_licenses={
                 str(item).lower()
                 for item in args.get("allowed_licenses", [])
@@ -877,12 +879,29 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
                 query=str(args.get("query", "")),
                 output_dir=output_dir,
                 local_repos=tuple(Path(x) for x in _string_tuple_arg(args, "local_repos")),
+                seed_queries=_string_tuple_arg(args, "seed_queries"),
+                web_results=tuple(
+                    dict(item)
+                    for item in args.get("web_results", [])
+                    if isinstance(item, dict)
+                )
+                if isinstance(args.get("web_results"), list)
+                else (),
                 enable_github_network=bool(args.get("github", False)),
                 repo_limit=max(int(args.get("repo_limit", 5)), 1),
+                max_query_arms=max(int(args.get("max_query_arms", 4)), 1),
                 min_stars=max(int(args.get("min_stars", 50)), 0),
                 allowed_licenses=_string_tuple_arg(args, "allowed_licenses"),
                 updated_after=str(args.get("updated_after", "")),
                 quality_threshold=float(args.get("quality_threshold", 6.5)),
+                downstream_metrics={
+                    str(key): float(value)
+                    for key, value in args.get("downstream_metrics", {}).items()
+                    if isinstance(value, (int, float))
+                }
+                if isinstance(args.get("downstream_metrics"), dict)
+                else {},
+                prior_strategy=args.get("strategy") if isinstance(args.get("strategy"), dict) else {},
             )
         )
         return {"ok": True, "action": name, **result.to_dict()}

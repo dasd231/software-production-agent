@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from agent.corpus_intelligence.feedback import build_corpus_feedback_report
-from agent.corpus_intelligence.ranking import rank_repo_profiles
+from agent.corpus_intelligence.ranking import build_github_query_plan, rank_repo_profiles
 from agent.evaluation.crawler import evaluate_crawl_run, evaluate_repo_profile, repo_quality_summary
 from agent.learning.filters import filter_repositories
 from agent.learning.github_search import GitHubSearchClient
@@ -43,12 +43,17 @@ class CrawlProfileInput:
     query: str
     output_dir: Path
     local_repos: tuple[Path, ...] = ()
+    seed_queries: tuple[str, ...] = ()
+    web_results: tuple[dict[str, Any], ...] = ()
     enable_github_network: bool = False
     repo_limit: int = 5
+    max_query_arms: int = 4
     min_stars: int = 50
     allowed_licenses: tuple[str, ...] = ()
     updated_after: str = ""
     quality_threshold: float = 6.5
+    downstream_metrics: dict[str, float] = field(default_factory=dict)
+    prior_strategy: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -129,6 +134,37 @@ def _candidate_from_local(path: Path) -> RepoCandidate:
         updated_at=datetime.fromtimestamp(path.stat().st_mtime).isoformat(),
         local_path=str(path),
     )
+
+
+def _dedupe_candidates(candidates: list[RepoCandidate]) -> list[RepoCandidate]:
+    seen: dict[str, RepoCandidate] = {}
+    for candidate in candidates:
+        key = str(candidate.full_name or candidate.html_url or candidate.local_path).strip().lower()
+        if not key:
+            continue
+        existing = seen.get(key)
+        if existing is None or candidate.stargazers_count > existing.stargazers_count:
+            seen[key] = candidate
+    return list(seen.values())
+
+
+def _search_candidates_from_plan(inp: CrawlProfileInput, query_plan: dict[str, Any]) -> list[RepoCandidate]:
+    if not inp.enable_github_network:
+        return []
+    rows = [row for row in query_plan.get("queries", []) if isinstance(row, dict)]
+    max_arms = max(int(inp.max_query_arms), 1)
+    selected_rows = rows[:max_arms]
+    if not selected_rows:
+        return []
+    total_budget = max(int(inp.repo_limit) * 3, 5)
+    per_query = max(1, (total_budget + len(selected_rows) - 1) // len(selected_rows))
+    client = GitHubSearchClient()
+    out: list[RepoCandidate] = []
+    for row in selected_rows:
+        query = str(row.get("query", "") or "").strip()
+        if query:
+            out.extend(client.search(query, per_page=per_query))
+    return out
 
 
 def _read_small_files(root: Path, structure: StructureSummary, max_files: int = 60, max_chars: int = 1200) -> str:
@@ -310,9 +346,16 @@ def crawl_frontend_backend_repos(inp: CrawlProfileInput) -> CrawlProfileResult:
     repos_dir.mkdir(parents=True, exist_ok=True)
     solutions_dir.mkdir(parents=True, exist_ok=True)
 
+    seed_queries = inp.seed_queries or ((inp.query,) if inp.query.strip() else ())
+    query_plan = build_github_query_plan(
+        seed_queries=seed_queries,
+        web_results=list(inp.web_results),
+        strategy=inp.prior_strategy,
+        max_queries=max(int(inp.max_query_arms), 1),
+    )
     candidates = [_candidate_from_local(path) for path in inp.local_repos]
-    if inp.enable_github_network and inp.query.strip():
-        candidates.extend(GitHubSearchClient().search(inp.query, per_page=max(int(inp.repo_limit) * 3, 5)))
+    candidates.extend(_search_candidates_from_plan(inp, query_plan))
+    candidates = _dedupe_candidates(candidates)
     candidates = filter_repositories(
         candidates,
         min_stars=max(int(inp.min_stars), 0),
@@ -333,10 +376,11 @@ def crawl_frontend_backend_repos(inp: CrawlProfileInput) -> CrawlProfileResult:
         profiles.append(profile)
 
     ranking = rank_repo_profiles(
-        query=inp.query,
+        query=inp.query or " ".join(seed_queries),
         profiles=profiles,
         allowed_licenses={str(item).lower() for item in inp.allowed_licenses if str(item).strip()},
         min_quality=float(inp.quality_threshold),
+        strategy=inp.prior_strategy,
     )
     ranking_rows = {
         str(row.get("repo", "")): row
@@ -348,27 +392,36 @@ def crawl_frontend_backend_repos(inp: CrawlProfileInput) -> CrawlProfileResult:
         route = ranking_rows.get(str(repo.get("full_name", "")), {})
         if route:
             profile["routing"] = route
-    feedback = build_corpus_feedback_report(ranking=ranking)
+    feedback = build_corpus_feedback_report(
+        ranking=ranking,
+        downstream_metrics=inp.downstream_metrics,
+    )
 
     profiles_path = output_dir / "repo_profiles.json"
     candidates_path = output_dir / "candidates.json"
     evaluation_path = output_dir / "evaluation_report.json"
+    query_plan_path = output_dir / "query_plan.json"
     ranking_path = output_dir / "routing_report.json"
     feedback_path = output_dir / "feedback_report.json"
+    strategy_path = output_dir / "corpus_strategy.json"
     report_path = output_dir / "report.md"
     evaluation = evaluate_crawl_run(profiles, exported).to_dict()
     profiles_path.write_text(json.dumps(profiles, ensure_ascii=False, indent=2), encoding="utf-8")
     candidates_path.write_text(json.dumps([c.to_dict() for c in candidates], ensure_ascii=False, indent=2), encoding="utf-8")
     evaluation_path.write_text(json.dumps(evaluation, ensure_ascii=False, indent=2), encoding="utf-8")
+    query_plan_path.write_text(json.dumps(query_plan, ensure_ascii=False, indent=2), encoding="utf-8")
     ranking_path.write_text(json.dumps(ranking, ensure_ascii=False, indent=2), encoding="utf-8")
     feedback_path.write_text(json.dumps(feedback, ensure_ascii=False, indent=2), encoding="utf-8")
+    strategy_path.write_text(json.dumps(feedback.get("strategy", {}), ensure_ascii=False, indent=2), encoding="utf-8")
     _write_report(report_path, profiles, exported, evaluation)
     files = {
         "profiles": str(profiles_path),
         "candidates": str(candidates_path),
         "evaluation_report": str(evaluation_path),
+        "query_plan": str(query_plan_path),
         "routing_report": str(ranking_path),
         "feedback_report": str(feedback_path),
+        "corpus_strategy": str(strategy_path),
         "report": str(report_path),
         "solutions_dir": str(solutions_dir),
     }
@@ -376,10 +429,14 @@ def crawl_frontend_backend_repos(inp: CrawlProfileInput) -> CrawlProfileResult:
         kind="github_crawl_profile",
         input_summary={
             "query": inp.query,
+            "seed_queries": list(seed_queries),
             "local_repos": [str(path) for path in inp.local_repos],
             "github": bool(inp.enable_github_network),
             "repo_limit": inp.repo_limit,
+            "max_query_arms": inp.max_query_arms,
             "quality_threshold": inp.quality_threshold,
+            "downstream_metrics": sorted(str(key) for key in inp.downstream_metrics),
+            "prior_strategy_schema": str(inp.prior_strategy.get("schema", "")) if inp.prior_strategy else "",
         },
         files=files,
         evaluation=evaluation,
