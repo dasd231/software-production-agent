@@ -40,11 +40,11 @@ WebSearch 功能已集成到软件生产 Agent 的默认生产环境中。Agent 
 
 ### research_synthesize Action
 
-**描述**: 本地方案库优先，正式方案库内部先做 `keyword + vector` 混合排序，再融合工作区/学习库 RAG、可选 Web Search 补充和可选 LLM 生成带引用方案。
+**描述**: 本地方案库优先，正式方案库内部先做 `keyword + vector + acceptance feedback` 混合排序，再融合工作区/学习库 RAG、可选 Web Search 补充和可选 LLM 生成带引用方案。
 
 **协议**:
 ```json
-{"type":"action","action":"research_synthesize","args":{"query":"员工审批管理系统 Spring Vue CRUD","top_k":4,"solution_dirs":["./product_runs/solution_library"],"learning_dirs":["./learning_runs/demo"],"use_web":true,"use_llm":true,"llm_provider":"deepseek"}}
+{"type":"action","action":"research_synthesize","args":{"query":"员工审批管理系统 Spring Vue CRUD","top_k":4,"solution_dirs":["./product_runs/solution_library"],"learning_dirs":["./learning_runs/demo"],"use_web":true,"use_llm":true,"llm_provider":"deepseek","use_cache":true,"refresh_cache":false,"cache_ttl_seconds":86400}}
 ```
 
 **证据优先级**:
@@ -55,6 +55,13 @@ WebSearch 功能已集成到软件生产 Agent 的默认生产环境中。Agent 
 4. LLM 综合：只根据上述证据输出方案，证据不足时明确说明
 
 默认 `use_web=false`、`use_llm=false`，因此离线可跑；需要外部信息或大模型综合时显式打开。
+
+缓存策略故意保守：
+
+- 只缓存 `use_web=false` 且 `use_llm=false` 的本地提取式请求；
+- L1 是短时内存缓存，L2 是 `.agent_cache/research/*.json` 磁盘缓存；
+- `refresh_cache=true` 可显式重算；
+- Web/LLM 请求默认标记为 `ineligible`，避免把外部新鲜度和生成成本悄悄冻结。
 
 每次 `research_synthesize` 还会把评价结果写入 `.agent_feedback/research_feedback.jsonl`；可以再用：
 
@@ -164,7 +171,7 @@ python test_web_search.py
 2. **内容抓取**: 自动获取搜索结果的完整网页内容
 3. **结果排序**: 按相关性、新鲜度、信任度排序
 4. **缓存优化**: 缓存频繁搜索的结果
-5. **反馈闭环深化**: 现已落盘研究评分与方案验收事件；下一步把长期用户反馈、交付结果和质量门禁结果继续反向写入方案库权重
+5. **反馈闭环深化**: 现已落盘研究评分与方案验收事件，并把 acceptance feedback 作为透明 `feedback_bonus` 回写方案排序；下一步继续接交付结果和长期用户满意度
 
 ## 故障排除
 

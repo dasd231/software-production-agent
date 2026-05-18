@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-_IGNORE_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules"}
+_IGNORE_DIRS = {".git", ".agent_cache", ".agent_feedback", "__pycache__", ".venv", "venv", "node_modules"}
 _PACKAGE_FILES = {"pyproject.toml", "requirements.txt", "package.json", "Cargo.toml", "go.mod"}
 
 

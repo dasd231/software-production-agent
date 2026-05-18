@@ -827,6 +827,9 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
                 use_llm=bool(args.get("use_llm", False)),
                 llm_provider=str(args.get("llm_provider", "openai")),
                 llm_model=str(args.get("llm_model")).strip() if args.get("llm_model") else None,
+                use_cache=bool(args.get("use_cache", True)),
+                refresh_cache=bool(args.get("refresh_cache", False)),
+                cache_ttl_seconds=int(args.get("cache_ttl_seconds", 86400)),
             )
         )
         return {"ok": True, "action": name, **result.to_dict()}

@@ -10,6 +10,8 @@ from typing import Any
 _TEXT_EXTS = {".py", ".md", ".txt", ".toml", ".json", ".yaml", ".yml"}
 _IGNORE_PARTS = {
     ".git",
+    ".agent_cache",
+    ".agent_feedback",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",

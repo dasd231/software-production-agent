@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping, Sequence
 from typing import Any
 
+from agent.chains.research_types import RAGHint, SolutionHit, WebResult
 
 _VERSION_RE = re.compile(r"\b(?:v|version\s*)?(\d+\.\d+(?:\.\d+)?)\b", re.IGNORECASE)
 
 
-def _versions(rows: list[dict[str, Any]], fields: tuple[str, ...]) -> set[str]:
+def _versions(rows: Sequence[Mapping[str, Any]], fields: tuple[str, ...]) -> set[str]:
     found: set[str] = set()
     for row in rows:
         text = " ".join(str(row.get(field, "") or "") for field in fields)
@@ -19,9 +21,9 @@ def _versions(rows: list[dict[str, Any]], fields: tuple[str, ...]) -> set[str]:
 
 def arbitrate_evidence(
     *,
-    solution_hits: list[dict[str, Any]],
-    rag_hints: list[dict[str, Any]],
-    web_results: list[dict[str, Any]],
+    solution_hits: list[SolutionHit],
+    rag_hints: list[RAGHint],
+    web_results: list[WebResult],
 ) -> dict[str, Any]:
     local_count = len(solution_hits) + len(rag_hints)
     web_count = len(web_results)

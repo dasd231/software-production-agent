@@ -516,9 +516,13 @@ class ActionDTO(BaseModel):
                 top_k = ar.get("top_k")
                 if not isinstance(top_k, int) or top_k < 1:
                     raise ValueError("research_synthesize top_k must be positive integer")
-            for key in ("use_web", "use_llm"):
+            for key in ("use_web", "use_llm", "use_cache", "refresh_cache"):
                 if key in ar and not isinstance(ar.get(key), bool):
                     raise ValueError(f"research_synthesize {key} must be boolean")
+            if "cache_ttl_seconds" in ar:
+                value = ar.get("cache_ttl_seconds")
+                if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                    raise ValueError("research_synthesize cache_ttl_seconds must be positive integer")
             for key in ("web_provider", "llm_provider", "llm_model"):
                 if key in ar and ar.get(key) is not None and not isinstance(ar.get(key), str):
                     raise ValueError(f"research_synthesize {key} must be string")

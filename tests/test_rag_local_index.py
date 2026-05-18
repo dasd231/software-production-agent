@@ -42,6 +42,10 @@ def test_build_local_index_skips_agent_artifacts(tmp_path: Path) -> None:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / ".agent_state.json").write_text('{"goal":"flask api"}\n', encoding="utf-8")
+    (ws / ".agent_cache" / "research").mkdir(parents=True)
+    (ws / ".agent_cache" / "research" / "cache.json").write_text('{"answer":"flask api"}\n', encoding="utf-8")
+    (ws / ".agent_feedback").mkdir()
+    (ws / ".agent_feedback" / "research_feedback.jsonl").write_text('{"query":"flask api"}\n', encoding="utf-8")
     (ws / "app.py").write_text("from flask import Flask\n", encoding="utf-8")
 
     idx = build_local_index(ws)

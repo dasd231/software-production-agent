@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from agent.chains.research_types import RAGHint, SolutionHit, WebResult
 
 RESEARCH_FEEDBACK_SCHEMA = "research_feedback_event.v1"
 SOLUTION_ACCEPTANCE_SCHEMA = "solution_acceptance_event.v1"
@@ -34,9 +35,9 @@ def append_research_feedback(
     query: str,
     evaluation: dict[str, Any],
     trace: dict[str, Any],
-    solution_hits: list[dict[str, Any]],
-    rag_hints: list[dict[str, Any]],
-    web_results: list[dict[str, Any]],
+    solution_hits: list[SolutionHit],
+    rag_hints: list[RAGHint],
+    web_results: list[WebResult],
 ) -> Path:
     """Persist one research synthesis outcome for later offline review."""
 
@@ -81,6 +82,49 @@ def append_solution_acceptance_feedback(
         "training_eligible": bool(manifest.get("training_eligible", False)),
     }
     return _append_jsonl(_feedback_dir(workspace) / "solution_acceptance.jsonl", row)
+
+
+def build_solution_acceptance_index(roots: Iterable[Path]) -> dict[str, dict[str, dict[str, Any]]]:
+    """Build transparent acceptance aggregates for later retrieval reranking."""
+
+    rows = _load_jsonl(_iter_feedback_files(roots, "solution_acceptance.jsonl"))
+    by_published_dir: dict[str, dict[str, Any]] = {}
+    by_template: dict[str, dict[str, Any]] = {}
+
+    def _update(bucket: dict[str, dict[str, Any]], key: str, row: dict[str, Any]) -> None:
+        if not key:
+            return
+        item = bucket.setdefault(
+            key,
+            {
+                "accepted_count": 0,
+                "last_accepted_at": "",
+                "accepted_by": [],
+            },
+        )
+        item["accepted_count"] = int(item.get("accepted_count", 0) or 0) + 1
+        accepted_at = str(row.get("accepted_at", "") or row.get("created_at", "") or "")
+        if accepted_at and accepted_at > str(item.get("last_accepted_at", "") or ""):
+            item["last_accepted_at"] = accepted_at
+        accepted_by = str(row.get("accepted_by", "") or "")
+        people = [str(x) for x in item.get("accepted_by", []) if str(x)]
+        if accepted_by and accepted_by not in people:
+            people.append(accepted_by)
+        item["accepted_by"] = people
+
+    for row in rows:
+        published_dir = str(row.get("published_dir", "") or "")
+        if published_dir:
+            try:
+                published_dir = str(Path(published_dir).resolve())
+            except OSError:
+                pass
+        _update(by_published_dir, published_dir, row)
+        _update(by_template, str(row.get("template", "") or ""), row)
+    return {
+        "by_published_dir": by_published_dir,
+        "by_template": by_template,
+    }
 
 
 def _iter_feedback_files(roots: Iterable[Path], name: str) -> list[Path]:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from agent.chains.research_types import RAGHint, SolutionHit, WebResult
 from agent.evaluation.schemas import Metric, MetricReport
 
 
@@ -37,9 +38,9 @@ def evaluate_research_synthesis(
     *,
     query: str,
     answer: str,
-    solution_hits: list[dict[str, Any]],
-    rag_hints: list[dict[str, Any]],
-    web_results: list[dict[str, Any]],
+    solution_hits: list[SolutionHit],
+    rag_hints: list[RAGHint],
+    web_results: list[WebResult],
     trace: dict[str, Any],
 ) -> MetricReport:
     counts = {"S": len(solution_hits), "R": len(rag_hints), "W": len(web_results)}

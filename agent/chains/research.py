@@ -9,8 +9,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from agent.chains.research_cache import (
+    DEFAULT_L2_TTL_SECONDS,
+    build_cache_key,
+    is_cache_eligible,
+    load_cached_payload,
+    store_cached_payload,
+)
+from agent.chains.research_types import RAGHint, ResearchCachePayload, SolutionHit, WebResult
 from agent.evidence.arbiter import arbitrate_evidence
-from agent.evaluation.feedback import append_research_feedback
+from agent.evaluation.feedback import append_research_feedback, build_solution_acceptance_index
 from agent.evaluation.research import evaluate_research_synthesis
 from agent.learning.vector_store import cosine_similarity, vectorize_text
 from agent.learning.web_search import search_web
@@ -32,15 +40,18 @@ class ResearchChainInput:
     use_llm: bool = False
     llm_provider: str = "openai"
     llm_model: str | None = None
+    use_cache: bool = True
+    refresh_cache: bool = False
+    cache_ttl_seconds: int = DEFAULT_L2_TTL_SECONDS
 
 
 @dataclass(frozen=True)
 class ResearchChainResult:
     query: str
     answer: str
-    solution_hits: list[dict[str, Any]] = field(default_factory=list)
-    rag_hints: list[dict[str, Any]] = field(default_factory=list)
-    web_results: list[dict[str, Any]] = field(default_factory=list)
+    solution_hits: list[SolutionHit] = field(default_factory=list)
+    rag_hints: list[RAGHint] = field(default_factory=list)
+    web_results: list[WebResult] = field(default_factory=list)
     trace: dict[str, Any] = field(default_factory=dict)
     evaluation: dict[str, Any] = field(default_factory=dict)
     manifest: dict[str, Any] = field(default_factory=dict)
@@ -138,6 +149,38 @@ def _manifest_paths(solution_dirs: tuple[Path, ...], *, max_manifests: int = 120
     return deduped[:max_manifests]
 
 
+def _acceptance_feedback_roots(workspace: Path, solution_dirs: tuple[Path, ...]) -> tuple[Path, ...]:
+    roots: list[Path] = []
+    for candidate in (workspace, workspace.parent, *solution_dirs, *(path.parent for path in solution_dirs)):
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            resolved = candidate
+        if resolved not in roots and resolved.exists():
+            roots.append(resolved)
+    return tuple(roots)
+
+
+def _feedback_stats_for_solution(
+    acceptance_index: dict[str, dict[str, dict[str, Any]]],
+    *,
+    run_dir: Path,
+    template: str,
+) -> tuple[dict[str, Any], str]:
+    by_dir = acceptance_index.get("by_published_dir", {})
+    by_template = acceptance_index.get("by_template", {})
+    try:
+        exact = by_dir.get(str(run_dir.resolve()))
+    except OSError:
+        exact = by_dir.get(str(run_dir))
+    if isinstance(exact, dict):
+        return exact, "published_dir"
+    template_stats = by_template.get(template)
+    if isinstance(template_stats, dict):
+        return template_stats, "template"
+    return {"accepted_count": 0, "last_accepted_at": "", "accepted_by": []}, "none"
+
+
 def _hybrid_solution_score(
     *,
     query: str,
@@ -146,24 +189,32 @@ def _hybrid_solution_score(
     hit_tokens: list[str],
     tag_count: int,
     has_backup: bool,
+    feedback_bonus: float,
 ) -> dict[str, float]:
     keyword_overlap = len(hit_tokens) / max(len(query_tokens), 1) if query_tokens else 0.0
     keyword_points = min(len(hit_tokens) * 5.0, 20.0)
     semantic_similarity = max(cosine_similarity(vectorize_text(query), vectorize_text(haystack)), 0.0) if query.strip() else 0.0
     semantic_points = semantic_similarity * 10.0
     evidence_bonus = (2.0 if has_backup else 0.0) + min(tag_count, 6)
-    total = keyword_points * 0.72 + semantic_points * 0.28 + evidence_bonus
+    total = keyword_points * 0.72 + semantic_points * 0.28 + evidence_bonus + feedback_bonus
     return {
         "keyword_overlap": round(keyword_overlap, 4),
         "keyword_points": round(keyword_points, 4),
         "semantic_similarity": round(semantic_similarity, 4),
         "semantic_points": round(semantic_points, 4),
         "evidence_bonus": round(evidence_bonus, 4),
+        "feedback_bonus": round(feedback_bonus, 4),
         "hybrid_score": round(total, 4),
     }
 
 
-def _load_solution_hit(path: Path, query: str, query_tokens: set[str]) -> dict[str, Any] | None:
+def _load_solution_hit(
+    path: Path,
+    query: str,
+    query_tokens: set[str],
+    *,
+    acceptance_index: dict[str, dict[str, dict[str, Any]]],
+) -> SolutionHit | None:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -187,6 +238,14 @@ def _load_solution_hit(path: Path, query: str, query_tokens: set[str]) -> dict[s
             backup_text,
         ]
     )
+    template = str(raw.get("template", ""))
+    feedback_stats, feedback_scope = _feedback_stats_for_solution(
+        acceptance_index,
+        run_dir=run_dir,
+        template=template,
+    )
+    accepted_count = int(feedback_stats.get("accepted_count", 0) or 0)
+    feedback_bonus = min(accepted_count, 5) * (0.8 if feedback_scope == "published_dir" else 0.35 if feedback_scope == "template" else 0.0)
     hit_tokens = sorted(_tokens(haystack) & query_tokens)
     score_breakdown = _hybrid_solution_score(
         query=query,
@@ -195,6 +254,7 @@ def _load_solution_hit(path: Path, query: str, query_tokens: set[str]) -> dict[s
         hit_tokens=hit_tokens,
         tag_count=len(tags),
         has_backup=bool(backup_text),
+        feedback_bonus=feedback_bonus,
     )
     # 先保留一个很小的语义兜底门槛。默认 hashing vector 仍然很轻，
     # 但接口已经把后续替换为 ST/Ollama embedding 的口子留出来了。
@@ -210,7 +270,7 @@ def _load_solution_hit(path: Path, query: str, query_tokens: set[str]) -> dict[s
         "run_id": run_dir.name,
         "goal": str(raw.get("goal", "")),
         "stack": str(raw.get("stack", "")),
-        "template": str(raw.get("template", "")),
+        "template": template,
         "retrieval_tags": [str(x) for x in tags[:12]],
         "artifact_hints": [str(x) for x in artifacts[:12]],
         "matched_tokens": hit_tokens[:12],
@@ -218,6 +278,9 @@ def _load_solution_hit(path: Path, query: str, query_tokens: set[str]) -> dict[s
         "backup_preview": backup_text[:700],
         "acceptance_status": str(raw.get("acceptance_status", "")),
         "accepted_by": str(raw.get("accepted_by", "")),
+        "accepted_count": accepted_count,
+        "last_accepted_at": str(feedback_stats.get("last_accepted_at", "") or ""),
+        "feedback_scope": feedback_scope,
     }
 
 
@@ -227,19 +290,20 @@ def search_solution_library(
     workspace: Path,
     solution_dirs: tuple[Path, ...] = (),
     top_k: int = 4,
-) -> list[dict[str, Any]]:
+) -> list[SolutionHit]:
     roots = solution_dirs or _default_solution_dirs(workspace)
     query_tokens = _tokens(query)
-    hits: list[dict[str, Any]] = []
+    acceptance_index = build_solution_acceptance_index(_acceptance_feedback_roots(workspace, roots))
+    hits: list[SolutionHit] = []
     for manifest in _manifest_paths(roots):
-        hit = _load_solution_hit(manifest, query, query_tokens)
+        hit = _load_solution_hit(manifest, query, query_tokens, acceptance_index=acceptance_index)
         if hit:
             hits.append(hit)
     hits.sort(key=lambda row: (-float(row.get("score", 0.0) or 0.0), str(row.get("run_id", ""))))
     return hits[: max(int(top_k), 1)]
 
 
-def _format_web_results(items: list[Any]) -> list[dict[str, Any]]:
+def _format_web_results(items: list[Any]) -> list[WebResult]:
     return [
         {"title": r.title, "url": r.url, "snippet": r.snippet, "source": r.source}
         for r in items
@@ -280,9 +344,9 @@ def _block_chars(blocks: list[_EvidenceBlock]) -> int:
 
 def _pack_llm_evidence(
     *,
-    solution_hits: list[dict[str, Any]],
-    rag_hints: list[dict[str, Any]],
-    web_results: list[dict[str, Any]],
+    solution_hits: list[SolutionHit],
+    rag_hints: list[RAGHint],
+    web_results: list[WebResult],
     budget_chars: int = 5200,
 ) -> tuple[list[str], dict[str, Any]]:
     blocks: list[_EvidenceBlock] = []
@@ -354,9 +418,9 @@ def _pack_llm_evidence(
 def _extractive_answer(
     query: str,
     *,
-    solution_hits: list[dict[str, Any]],
-    rag_hints: list[dict[str, Any]],
-    web_results: list[dict[str, Any]],
+    solution_hits: list[SolutionHit],
+    rag_hints: list[RAGHint],
+    web_results: list[WebResult],
     evidence_policy: dict[str, Any] | None = None,
 ) -> str:
     lines = [f"问题：{query}", "", "本地优先结论："]
@@ -395,9 +459,9 @@ def _extractive_answer(
 def _llm_synthesis(
     query: str,
     *,
-    solution_hits: list[dict[str, Any]],
-    rag_hints: list[dict[str, Any]],
-    web_results: list[dict[str, Any]],
+    solution_hits: list[SolutionHit],
+    rag_hints: list[RAGHint],
+    web_results: list[WebResult],
     provider: str,
     model: str | None,
 ) -> tuple[str, dict[str, Any]]:
@@ -445,6 +509,88 @@ def _llm_synthesis(
         return "", {"llm_ok": False, "llm_error": str(exc)[:240], "evidence_pack": pack_trace}
 
 
+def _finalise_research_result(
+    inp: ResearchChainInput,
+    *,
+    query: str,
+    top_k: int,
+    answer: str,
+    solution_hits: list[SolutionHit],
+    rag_hints: list[RAGHint],
+    rag_summary: dict[str, Any],
+    web_results: list[WebResult],
+    evidence_policy: dict[str, Any],
+    llm_trace: dict[str, Any],
+    retrieval_trace: dict[str, Any],
+    cache_trace: dict[str, Any],
+) -> ResearchChainResult:
+    trace = {
+        "solution_dirs": [str(x) for x in (inp.solution_dirs or _default_solution_dirs(inp.workspace))],
+        "solution_hits": len(solution_hits),
+        "rag": rag_summary,
+        "web_enabled": bool(inp.use_web),
+        "web_results": len(web_results),
+        "retrieval": retrieval_trace,
+        "cache": cache_trace,
+        "evidence_policy": evidence_policy,
+        **llm_trace,
+    }
+    evaluation = evaluate_research_synthesis(
+        query=query,
+        answer=answer,
+        solution_hits=solution_hits,
+        rag_hints=rag_hints,
+        web_results=web_results,
+        trace=trace,
+    ).to_dict()
+    trace["evaluation_score"] = evaluation.get("overall_score")
+    trace["evaluation_grade"] = evaluation.get("grade")
+    feedback_path = append_research_feedback(
+        inp.workspace,
+        query=query,
+        evaluation=evaluation,
+        trace=trace,
+        solution_hits=solution_hits,
+        rag_hints=rag_hints,
+        web_results=web_results,
+    )
+    trace["feedback_log"] = str(feedback_path)
+    manifest = build_run_manifest(
+        kind="research_synthesize",
+        input_summary={
+            "query": query,
+            "workspace": str(inp.workspace),
+            "solution_dirs": [str(path) for path in inp.solution_dirs],
+            "learning_dirs": list(inp.learning_dirs),
+            "top_k": top_k,
+            "use_web": inp.use_web,
+            "use_llm": inp.use_llm,
+            "use_cache": inp.use_cache,
+            "refresh_cache": inp.refresh_cache,
+            "cache_ttl_seconds": inp.cache_ttl_seconds,
+        },
+        files={"feedback_log": str(feedback_path)},
+        evaluation=evaluation,
+        source_refs=[
+            {"type": "solution", "path": row.get("manifest", ""), "score": row.get("score")}
+            for row in solution_hits
+        ]
+        + [{"type": "rag", "path": row.get("path", ""), "source": row.get("source")} for row in rag_hints]
+        + [{"type": "web", "url": row.get("url", ""), "title": row.get("title", "")} for row in web_results],
+        risks=["web_evidence_requires_verification"] if web_results else [],
+    )
+    return ResearchChainResult(
+        query=query,
+        answer=answer,
+        solution_hits=solution_hits,
+        rag_hints=rag_hints,
+        web_results=web_results,
+        trace=trace,
+        evaluation=evaluation,
+        manifest=manifest,
+    )
+
+
 def run_research_chain(
     inp: ResearchChainInput,
     *,
@@ -452,6 +598,53 @@ def run_research_chain(
 ) -> ResearchChainResult:
     query = inp.query.strip()
     top_k = max(int(inp.top_k), 1)
+    cache_eligible = is_cache_eligible(
+        use_cache=inp.use_cache,
+        use_web=inp.use_web,
+        use_llm=inp.use_llm,
+    )
+    cache_trace: dict[str, Any]
+    cache_key = ""
+    if cache_eligible:
+        cache_key = build_cache_key(
+            query=query,
+            workspace=inp.workspace,
+            solution_dirs=inp.solution_dirs or _default_solution_dirs(inp.workspace),
+            learning_dirs=inp.learning_dirs,
+            top_k=top_k,
+        )
+        payload, cache_trace = load_cached_payload(
+            inp.workspace,
+            key=cache_key,
+            ttl_seconds=max(int(inp.cache_ttl_seconds), 1),
+            refresh=inp.refresh_cache,
+        )
+        if payload is not None:
+            return _finalise_research_result(
+                inp,
+                query=query,
+                top_k=top_k,
+                answer=payload["answer"],
+                solution_hits=payload["solution_hits"],
+                rag_hints=payload["rag_hints"],
+                rag_summary=payload["rag_summary"],
+                web_results=payload["web_results"],
+                evidence_policy=payload["evidence_policy"],
+                llm_trace=payload["llm_trace"],
+                retrieval_trace={
+                    "mode": "cache",
+                    "parallel": False,
+                    "branches": ["solution", "rag"],
+                },
+                cache_trace=cache_trace,
+            )
+    else:
+        cache_trace = {
+            "status": "disabled" if not inp.use_cache else "ineligible",
+            "layer": "",
+            "policy": "local_extractive_only",
+            "reason": "disabled" if not inp.use_cache else "web_or_llm_enabled",
+        }
     with ThreadPoolExecutor(max_workers=3 if inp.use_web else 2) as pool:
         solution_future = pool.submit(
             search_solution_library,
@@ -477,9 +670,10 @@ def run_research_chain(
         solution_hits = solution_future.result()
         rag_result = rag_future.result()
         web_results = _format_web_results(web_future.result()) if web_future else []
+    rag_hints = rag_result.hints[:top_k]
     evidence_policy = arbitrate_evidence(
         solution_hits=solution_hits,
-        rag_hints=rag_result.hints[:top_k],
+        rag_hints=rag_hints,
         web_results=web_results,
     )
     llm_trace: dict[str, Any] = {"llm_ok": False}
@@ -488,7 +682,7 @@ def run_research_chain(
         answer, llm_trace = _llm_synthesis(
             query,
             solution_hits=solution_hits,
-            rag_hints=rag_result.hints[:top_k],
+            rag_hints=rag_hints,
             web_results=web_results,
             provider=inp.llm_provider,
             model=inp.llm_model,
@@ -497,72 +691,42 @@ def run_research_chain(
         answer = _extractive_answer(
             query,
             solution_hits=solution_hits,
-            rag_hints=rag_result.hints[:top_k],
+            rag_hints=rag_hints,
             web_results=web_results,
             evidence_policy=evidence_policy,
         )
-    trace = {
-        "solution_dirs": [str(x) for x in (inp.solution_dirs or _default_solution_dirs(inp.workspace))],
-        "solution_hits": len(solution_hits),
-        "rag": rag_result.summary,
-        "web_enabled": bool(inp.use_web),
-        "web_results": len(web_results),
-        "retrieval": {
+    if cache_eligible:
+        payload: ResearchCachePayload = {
+            "answer": answer,
+            "solution_hits": solution_hits,
+            "rag_hints": rag_hints,
+            "rag_summary": rag_result.summary,
+            "web_results": web_results,
+            "evidence_policy": evidence_policy,
+            "llm_trace": llm_trace,
+        }
+        cache_path = store_cached_payload(inp.workspace, key=cache_key, payload=payload)
+        cache_trace = {
+            **cache_trace,
+            "status": "stored" if cache_trace.get("status") != "refresh_requested" else "refreshed",
+            "layer": "L2",
+            "path": str(cache_path),
+        }
+    return _finalise_research_result(
+        inp,
+        query=query,
+        top_k=top_k,
+        answer=answer,
+        solution_hits=solution_hits,
+        rag_hints=rag_hints,
+        rag_summary=rag_result.summary,
+        web_results=web_results,
+        evidence_policy=evidence_policy,
+        llm_trace=llm_trace,
+        retrieval_trace={
             "mode": "thread_pool",
             "parallel": True,
             "branches": ["solution", "rag"] + (["web"] if inp.use_web else []),
         },
-        "evidence_policy": evidence_policy,
-        **llm_trace,
-    }
-    evaluation = evaluate_research_synthesis(
-        query=query,
-        answer=answer,
-        solution_hits=solution_hits,
-        rag_hints=rag_result.hints[:top_k],
-        web_results=web_results,
-        trace=trace,
-    ).to_dict()
-    trace["evaluation_score"] = evaluation.get("overall_score")
-    trace["evaluation_grade"] = evaluation.get("grade")
-    feedback_path = append_research_feedback(
-        inp.workspace,
-        query=query,
-        evaluation=evaluation,
-        trace=trace,
-        solution_hits=solution_hits,
-        rag_hints=rag_result.hints[:top_k],
-        web_results=web_results,
-    )
-    trace["feedback_log"] = str(feedback_path)
-    manifest = build_run_manifest(
-        kind="research_synthesize",
-        input_summary={
-            "query": query,
-            "workspace": str(inp.workspace),
-            "solution_dirs": [str(path) for path in inp.solution_dirs],
-            "learning_dirs": list(inp.learning_dirs),
-            "top_k": top_k,
-            "use_web": inp.use_web,
-            "use_llm": inp.use_llm,
-        },
-        files={"feedback_log": str(feedback_path)},
-        evaluation=evaluation,
-        source_refs=[
-            {"type": "solution", "path": row.get("manifest", ""), "score": row.get("score")}
-            for row in solution_hits
-        ]
-        + [{"type": "rag", "path": row.get("path", ""), "source": row.get("source")} for row in rag_result.hints[:top_k]]
-        + [{"type": "web", "url": row.get("url", ""), "title": row.get("title", "")} for row in web_results],
-        risks=["web_evidence_requires_verification"] if web_results else [],
-    )
-    return ResearchChainResult(
-        query=query,
-        answer=answer,
-        solution_hits=solution_hits,
-        rag_hints=rag_result.hints[:top_k],
-        web_results=web_results,
-        trace=trace,
-        evaluation=evaluation,
-        manifest=manifest,
+        cache_trace=cache_trace,
     )

@@ -5,8 +5,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 from agent.chains.research import ResearchChainInput, run_research_chain, search_solution_library
+from agent.chains.research_cache import clear_l1_cache
 from agent.chains.research import _pack_llm_evidence
-from agent.evaluation.feedback import build_research_feedback_report
+from agent.evaluation.feedback import (
+    append_solution_acceptance_feedback,
+    build_research_feedback_report,
+)
 
 
 class _FakeResponse:
@@ -85,6 +89,30 @@ def test_search_solution_library_skips_unaccepted_candidates(tmp_path: Path) -> 
     assert hits == []
 
 
+def test_search_solution_library_uses_acceptance_feedback_bonus(tmp_path: Path) -> None:
+    run = _make_solution_run(tmp_path)
+    source = tmp_path / "source_run"
+    source.mkdir()
+    append_solution_acceptance_feedback(
+        source,
+        published_dir=run,
+        manifest={
+            "template": "spring-vue-management",
+            "acceptance_status": "accepted",
+            "accepted_at": "2026-05-18T00:00:00+00:00",
+            "accepted_by": "alice",
+        },
+    )
+    ws = tmp_path / "ws"
+    ws.mkdir()
+
+    hits = search_solution_library("员工管理 CRUD", workspace=ws, solution_dirs=(tmp_path,), top_k=2)
+
+    assert hits[0]["accepted_count"] == 1
+    assert hits[0]["feedback_scope"] == "published_dir"
+    assert hits[0]["score_breakdown"]["feedback_bonus"] == 0.8
+
+
 def test_research_chain_combines_solution_rag_and_web(tmp_path: Path) -> None:
     _make_solution_run(tmp_path)
     ws = tmp_path / "ws"
@@ -142,6 +170,54 @@ def test_research_chain_llm_falls_back_without_key(tmp_path: Path) -> None:
     assert out.trace["llm_ok"] is False
     assert "可复用方案库命中" in out.answer
     assert out.evaluation["metrics"]["llm_synthesis"]["status"] == "failed"
+
+
+def test_research_chain_local_extractive_cache_uses_l1_and_l2(tmp_path: Path) -> None:
+    clear_l1_cache()
+    _make_solution_run(tmp_path)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "app.py").write_text("employee approval workflow\n", encoding="utf-8")
+    inp = ResearchChainInput(
+        query="employee approval workflow",
+        workspace=ws,
+        solution_dirs=(tmp_path,),
+        top_k=2,
+    )
+
+    first = run_research_chain(inp)
+    second = run_research_chain(inp)
+    clear_l1_cache()
+    third = run_research_chain(inp)
+
+    assert first.trace["cache"]["status"] == "stored"
+    assert second.trace["cache"]["status"] == "hit"
+    assert second.trace["cache"]["layer"] == "L1"
+    assert second.trace["retrieval"]["mode"] == "cache"
+    assert third.trace["cache"]["status"] == "hit"
+    assert third.trace["cache"]["layer"] == "L2"
+
+
+def test_research_chain_web_requests_skip_cache(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    payload = {
+        "Heading": "Spring",
+        "AbstractURL": "https://example.test/spring",
+        "AbstractText": "Spring Boot docs",
+    }
+
+    out = run_research_chain(
+        ResearchChainInput(
+            query="spring docs",
+            workspace=ws,
+            use_web=True,
+        ),
+        web_opener=lambda *_args, **_kwargs: _FakeResponse(payload),
+    )
+
+    assert out.trace["cache"]["status"] == "ineligible"
+    assert out.trace["cache"]["reason"] == "web_or_llm_enabled"
 
 
 def test_research_feedback_report_summarizes_low_score_queries(tmp_path: Path) -> None:

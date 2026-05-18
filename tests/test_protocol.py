@@ -246,7 +246,7 @@ def test_intent_compile_requires_goal() -> None:
 
 def test_research_synthesize_valid() -> None:
     d = parse_and_validate_action_line(
-        '{"type":"action","action":"research_synthesize","args":{"query":"员工管理","top_k":2,"use_web":false,"use_llm":false,"solution_dirs":["./product_runs"],"learning_dirs":["./learning_runs/demo"]}}'
+        '{"type":"action","action":"research_synthesize","args":{"query":"员工管理","top_k":2,"use_web":false,"use_llm":false,"use_cache":true,"refresh_cache":false,"cache_ttl_seconds":3600,"solution_dirs":["./product_runs"],"learning_dirs":["./learning_runs/demo"]}}'
     )
     assert d["action"] == "research_synthesize"
 
