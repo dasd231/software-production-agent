@@ -197,6 +197,7 @@ pip install -r requirements-serving.txt
 | **备用模型评测** | `agent/evaluation/model_benchmark.py` + `agent/training/backup_eval.py`：从协议遵循、证据忠实和方案复用三个维度，对基座模型与 LoRA adapter 做可复现对照 |
 | **GitHub 前后端爬取画像** | `agent/chains/github_crawler.py`：搜索/复制常规前后端项目，按可扩展架构规则识别 Spring/Vue、React、Node、Python API 等，打标签、质量评分，并把高质量项目导出成本地方案备份；crawler 自己会按 bounded query plan 抓取，并把反馈转成 `corpus_strategy.v1`，让下一轮 query / 排序 / 分流真实改变 |
 | **GitHub 语料调度器** | `agent/corpus_intelligence/scheduler.py`：不做失控常驻 daemon，而是给 systemd timer / cron 提供 single-shot cycle；每轮保守限制 `repo_limit/max_query_arms/cpu_thread_budget`，把状态和 strategy 写回 `scheduler_state.json` |
+| **GitHub 项目化桥接** | `agent/corpus_intelligence/projectization.py`：把 crawler 的 `train_now/distill_pool/benchmark_holdout` 路由结果转成 repo-memory 与 route-separated task assets；`benchmark_holdout` 优先隔离，避免混入训练集 |
 | **MCP 适配层** | 提供 `mcp_capabilities` 与 `invoke_mcp_tool` 骨架，带参数归一化和结构化错误返回，可平滑扩展到真实 MCP |
 | **LLM Provider** | `agent/llm/providers.py` 统一 OPENAI/GROQ/DEEPSEEK 的 API key、base_url、model 列表和 OpenAI-compatible client 创建 |
 | **模型池路由** | `agent/scheduler/routing.py`：估算 prompt/output tokens，识别短请求、长上下文 RAG、Agent 工具调用和训练批处理，并输出 short/long/agent/training pool 准入计划，避免长上下文被短请求抢占 |
@@ -287,7 +288,7 @@ OPENAI_PLANNER_MODEL=gpt-4o-mini
 - **`enterprise_stack_plan`**：面向上市企业/私有化场景输出技术选型、热迭代、vLLM/SGLang 模型服务、多 Agent 工程治理、100+ 终端弹性和灰度方案。
 - **`distributed_platform_plan` / `distributed_workload_catalog` / `distributed_job_plan`**：查看 Ray-first / Spark-later / Flink-when-needed 平台路线、标准 workload 目录，并在不派发任务的前提下预览分布式 job manifest 与 Ray submission contract。
 - **`project_model_program_plan`**：查看“项目大模型”路线，返回 internet-scale 数据源、repo-level 任务、训练阶段、benchmark 和当前推荐的 `repo_memory_v1` 首建目标。
-- **`github_corpus_program_plan` / `github_corpus_scheduler_plan` / `github_corpus_scheduler_cycle` / `github_query_plan_build` / `github_candidate_rank` / `corpus_feedback_plan`**：查看 GitHub 持续语料系统，按 single-shot scheduler 做有界周期抓取，基于 seed query + WebSearch 线索生成查询计划，对候选项目做推荐分流，并把 intake / benchmark 反馈转成下一轮可执行 `corpus_strategy`。
+- **`github_corpus_program_plan` / `github_corpus_scheduler_plan` / `github_corpus_scheduler_cycle` / `github_corpus_projectization_plan` / `github_corpus_projectize` / `github_query_plan_build` / `github_candidate_rank` / `corpus_feedback_plan`**：查看 GitHub 持续语料系统，按 single-shot scheduler 做有界周期抓取，基于 seed query + WebSearch 线索生成查询计划，对候选项目做推荐分流，把 intake / benchmark 反馈转成下一轮可执行 `corpus_strategy`，并把路由后的仓库继续转成项目级训练对象。
 - **`project_repo_memory_build`**：把一个仓库快照压成 `project_map.json`、`symbol_index.jsonl`、`evidence_index.jsonl` 与 `repo_memory_manifest.json`，作为后续 retriever / reader 训练的最小项目对象。
 - **`project_task_synthesis_build`**：从一个或多个 repo-memory 产物合成项目级 `training_examples.jsonl` 与 `retrieval_pairs.jsonl`，把“项目对象”正式转成可训练样本。
 - **`training_platform_blueprint`**：查看蒸馏、互联网语料、训练工作室、benchmark/论文四大 Plane，以及当前固定路线 A→B→C。
@@ -499,6 +500,15 @@ Linux 常驻形态建议用单轮调度 action 配 systemd timer / cron，而不
 ```
 
 每轮会留下 `scheduler_state.json`，并把上一轮 `corpus_strategy.json` 自动接到下一轮；这使得“持续爬”同时保持可停、可续和共享服务器友好。
+
+把某一轮 crawl 产物继续转成项目级对象：
+
+```json
+{"type":"action","action":"github_corpus_projectization_plan","args":{"crawl_output_dir":"./crawl_runs/fullstack","output_dir":"./projectized_runs/fullstack"}}
+{"type":"action","action":"github_corpus_projectize","args":{"crawl_output_dir":"./crawl_runs/fullstack","output_dir":"./projectized_runs/fullstack"}}
+```
+
+它会把不同 route 拆成不同资产桶：`train_now` 可作为 supervised training 候选，`distill_pool` 可作为教师蒸馏候选，`benchmark_holdout` 只可做 holdout，不能混入 `training_prepare`。
 
 离线调试可以用本地仓库：
 

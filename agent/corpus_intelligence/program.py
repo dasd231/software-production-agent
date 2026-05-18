@@ -202,7 +202,7 @@ def build_github_corpus_program() -> dict[str, Any]:
         },
         "recommended_next_builds": [
             "run the single-shot corpus scheduler under systemd timer or cron",
-            "persist multi-cycle query-arm rewards after enough crawl history exists",
+            "projectize routed crawl outputs into repo-memory and route-separated task assets",
             "add online query-arm rewards after enough crawl history exists",
             "upgrade benchmark lane from skeleton to paper-grade comparison",
         ],

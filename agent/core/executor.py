@@ -63,6 +63,11 @@ from agent.chains.research import ResearchChainInput, run_research_chain
 from agent.chains.training import TrainingPrepareInput, prepare_fine_tuning_dataset
 from agent.corpus_intelligence.feedback import build_corpus_feedback_report
 from agent.corpus_intelligence.program import build_github_corpus_program
+from agent.corpus_intelligence.projectization import (
+    CorpusProjectizationInput,
+    build_corpus_projectization_plan,
+    materialize_corpus_projectization,
+)
 from agent.corpus_intelligence.ranking import build_github_query_plan, rank_repo_profiles
 from agent.corpus_intelligence.scheduler import (
     CorpusSchedulerConfig,
@@ -577,6 +582,24 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
         cycle = run_corpus_scheduler_cycle(scheduler_config, force=bool(args.get("force", False)))
         return {"ok": bool(cycle.get("ran")) or cycle.get("status") == "skipped_cooldown", "action": name, "cycle": cycle}
+
+    if name in {"github_corpus_projectization_plan", "github_corpus_projectize"}:
+        crawl_output_raw = Path(str(_require(args, "crawl_output_dir")))
+        output_dir_raw = Path(str(_require(args, "output_dir")))
+        projectization_input = CorpusProjectizationInput(
+            crawl_output_dir=crawl_output_raw if crawl_output_raw.is_absolute() else (workspace / crawl_output_raw),
+            output_dir=output_dir_raw if output_dir_raw.is_absolute() else (workspace / output_dir_raw),
+            allowed_routes=_string_tuple_arg(args, "allowed_routes") or ("train_now", "distill_pool", "benchmark_holdout"),
+            max_repos=max(int(args.get("max_repos", 50)), 0),
+            max_files=max(int(args.get("max_files", 500)), 1),
+            max_slices=max(int(args.get("max_slices", 800)), 1),
+            max_symbol_examples_per_repo=max(int(args.get("max_symbol_examples_per_repo", 64)), 0),
+        )
+        if name == "github_corpus_projectization_plan":
+            plan = build_corpus_projectization_plan(projectization_input)
+            return {"ok": True, "action": name, "plan": plan}
+        result = materialize_corpus_projectization(projectization_input)
+        return {"ok": True, "action": name, **result.to_dict()}
 
     if name == "github_query_plan_build":
         plan = build_github_query_plan(

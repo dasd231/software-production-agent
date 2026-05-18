@@ -70,6 +70,8 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "github_corpus_program_plan",
         "github_corpus_scheduler_plan",
         "github_corpus_scheduler_cycle",
+        "github_corpus_projectization_plan",
+        "github_corpus_projectize",
         "github_query_plan_build",
         "github_candidate_rank",
         "corpus_feedback_plan",
@@ -334,6 +336,19 @@ class ActionDTO(BaseModel):
                 raise ValueError(f"{a} updated_after must be string")
             if "force" in ar and not isinstance(ar.get("force"), bool):
                 raise ValueError(f"{a} force must be boolean")
+        elif a in {"github_corpus_projectization_plan", "github_corpus_projectize"}:
+            for key in ("crawl_output_dir", "output_dir"):
+                if key not in ar or not isinstance(ar.get(key), str):
+                    raise ValueError(f"{a} requires string {key}")
+            if "allowed_routes" in ar:
+                value = ar.get("allowed_routes")
+                if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                    raise ValueError(f"{a} allowed_routes must be string array")
+            for key in ("max_repos", "max_files", "max_slices", "max_symbol_examples_per_repo"):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                        raise ValueError(f"{a} {key} must be non-negative integer")
         elif a == "project_repo_memory_build":
             for key in ("repo_path", "output_dir"):
                 if key not in ar or not isinstance(ar.get(key), str):

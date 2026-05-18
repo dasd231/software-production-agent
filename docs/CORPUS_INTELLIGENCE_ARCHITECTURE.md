@@ -81,6 +81,18 @@ operator seed queries
 
 如果上一轮反馈表明检索质量或引用精度下降，strategy 会显式提高 `docs/tests/entrypoints/package_manifest` 这类证据标签的 utility，重新归一化排序权重，并在必要时抬高下一轮最小质量门槛。这样“论文里解释得通”和“程序里真的会执行”是一回事。
 
+## 4.1 项目化桥接
+
+推荐层之后，系统不能只停在“这仓库值得看”。第一版桥接规则是：
+
+| Route | 下游用途 |
+| --- | --- |
+| `train_now` | supervised training 候选 |
+| `distill_pool` | 教师蒸馏候选 |
+| `benchmark_holdout` | 只做 holdout，不可回流训练 |
+
+`github_corpus_projectize` 会把这些仓库先转成 `repo_memory_v1`，再按 route 分桶合成 task assets。若同一仓库同时满足多个 route，`benchmark_holdout` 优先级最高，先把评测集隔离出来，避免训练泄漏。
+
 ## 4. 为什么要接 WebSearch
 
 GitHub Search 更像结构化检索；WebSearch 更像外部世界对“什么值得看”的提示。  
@@ -158,6 +170,7 @@ systemd timer / cron
 4. `corpus_feedback_report.v1`：把模型反馈回流到语料层；
 5. `corpus_strategy.v1`：把反馈变成下一轮 query / ranking / routing 可直接消费的策略；
 6. crawler 侧写入 `query_plan.json`、`routing_report.json`、`feedback_report.json` 与 `corpus_strategy.json`；
-7. `github_corpus_scheduler_plan/cycle` 提供单轮有界调度、状态续跑和 Linux timer 友好的运行形态。
+7. `github_corpus_scheduler_plan/cycle` 提供单轮有界调度、状态续跑和 Linux timer 友好的运行形态；
+8. `github_corpus_projectization_plan/projectize` 把 route 结果继续变成 repo-memory 与 route-separated project tasks。
 
 这意味着 GitHub 不再只是“数据来源”，而是正式成为训练系统的第一层智能入口。

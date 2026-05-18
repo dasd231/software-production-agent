@@ -184,6 +184,7 @@ repo_memory_v1
 3. 新增 `project_repo_memory_build`，把单仓库压成 `project_map`、`symbol_index`、`evidence_index` 与 manifest；
 4. 新增 `project_task_synthesis_build`，把 repo-memory 转成第一批项目级 SFT 样本和 retrieval pairs；
 5. 把仓库级语料加工加入分布式 workload catalog；
-6. 把项目大模型路线写入 research workbench，后续可以继续往 retriever 训练和 benchmark runner 推进。
+6. 把项目大模型路线写入 research workbench，后续可以继续往 retriever 训练和 benchmark runner 推进；
+7. GitHub corpus 侧新增 `github_corpus_projectize`，把 crawl route 直接接到 repo-memory / task synthesis，并把 `benchmark_holdout` 从训练资产中隔离。
 
 这意味着“项目大模型”不再只是战略描述，而是已经进入当前仓库的正式能力边界。
