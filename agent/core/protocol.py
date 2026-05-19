@@ -67,6 +67,8 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "distributed_workload_catalog",
         "distributed_job_plan",
         "project_model_program_plan",
+        "project_holdout_benchmark_build",
+        "project_holdout_evaluate",
         "github_corpus_program_plan",
         "github_corpus_scheduler_plan",
         "github_corpus_scheduler_cycle",
@@ -358,6 +360,16 @@ class ActionDTO(BaseModel):
                     value = ar.get(key)
                     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                         raise ValueError(f"project_repo_memory_build {key} must be positive integer")
+        elif a == "project_holdout_benchmark_build":
+            for key in ("projectization_dir", "output_dir"):
+                if key not in ar or not isinstance(ar.get(key), str):
+                    raise ValueError(f"project_holdout_benchmark_build requires string {key}")
+        elif a == "project_holdout_evaluate":
+            for key in ("benchmark_path", "predictions_path", "output_dir"):
+                if key not in ar or not isinstance(ar.get(key), str):
+                    raise ValueError(f"project_holdout_evaluate requires string {key}")
+            if "baseline_report_path" in ar and not isinstance(ar.get("baseline_report_path"), str):
+                raise ValueError("project_holdout_evaluate baseline_report_path must be string")
         elif a == "project_task_synthesis_build":
             if "output_dir" not in ar or not isinstance(ar.get("output_dir"), str):
                 raise ValueError("project_task_synthesis_build requires string output_dir")

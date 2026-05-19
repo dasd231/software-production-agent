@@ -204,6 +204,6 @@ def build_github_corpus_program() -> dict[str, Any]:
             "run the single-shot corpus scheduler under systemd timer or cron",
             "projectize routed crawl outputs into repo-memory and route-separated task assets",
             "add online query-arm rewards after enough crawl history exists",
-            "upgrade benchmark lane from skeleton to paper-grade comparison",
+            "upgrade project holdout benchmark from offline scoring to paper-grade comparison",
         ],
     }

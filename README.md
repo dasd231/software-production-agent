@@ -198,6 +198,7 @@ pip install -r requirements-serving.txt
 | **GitHub 前后端爬取画像** | `agent/chains/github_crawler.py`：搜索/复制常规前后端项目，按可扩展架构规则识别 Spring/Vue、React、Node、Python API 等，打标签、质量评分，并把高质量项目导出成本地方案备份；crawler 自己会按 bounded query plan 抓取，并把反馈转成 `corpus_strategy.v1`，让下一轮 query / 排序 / 分流真实改变 |
 | **GitHub 语料调度器** | `agent/corpus_intelligence/scheduler.py`：不做失控常驻 daemon，而是给 systemd timer / cron 提供 single-shot cycle；每轮保守限制 `repo_limit/max_query_arms/cpu_thread_budget`，把状态和 strategy 写回 `scheduler_state.json` |
 | **GitHub 项目化桥接** | `agent/corpus_intelligence/projectization.py`：把 crawler 的 `train_now/distill_pool/benchmark_holdout` 路由结果转成 repo-memory 与 route-separated task assets；`benchmark_holdout` 优先隔离，避免混入训练集 |
+| **项目 Holdout 评测** | `agent/project_model/holdout_benchmark.py`：只消费 `benchmark_holdout` 资产，构造离线 benchmark，并从预测结果计算 `Recall@5/MRR/citation precision/answer F1/tokens per correct answer` 与可回流 delta |
 | **MCP 适配层** | 提供 `mcp_capabilities` 与 `invoke_mcp_tool` 骨架，带参数归一化和结构化错误返回，可平滑扩展到真实 MCP |
 | **LLM Provider** | `agent/llm/providers.py` 统一 OPENAI/GROQ/DEEPSEEK 的 API key、base_url、model 列表和 OpenAI-compatible client 创建 |
 | **模型池路由** | `agent/scheduler/routing.py`：估算 prompt/output tokens，识别短请求、长上下文 RAG、Agent 工具调用和训练批处理，并输出 short/long/agent/training pool 准入计划，避免长上下文被短请求抢占 |
@@ -510,6 +511,15 @@ Linux 常驻形态建议用单轮调度 action 配 systemd timer / cron，而不
 
 它会把不同 route 拆成不同资产桶：`train_now` 可作为 supervised training 候选，`distill_pool` 可作为教师蒸馏候选，`benchmark_holdout` 只可做 holdout，不能混入 `training_prepare`。
 
+从 holdout 资产生成评测集并打分：
+
+```json
+{"type":"action","action":"project_holdout_benchmark_build","args":{"projectization_dir":"./projectized_runs/fullstack","output_dir":"./benchmark_runs/fullstack"}}
+{"type":"action","action":"project_holdout_evaluate","args":{"benchmark_path":"./benchmark_runs/fullstack/project_holdout_benchmark.json","predictions_path":"./benchmark_runs/fullstack/predictions.json","output_dir":"./benchmark_runs/fullstack/eval","baseline_report_path":"./benchmark_runs/baseline/project_holdout_evaluation_report.json"}}
+```
+
+评测报告会同时输出 `feedback_metrics` 和 `feedback_deltas`；后者里的 `recall_at_5_delta`、`citation_precision_delta` 可以直接回流给 `corpus_feedback_plan`。
+
 离线调试可以用本地仓库：
 
 ```json
@@ -585,7 +595,7 @@ python scripts/update_research_workbench.py
 
 研究分链还会输出 `trace.evidence_policy`，按“已验收方案库 > 本地/RAG > Web”的顺序做证据仲裁；Web 只作为补充，来源冲突会进入 `conflicts` 与 `conflict_details`，并附带 `decision_rationale`、基于历史成败自动校准的 `source_confidence`，不再只给黑盒结论。正式方案库只收用户在前端显式点击“满意并沉淀”后的资产，普通 run 产物默认不进入检索和训练来源；验收动作会写入 `.agent_feedback/solution_acceptance.jsonl`，而方案库排序会把这些接受事件作为透明的 `feedback_bonus` 回流。方案库同时会把 `goal/stack/tags/SOLUTION_BACKUP.md` 建成持久语义索引 `.agent_cache/solution_semantic/*`；历史低分 query 会自动生成 retrieval policy，调节 keyword/semantic 权重、语义阈值和 manifest 遍历上限。研究链的 `SolutionHit`、`RAGHint`、`WebResult`、`EvidencePolicy` 等契约已集中到 `agent/chains/research_types.py`，把最容易漂移的宽松 dict 边界收紧。
 
-GitHub 语料层也已经从“只会出建议”推进到“会真正改变下一轮行为”：`corpus_feedback_report.v1` 会同时给出 `corpus_strategy.v1`，里面包含 query arm 分数调整、facet promotion/suppression、下一轮排序权重、标签 utility 以及更严格的 routing threshold。`github_query_plan_build`、`github_candidate_rank` 和 `github_crawl_profile` 都可以直接消费这个 strategy；crawler 自己会先生成有上限的 `query_plan.json`，再按 `max_query_arms` 控制真实 GitHub 查询数量，最后把下一轮策略落成 `corpus_strategy.json`。`github_corpus_scheduler_cycle` 则把这些产物接成多轮 `scheduler_state.json`，让 Linux 上的 systemd timer / cron 可以低侵入地长期续跑。
+GitHub 语料层也已经从“只会出建议”推进到“会真正改变下一轮行为”：`corpus_feedback_report.v1` 会同时给出 `corpus_strategy.v1`，里面包含 query arm 分数调整、facet promotion/suppression、下一轮排序权重、标签 utility 以及更严格的 routing threshold。`github_query_plan_build`、`github_candidate_rank` 和 `github_crawl_profile` 都可以直接消费这个 strategy；crawler 自己会先生成有上限的 `query_plan.json`，再按 `max_query_arms` 控制真实 GitHub 查询数量，最后把下一轮策略落成 `corpus_strategy.json`。`github_corpus_scheduler_cycle` 则把这些产物接成多轮 `scheduler_state.json`，让 Linux 上的 systemd timer / cron 可以低侵入地长期续跑；`project_holdout_evaluate` 则把项目级 holdout 的指标 delta 再喂回这条闭环。
 
 ### Model Plane / 本地大模型
 

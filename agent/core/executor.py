@@ -97,6 +97,12 @@ from agent.learning.web_search import search_web
 from agent.mcp.adapter import default_mcp_capabilities, invoke_mcp_tool
 from agent.policies.loader import CommandPolicyError, assert_command_policy
 from agent.project_model.program import build_project_model_program
+from agent.project_model.holdout_benchmark import (
+    ProjectHoldoutBenchmarkBuildInput,
+    ProjectHoldoutEvaluationInput,
+    build_project_holdout_benchmark,
+    evaluate_project_holdout,
+)
 from agent.project_model.repo_memory import RepoMemoryBuildInput, build_repo_memory
 from agent.project_model.task_synthesis import ProjectTaskSynthesisInput, synthesize_project_tasks
 from agent.training.studio import (
@@ -545,6 +551,32 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             target_context_tokens=int(args.get("target_context_tokens", 32768)),
         )
         return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
+
+    if name == "project_holdout_benchmark_build":
+        projectization_raw = Path(str(_require(args, "projectization_dir")))
+        output_raw = Path(str(_require(args, "output_dir")))
+        result = build_project_holdout_benchmark(
+            ProjectHoldoutBenchmarkBuildInput(
+                projectization_dir=projectization_raw if projectization_raw.is_absolute() else (workspace / projectization_raw),
+                output_dir=output_raw if output_raw.is_absolute() else (workspace / output_raw),
+            )
+        )
+        return {"ok": True, "action": name, **result.to_dict()}
+
+    if name == "project_holdout_evaluate":
+        benchmark_raw = Path(str(_require(args, "benchmark_path")))
+        predictions_raw = Path(str(_require(args, "predictions_path")))
+        output_raw = Path(str(_require(args, "output_dir")))
+        baseline_raw = _optional_path_arg(workspace, args, "baseline_report_path")
+        report = evaluate_project_holdout(
+            ProjectHoldoutEvaluationInput(
+                benchmark_path=benchmark_raw if benchmark_raw.is_absolute() else (workspace / benchmark_raw),
+                predictions_path=predictions_raw if predictions_raw.is_absolute() else (workspace / predictions_raw),
+                output_dir=output_raw if output_raw.is_absolute() else (workspace / output_raw),
+                baseline_report_path=baseline_raw,
+            )
+        )
+        return {"ok": True, "action": name, "report": report}
 
     if name == "github_corpus_program_plan":
         return {"ok": True, "action": name, "plan": build_github_corpus_program()}

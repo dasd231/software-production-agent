@@ -93,6 +93,16 @@ operator seed queries
 
 `github_corpus_projectize` 会把这些仓库先转成 `repo_memory_v1`，再按 route 分桶合成 task assets。若同一仓库同时满足多个 route，`benchmark_holdout` 优先级最高，先把评测集隔离出来，避免训练泄漏。
 
+`project_holdout_benchmark_build` 会只读取 `benchmark_holdout` 桶，生成项目级离线 benchmark；`project_holdout_evaluate` 接收预测结果后，直接输出：
+
+- `recall_at_5`
+- `mrr`
+- `citation_precision`
+- `answer_f1`
+- `tokens_per_correct_answer`
+
+如果提供 baseline report，还会生成 `feedback_deltas`，可直接回流给 corpus feedback。这样“语料推荐层”和“模型是否真的变强”开始形成同一条闭环。
+
 ## 4. 为什么要接 WebSearch
 
 GitHub Search 更像结构化检索；WebSearch 更像外部世界对“什么值得看”的提示。  
@@ -171,6 +181,7 @@ systemd timer / cron
 5. `corpus_strategy.v1`：把反馈变成下一轮 query / ranking / routing 可直接消费的策略；
 6. crawler 侧写入 `query_plan.json`、`routing_report.json`、`feedback_report.json` 与 `corpus_strategy.json`；
 7. `github_corpus_scheduler_plan/cycle` 提供单轮有界调度、状态续跑和 Linux timer 友好的运行形态；
-8. `github_corpus_projectization_plan/projectize` 把 route 结果继续变成 repo-memory 与 route-separated project tasks。
+8. `github_corpus_projectization_plan/projectize` 把 route 结果继续变成 repo-memory 与 route-separated project tasks；
+9. `project_holdout_benchmark_build/evaluate` 把 holdout 资产变成可回流的项目级评价指标。
 
 这意味着 GitHub 不再只是“数据来源”，而是正式成为训练系统的第一层智能入口。
