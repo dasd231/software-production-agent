@@ -70,6 +70,7 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "project_holdout_benchmark_build",
         "project_holdout_evaluate",
         "github_corpus_program_plan",
+        "github_corpus_status",
         "github_corpus_scheduler_plan",
         "github_corpus_scheduler_cycle",
         "github_corpus_flywheel_cycle",
@@ -440,6 +441,9 @@ class ActionDTO(BaseModel):
                     raise ValueError(f"project_holdout_evaluate requires string {key}")
             if "baseline_report_path" in ar and not isinstance(ar.get("baseline_report_path"), str):
                 raise ValueError("project_holdout_evaluate baseline_report_path must be string")
+        elif a == "github_corpus_status":
+            if "output_root" not in ar or not isinstance(ar.get("output_root"), str):
+                raise ValueError("github_corpus_status requires string output_root")
         elif a == "project_task_synthesis_build":
             if "output_dir" not in ar or not isinstance(ar.get("output_dir"), str):
                 raise ValueError("project_task_synthesis_build requires string output_dir")

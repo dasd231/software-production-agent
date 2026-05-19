@@ -75,6 +75,7 @@ from agent.corpus_intelligence.scheduler import (
     build_corpus_scheduler_plan,
     run_corpus_scheduler_cycle,
 )
+from agent.corpus_intelligence.status import build_corpus_flywheel_status
 from agent.corpus_intelligence.training_bundle import CorpusTrainingBundleInput, build_corpus_training_bundle
 from agent.evidence.ledger import build_evidence_ledger
 from agent.enterprise.stack import build_enterprise_stack_plan
@@ -582,6 +583,12 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
 
     if name == "github_corpus_program_plan":
         return {"ok": True, "action": name, "plan": build_github_corpus_program()}
+
+    if name == "github_corpus_status":
+        output_root_raw = Path(str(_require(args, "output_root")))
+        output_root = output_root_raw if output_root_raw.is_absolute() else (workspace / output_root_raw)
+        status = build_corpus_flywheel_status(output_root)
+        return {"ok": True, "action": name, "status": status}
 
     if name in {"github_corpus_scheduler_plan", "github_corpus_scheduler_cycle"}:
         output_root_raw = Path(str(_require(args, "output_root")))

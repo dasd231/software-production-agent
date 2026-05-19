@@ -200,6 +200,7 @@ pip install -r requirements-serving.txt
 | **GitHub 语料飞轮** | `agent/corpus_intelligence/flywheel.py`：一轮 CPU-only 串起 scheduler crawl、projectization、holdout benchmark，并可读取上一轮 `feedback_deltas` 回流到本轮 corpus strategy |
 | **GitHub 项目化桥接** | `agent/corpus_intelligence/projectization.py`：把 crawler 的 `train_now/distill_pool/benchmark_holdout` 路由结果转成 repo-memory 与 route-separated task assets；`benchmark_holdout` 优先隔离，避免混入训练集 |
 | **GitHub 训练包** | `agent/corpus_intelligence/training_bundle.py`：从 projectized assets 生成第一轮训练输入包；默认只收 `train_now/distill_pool`，明确排除 `benchmark_holdout`，可选 CPU-only 执行 `training_prepare` |
+| **GitHub 飞轮状态** | `agent/corpus_intelligence/status.py`：只读汇总 `scheduler_state.json`、最新 strategy、projectization、holdout benchmark/evaluation 与下一步建议，方便无人值守巡检 |
 | **项目 Holdout 评测** | `agent/project_model/holdout_benchmark.py`：只消费 `benchmark_holdout` 资产，构造离线 benchmark，并从预测结果计算 `Recall@5/MRR/citation precision/answer F1/tokens per correct answer` 与可回流 delta |
 | **MCP 适配层** | 提供 `mcp_capabilities` 与 `invoke_mcp_tool` 骨架，带参数归一化和结构化错误返回，可平滑扩展到真实 MCP |
 | **LLM Provider** | `agent/llm/providers.py` 统一 OPENAI/GROQ/DEEPSEEK 的 API key、base_url、model 列表和 OpenAI-compatible client 创建 |
@@ -529,6 +530,9 @@ python -m agent.corpus_intelligence.cli training-bundle \
   --output-dir ./training_bundles/<cycle_id> \
   --include-routes train_now,distill_pool \
   --prepare-dataset
+
+python -m agent.corpus_intelligence.cli status \
+  --output-root ./corpus_runs/main
 ```
 
 把某一轮 crawl 产物继续转成项目级对象：

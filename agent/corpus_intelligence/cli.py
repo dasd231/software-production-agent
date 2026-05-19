@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from agent.corpus_intelligence.flywheel import CorpusFlywheelInput, run_corpus_flywheel_cycle
+from agent.corpus_intelligence.status import build_corpus_flywheel_status
 from agent.corpus_intelligence.training_bundle import CorpusTrainingBundleInput, build_corpus_training_bundle
 
 
@@ -89,6 +90,18 @@ def _cmd_training_bundle(args: argparse.Namespace) -> int:
     return 0 if bool(validation.get("ok")) else 2
 
 
+def _cmd_status(args: argparse.Namespace) -> int:
+    status = build_corpus_flywheel_status(Path(args.output_root))
+    print(f"state_exists: {status['state']['exists']}")
+    print(f"latest_cycle_id: {status['state']['latest_cycle_id']}")
+    print(f"cycle_count: {status['state']['cycle_count']}")
+    for name, artifact in status["artifacts"].items():
+        print(f"{name}: {artifact['path']} exists={artifact['exists']}")
+    for step in status["next_steps"]:
+        print(f"next: {step}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="CPU-first GitHub corpus flywheel CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -110,6 +123,10 @@ def main(argv: list[str] | None = None) -> int:
     bundle.add_argument("--no-protocol-examples", action="store_true")
     bundle.add_argument("--protocol-example-limit", type=int, default=0)
     bundle.set_defaults(func=_cmd_training_bundle)
+
+    status = sub.add_parser("status", help="Read latest corpus flywheel state without running work")
+    status.add_argument("--output-root", required=True)
+    status.set_defaults(func=_cmd_status)
 
     args = parser.parse_args(argv)
     return int(args.func(args))
