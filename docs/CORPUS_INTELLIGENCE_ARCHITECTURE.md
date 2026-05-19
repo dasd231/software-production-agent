@@ -175,6 +175,8 @@ systemd timer / cron
 
 `github_corpus_flywheel_cycle` 是推荐入口：它在一个 CPU-only 周期里串起 `scheduler cycle -> projectization -> holdout benchmark`。如果传入上一轮 `project_holdout_evaluation_report.json`，它会读取其中的 `feedback_deltas`，本轮 crawler feedback 就会据此调整 strategy。
 
+CLI 入口是 `python -m agent.corpus_intelligence.cli flywheel ...` 和 `python -m agent.corpus_intelligence.cli training-bundle ...`。它们只是 action 的薄封装，便于 Linux 定时任务调用，不绕过协议中的资源预算与 holdout 隔离策略。
+
 ## 8. 本轮落地
 
 这轮新增：

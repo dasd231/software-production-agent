@@ -512,6 +512,25 @@ Linux 常驻形态建议用单轮调度 action 配 systemd timer / cron，而不
 
 它会顺序产出 crawl、projectized route assets、holdout benchmark 和 `flywheel_cycle_report.json`；`downstream_metrics_path` 可传上一轮评测报告，自动把 `feedback_deltas` 带入本轮 corpus feedback。
 
+Linux 上也可以直接用 CLI，适合放进 cron/systemd timer：
+
+```bash
+python -m agent.corpus_intelligence.cli flywheel \
+  --output-root ./corpus_runs/main \
+  --seed-query "spring boot vue management system" \
+  --github \
+  --repo-limit 5 \
+  --max-query-arms 4 \
+  --license MIT \
+  --license Apache-2.0
+
+python -m agent.corpus_intelligence.cli training-bundle \
+  --projectization-dir ./corpus_runs/main/cycles/<cycle_id>/projectized \
+  --output-dir ./training_bundles/<cycle_id> \
+  --include-routes train_now,distill_pool \
+  --prepare-dataset
+```
+
 把某一轮 crawl 产物继续转成项目级对象：
 
 ```json
