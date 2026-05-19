@@ -75,6 +75,7 @@ from agent.corpus_intelligence.scheduler import (
     build_corpus_scheduler_plan,
     run_corpus_scheduler_cycle,
 )
+from agent.corpus_intelligence.training_bundle import CorpusTrainingBundleInput, build_corpus_training_bundle
 from agent.evidence.ledger import build_evidence_ledger
 from agent.enterprise.stack import build_enterprise_stack_plan
 from agent.distillation.catalog import list_teacher_models, list_teacher_tasks
@@ -676,6 +677,26 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             return {"ok": True, "action": name, "plan": plan}
         result = materialize_corpus_projectization(projectization_input)
         return {"ok": True, "action": name, **result.to_dict()}
+
+    if name == "github_corpus_training_bundle":
+        projectization_raw = Path(str(_require(args, "projectization_dir")))
+        output_raw = Path(str(_require(args, "output_dir")))
+        result = build_corpus_training_bundle(
+            CorpusTrainingBundleInput(
+                projectization_dir=projectization_raw if projectization_raw.is_absolute() else (workspace / projectization_raw),
+                output_dir=output_raw if output_raw.is_absolute() else (workspace / output_raw),
+                include_routes=_string_tuple_arg(args, "include_routes") or ("train_now", "distill_pool"),
+                dataset_format=str(args.get("dataset_format", "messages") or "messages"),
+                eval_ratio=float(args.get("eval_ratio", 0.15)),
+                min_chars=int(args.get("min_chars", 20)),
+                max_examples=int(args.get("max_examples", 2000)),
+                model_hint=str(args.get("model_hint", "deepseek-coder") or "deepseek-coder"),
+                include_protocol_examples=bool(args.get("include_protocol_examples", True)),
+                protocol_example_limit=int(args.get("protocol_example_limit", 0)),
+                prepare_dataset=bool(args.get("prepare_dataset", False)),
+            )
+        )
+        return {"ok": bool(result.manifest.get("validation", {}).get("ok")), "action": name, **result.to_dict()}
 
     if name == "github_query_plan_build":
         plan = build_github_query_plan(

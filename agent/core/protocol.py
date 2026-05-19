@@ -75,6 +75,7 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "github_corpus_flywheel_cycle",
         "github_corpus_projectization_plan",
         "github_corpus_projectize",
+        "github_corpus_training_bundle",
         "github_query_plan_build",
         "github_candidate_rank",
         "corpus_feedback_plan",
@@ -399,6 +400,27 @@ class ActionDTO(BaseModel):
                     value = ar.get(key)
                     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                         raise ValueError(f"{a} {key} must be non-negative integer")
+        elif a == "github_corpus_training_bundle":
+            for key in ("projectization_dir", "output_dir"):
+                if key not in ar or not isinstance(ar.get(key), str):
+                    raise ValueError(f"github_corpus_training_bundle requires string {key}")
+            if "include_routes" in ar:
+                value = ar.get("include_routes")
+                if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                    raise ValueError("github_corpus_training_bundle include_routes must be string array")
+            for key in ("dataset_format", "model_hint"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"github_corpus_training_bundle {key} must be string")
+            if "eval_ratio" in ar and not isinstance(ar.get("eval_ratio"), (int, float)):
+                raise ValueError("github_corpus_training_bundle eval_ratio must be number")
+            for key in ("min_chars", "max_examples", "protocol_example_limit"):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                        raise ValueError(f"github_corpus_training_bundle {key} must be non-negative integer")
+            for key in ("include_protocol_examples", "prepare_dataset"):
+                if key in ar and not isinstance(ar.get(key), bool):
+                    raise ValueError(f"github_corpus_training_bundle {key} must be boolean")
         elif a == "project_repo_memory_build":
             for key in ("repo_path", "output_dir"):
                 if key not in ar or not isinstance(ar.get(key), str):

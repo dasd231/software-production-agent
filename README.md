@@ -199,6 +199,7 @@ pip install -r requirements-serving.txt
 | **GitHub 语料调度器** | `agent/corpus_intelligence/scheduler.py`：不做失控常驻 daemon，而是给 systemd timer / cron 提供 single-shot cycle；每轮保守限制 `repo_limit/max_query_arms/cpu_thread_budget`，把状态和 strategy 写回 `scheduler_state.json` |
 | **GitHub 语料飞轮** | `agent/corpus_intelligence/flywheel.py`：一轮 CPU-only 串起 scheduler crawl、projectization、holdout benchmark，并可读取上一轮 `feedback_deltas` 回流到本轮 corpus strategy |
 | **GitHub 项目化桥接** | `agent/corpus_intelligence/projectization.py`：把 crawler 的 `train_now/distill_pool/benchmark_holdout` 路由结果转成 repo-memory 与 route-separated task assets；`benchmark_holdout` 优先隔离，避免混入训练集 |
+| **GitHub 训练包** | `agent/corpus_intelligence/training_bundle.py`：从 projectized assets 生成第一轮训练输入包；默认只收 `train_now/distill_pool`，明确排除 `benchmark_holdout`，可选 CPU-only 执行 `training_prepare` |
 | **项目 Holdout 评测** | `agent/project_model/holdout_benchmark.py`：只消费 `benchmark_holdout` 资产，构造离线 benchmark，并从预测结果计算 `Recall@5/MRR/citation precision/answer F1/tokens per correct answer` 与可回流 delta |
 | **MCP 适配层** | 提供 `mcp_capabilities` 与 `invoke_mcp_tool` 骨架，带参数归一化和结构化错误返回，可平滑扩展到真实 MCP |
 | **LLM Provider** | `agent/llm/providers.py` 统一 OPENAI/GROQ/DEEPSEEK 的 API key、base_url、model 列表和 OpenAI-compatible client 创建 |
@@ -290,7 +291,7 @@ OPENAI_PLANNER_MODEL=gpt-4o-mini
 - **`enterprise_stack_plan`**：面向上市企业/私有化场景输出技术选型、热迭代、vLLM/SGLang 模型服务、多 Agent 工程治理、100+ 终端弹性和灰度方案。
 - **`distributed_platform_plan` / `distributed_workload_catalog` / `distributed_job_plan`**：查看 Ray-first / Spark-later / Flink-when-needed 平台路线、标准 workload 目录，并在不派发任务的前提下预览分布式 job manifest 与 Ray submission contract。
 - **`project_model_program_plan`**：查看“项目大模型”路线，返回 internet-scale 数据源、repo-level 任务、训练阶段、benchmark 和当前推荐的 `repo_memory_v1` 首建目标。
-- **`github_corpus_program_plan` / `github_corpus_scheduler_plan` / `github_corpus_scheduler_cycle` / `github_corpus_flywheel_cycle` / `github_corpus_projectization_plan` / `github_corpus_projectize` / `github_query_plan_build` / `github_candidate_rank` / `corpus_feedback_plan`**：查看 GitHub 持续语料系统，按 single-shot scheduler 做有界周期抓取，基于 seed query + WebSearch 线索生成查询计划，对候选项目做推荐分流，把 intake / benchmark 反馈转成下一轮可执行 `corpus_strategy`，并把路由后的仓库继续转成项目级训练对象。
+- **`github_corpus_program_plan` / `github_corpus_scheduler_plan` / `github_corpus_scheduler_cycle` / `github_corpus_flywheel_cycle` / `github_corpus_projectization_plan` / `github_corpus_projectize` / `github_corpus_training_bundle` / `github_query_plan_build` / `github_candidate_rank` / `corpus_feedback_plan`**：查看 GitHub 持续语料系统，按 single-shot scheduler 做有界周期抓取，基于 seed query + WebSearch 线索生成查询计划，对候选项目做推荐分流，把 intake / benchmark 反馈转成下一轮可执行 `corpus_strategy`，并把路由后的仓库继续转成项目级训练对象和训练前数据包。
 - **`project_repo_memory_build`**：把一个仓库快照压成 `project_map.json`、`symbol_index.jsonl`、`evidence_index.jsonl` 与 `repo_memory_manifest.json`，作为后续 retriever / reader 训练的最小项目对象。
 - **`project_task_synthesis_build`**：从一个或多个 repo-memory 产物合成项目级 `training_examples.jsonl` 与 `retrieval_pairs.jsonl`，把“项目对象”正式转成可训练样本。
 - **`training_platform_blueprint`**：查看蒸馏、互联网语料、训练工作室、benchmark/论文四大 Plane，以及当前固定路线 A→B→C。
@@ -519,6 +520,14 @@ Linux 常驻形态建议用单轮调度 action 配 systemd timer / cron，而不
 ```
 
 它会把不同 route 拆成不同资产桶：`train_now` 可作为 supervised training 候选，`distill_pool` 可作为教师蒸馏候选，`benchmark_holdout` 只可做 holdout，不能混入 `training_prepare`。
+
+准备第一轮训练输入包：
+
+```json
+{"type":"action","action":"github_corpus_training_bundle","args":{"projectization_dir":"./projectized_runs/fullstack","output_dir":"./training_bundles/fullstack","include_routes":["train_now","distill_pool"],"prepare_dataset":true,"dataset_format":"messages","model_hint":"deepseek-coder","include_protocol_examples":true}}
+```
+
+这个动作只执行 CPU 数据准备，不启动 GPU 训练；真正开训仍然要走 `backup_model_train` 和 `training_server_preflight`。
 
 从 holdout 资产生成评测集并打分：
 

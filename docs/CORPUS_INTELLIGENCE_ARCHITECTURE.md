@@ -103,6 +103,8 @@ operator seed queries
 
 如果提供 baseline report，还会生成 `feedback_deltas`，可直接回流给 corpus feedback。这样“语料推荐层”和“模型是否真的变强”开始形成同一条闭环。
 
+训练入口则由 `github_corpus_training_bundle` 收口：它只把 `train_now` / `distill_pool` route 的 task assets 放入 `learning_dirs`，并把 `benchmark_holdout` 写入 holdout 清单但不交给 `training_prepare`。这让第一轮训练和论文评测的边界可以在 manifest 里直接审计。
+
 ## 4. 为什么要接 WebSearch
 
 GitHub Search 更像结构化检索；WebSearch 更像外部世界对“什么值得看”的提示。  
@@ -187,5 +189,6 @@ systemd timer / cron
 8. `github_corpus_projectization_plan/projectize` 把 route 结果继续变成 repo-memory 与 route-separated project tasks；
 9. `project_holdout_benchmark_build/evaluate` 把 holdout 资产变成可回流的项目级评价指标；
 10. `github_corpus_flywheel_cycle` 把 scheduler、projectization、holdout benchmark 与上一轮 feedback delta 串成单轮可审计闭环。
+11. `github_corpus_training_bundle` 把可训练 route 变成第一轮训练数据包，同时继续隔离 holdout。
 
 这意味着 GitHub 不再只是“数据来源”，而是正式成为训练系统的第一层智能入口。
