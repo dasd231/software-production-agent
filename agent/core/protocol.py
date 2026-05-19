@@ -72,6 +72,7 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "github_corpus_program_plan",
         "github_corpus_scheduler_plan",
         "github_corpus_scheduler_cycle",
+        "github_corpus_flywheel_cycle",
         "github_corpus_projectization_plan",
         "github_corpus_projectize",
         "github_query_plan_build",
@@ -338,6 +339,53 @@ class ActionDTO(BaseModel):
                 raise ValueError(f"{a} updated_after must be string")
             if "force" in ar and not isinstance(ar.get("force"), bool):
                 raise ValueError(f"{a} force must be boolean")
+        elif a == "github_corpus_flywheel_cycle":
+            if "output_root" not in ar or not isinstance(ar.get("output_root"), str):
+                raise ValueError("github_corpus_flywheel_cycle requires string output_root")
+            value = ar.get("seed_queries")
+            if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                raise ValueError("github_corpus_flywheel_cycle requires seed_queries string array")
+            if "github" in ar and not isinstance(ar.get("github"), bool):
+                raise ValueError("github_corpus_flywheel_cycle github must be boolean")
+            for key in ("local_repos", "allowed_licenses"):
+                if key in ar:
+                    value = ar.get(key)
+                    if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                        raise ValueError(f"github_corpus_flywheel_cycle {key} must be string array")
+            if "web_results" in ar and not isinstance(ar.get("web_results"), list):
+                raise ValueError("github_corpus_flywheel_cycle web_results must be array")
+            if "downstream_metrics" in ar and not isinstance(ar.get("downstream_metrics"), dict):
+                raise ValueError("github_corpus_flywheel_cycle downstream_metrics must be object")
+            for key in (
+                "downstream_metrics_path",
+                "predictions_path",
+                "baseline_report_path",
+                "updated_after",
+            ):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"github_corpus_flywheel_cycle {key} must be string")
+            for key in (
+                "interval_seconds",
+                "repo_limit",
+                "max_query_arms",
+                "min_stars",
+                "cpu_thread_budget",
+                "max_cycles_retained",
+                "max_repos",
+                "max_files",
+                "max_slices",
+                "max_symbol_examples_per_repo",
+            ):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                        raise ValueError(f"github_corpus_flywheel_cycle {key} must be non-negative integer")
+            if "quality_threshold" in ar:
+                value = ar.get("quality_threshold")
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                    raise ValueError("github_corpus_flywheel_cycle quality_threshold must be finite number")
+            if "force" in ar and not isinstance(ar.get("force"), bool):
+                raise ValueError("github_corpus_flywheel_cycle force must be boolean")
         elif a in {"github_corpus_projectization_plan", "github_corpus_projectize"}:
             for key in ("crawl_output_dir", "output_dir"):
                 if key not in ar or not isinstance(ar.get(key), str):

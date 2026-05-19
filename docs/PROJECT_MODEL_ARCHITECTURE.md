@@ -187,5 +187,6 @@ repo_memory_v1
 6. 把项目大模型路线写入 research workbench，后续可以继续往 retriever 训练和 benchmark runner 推进；
 7. GitHub corpus 侧新增 `github_corpus_projectize`，把 crawl route 直接接到 repo-memory / task synthesis，并把 `benchmark_holdout` 从训练资产中隔离。
 8. 新增 `project_holdout_benchmark_build` / `project_holdout_evaluate`，把隔离后的 holdout 资产转成项目级离线 benchmark，并输出可回流的 `Recall@5`、`MRR`、`citation precision`、`answer F1` 与 token 效率指标。
+9. 新增 `github_corpus_flywheel_cycle`，用 CPU-only 单轮编排把 GitHub crawl、route projectization、holdout benchmark 和上一轮 feedback delta 接成闭环。
 
 这意味着“项目大模型”不再只是战略描述，而是已经进入当前仓库的正式能力边界。

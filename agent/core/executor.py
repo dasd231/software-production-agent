@@ -62,6 +62,7 @@ from agent.chains.registry import get_chain, list_chains
 from agent.chains.research import ResearchChainInput, run_research_chain
 from agent.chains.training import TrainingPrepareInput, prepare_fine_tuning_dataset
 from agent.corpus_intelligence.feedback import build_corpus_feedback_report
+from agent.corpus_intelligence.flywheel import CorpusFlywheelInput, run_corpus_flywheel_cycle
 from agent.corpus_intelligence.program import build_github_corpus_program
 from agent.corpus_intelligence.projectization import (
     CorpusProjectizationInput,
@@ -614,6 +615,49 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             return {"ok": bool(plan.get("validation", {}).get("ok")), "action": name, "plan": plan}
         cycle = run_corpus_scheduler_cycle(scheduler_config, force=bool(args.get("force", False)))
         return {"ok": bool(cycle.get("ran")) or cycle.get("status") == "skipped_cooldown", "action": name, "cycle": cycle}
+
+    if name == "github_corpus_flywheel_cycle":
+        output_root_raw = Path(str(_require(args, "output_root")))
+        output_root = output_root_raw if output_root_raw.is_absolute() else (workspace / output_root_raw)
+        downstream_metrics_path = _optional_path_arg(workspace, args, "downstream_metrics_path")
+        predictions_path = _optional_path_arg(workspace, args, "predictions_path")
+        baseline_report_path = _optional_path_arg(workspace, args, "baseline_report_path")
+        result = run_corpus_flywheel_cycle(
+            CorpusFlywheelInput(
+                output_root=output_root,
+                seed_queries=_string_tuple_arg(args, "seed_queries"),
+                local_repos=tuple(Path(x) for x in _string_tuple_arg(args, "local_repos")),
+                web_results=tuple(dict(item) for item in args.get("web_results", []) if isinstance(item, dict))
+                if isinstance(args.get("web_results"), list)
+                else (),
+                enable_github_network=bool(args.get("github", False)),
+                interval_seconds=max(int(args.get("interval_seconds", 3600)), 1),
+                repo_limit=max(int(args.get("repo_limit", 5)), 1),
+                max_query_arms=max(int(args.get("max_query_arms", 4)), 1),
+                min_stars=max(int(args.get("min_stars", 50)), 0),
+                allowed_licenses=_string_tuple_arg(args, "allowed_licenses"),
+                updated_after=str(args.get("updated_after", "")),
+                quality_threshold=float(args.get("quality_threshold", 6.5)),
+                downstream_metrics={
+                    str(key): float(value)
+                    for key, value in args.get("downstream_metrics", {}).items()
+                    if isinstance(value, (int, float))
+                }
+                if isinstance(args.get("downstream_metrics"), dict)
+                else {},
+                downstream_metrics_path=downstream_metrics_path,
+                predictions_path=predictions_path,
+                baseline_report_path=baseline_report_path,
+                cpu_thread_budget=max(int(args.get("cpu_thread_budget", 2)), 1),
+                max_cycles_retained=max(int(args.get("max_cycles_retained", 50)), 1),
+                max_repos=max(int(args.get("max_repos", 50)), 0),
+                max_files=max(int(args.get("max_files", 500)), 1),
+                max_slices=max(int(args.get("max_slices", 800)), 1),
+                max_symbol_examples_per_repo=max(int(args.get("max_symbol_examples_per_repo", 64)), 0),
+                force=bool(args.get("force", False)),
+            )
+        )
+        return {"ok": bool(result.get("ran")) or result.get("status") == "skipped_cooldown", "action": name, "flywheel": result}
 
     if name in {"github_corpus_projectization_plan", "github_corpus_projectize"}:
         crawl_output_raw = Path(str(_require(args, "crawl_output_dir")))

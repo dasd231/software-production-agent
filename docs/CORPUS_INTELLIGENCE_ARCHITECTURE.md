@@ -158,9 +158,10 @@ GitHub Search 更像结构化检索；WebSearch 更像外部世界对“什么�
 
 ```text
 systemd timer / cron
-  -> github_corpus_scheduler_cycle
+  -> github_corpus_flywheel_cycle
   -> one bounded crawl cycle
-  -> scheduler_state.json + corpus_strategy.json
+  -> projectization + holdout benchmark
+  -> scheduler_state.json + corpus_strategy.json + flywheel_cycle_report.json
   -> process exits
 ```
 
@@ -169,6 +170,8 @@ systemd timer / cron
 1. 每轮 `repo_limit`、`max_query_arms`、`cpu_thread_budget` 都是显式预算；
 2. 上一轮 strategy 会通过 `scheduler_state.json` 自动传给下一轮；
 3. 进程天然可停、可续、可审计，比共享服务器上的常驻死循环更稳。
+
+`github_corpus_flywheel_cycle` 是推荐入口：它在一个 CPU-only 周期里串起 `scheduler cycle -> projectization -> holdout benchmark`。如果传入上一轮 `project_holdout_evaluation_report.json`，它会读取其中的 `feedback_deltas`，本轮 crawler feedback 就会据此调整 strategy。
 
 ## 8. 本轮落地
 
@@ -182,6 +185,7 @@ systemd timer / cron
 6. crawler 侧写入 `query_plan.json`、`routing_report.json`、`feedback_report.json` 与 `corpus_strategy.json`；
 7. `github_corpus_scheduler_plan/cycle` 提供单轮有界调度、状态续跑和 Linux timer 友好的运行形态；
 8. `github_corpus_projectization_plan/projectize` 把 route 结果继续变成 repo-memory 与 route-separated project tasks；
-9. `project_holdout_benchmark_build/evaluate` 把 holdout 资产变成可回流的项目级评价指标。
+9. `project_holdout_benchmark_build/evaluate` 把 holdout 资产变成可回流的项目级评价指标；
+10. `github_corpus_flywheel_cycle` 把 scheduler、projectization、holdout benchmark 与上一轮 feedback delta 串成单轮可审计闭环。
 
 这意味着 GitHub 不再只是“数据来源”，而是正式成为训练系统的第一层智能入口。
