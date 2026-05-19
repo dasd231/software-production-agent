@@ -773,3 +773,7 @@ This repository is organized as a three-track project: employment-grade engineer
 - [Big-slam collaboration guide](docs/COLLABORATION_BIG_SLAM.md)
 - [GitHub collaboration setup](docs/GITHUB_COLLABORATION_SETUP.md)
 - [Roadmap](ROADMAP.md)
+
+## Software middle-layer small model
+
+A standalone middle-layer module is available for using a future small model to shortcut or prioritize expensive rule algorithms without launching heavy training by default. See [Software Middle-Layer Small Model](docs/SOFTWARE_MIDDLE_MODEL.md).

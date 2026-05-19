@@ -108,6 +108,7 @@ from agent.project_model.holdout_benchmark import (
 )
 from agent.project_model.repo_memory import RepoMemoryBuildInput, build_repo_memory
 from agent.project_model.task_synthesis import ProjectTaskSynthesisInput, synthesize_project_tasks
+from agent.software_middle_model import MiddleModelInput, build_software_middle_model_plan, decide_with_middle_model
 from agent.training.studio import (
     build_ablation_plan,
     build_training_platform_blueprint,
@@ -518,6 +519,27 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
             require_json=bool(args.get("require_json", False)),
         )
         return {"ok": bool(plan.get("admission", {}).get("admitted")), "action": name, "plan": plan}
+
+    if name == "software_middle_model_plan":
+        plan = build_software_middle_model_plan(str(args.get("target", "rule_acceleration") or "rule_acceleration"))
+        return {"ok": True, "action": name, "plan": plan}
+
+    if name == "software_middle_model_decide":
+        decision = decide_with_middle_model(
+            MiddleModelInput.from_dict(
+                {
+                    "task": str(_require(args, "task")),
+                    "features": args.get("features") if isinstance(args.get("features"), dict) else {},
+                    "candidates": args.get("candidates") if isinstance(args.get("candidates"), list) else [],
+                    "confidence_threshold": args.get("confidence_threshold", 0.78),
+                    "margin_threshold": args.get("margin_threshold", 0.12),
+                    "rule_budget_ms": args.get("rule_budget_ms", 250),
+                    "max_candidates": args.get("max_candidates", 8),
+                    "model_hint": args.get("model_hint", "software-middle-small-model"),
+                }
+            )
+        )
+        return {"ok": True, "action": name, "decision": decision}
 
     if name == "enterprise_stack_plan":
         plan = build_enterprise_stack_plan(

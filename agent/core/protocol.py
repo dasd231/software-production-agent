@@ -62,6 +62,8 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "model_admission_release",
         "model_admission_renew",
         "model_route_plan",
+        "software_middle_model_plan",
+        "software_middle_model_decide",
         "enterprise_stack_plan",
         "distributed_platform_plan",
         "distributed_workload_catalog",
@@ -213,6 +215,30 @@ class ActionDTO(BaseModel):
                 value = ar.get("max_output_tokens")
                 if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                     raise ValueError("model_route_plan max_output_tokens must be positive integer")
+        elif a == "software_middle_model_plan":
+            if "target" in ar and not isinstance(ar.get("target"), str):
+                raise ValueError("software_middle_model_plan target must be string")
+        elif a == "software_middle_model_decide":
+            if "task" not in ar or not isinstance(ar.get("task"), str):
+                raise ValueError("software_middle_model_decide requires string task")
+            if "features" in ar and not isinstance(ar.get("features"), dict):
+                raise ValueError("software_middle_model_decide features must be object")
+            if "candidates" not in ar or not isinstance(ar.get("candidates"), list):
+                raise ValueError("software_middle_model_decide requires candidates array")
+            if not all(isinstance(item, dict) for item in ar.get("candidates", [])):
+                raise ValueError("software_middle_model_decide candidates must be object array")
+            for key in ("confidence_threshold", "margin_threshold"):
+                value = ar.get(key)
+                if value is not None and (
+                    isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value))
+                ):
+                    raise ValueError(f"software_middle_model_decide {key} must be finite number")
+            for key in ("rule_budget_ms", "max_candidates"):
+                value = ar.get(key)
+                if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+                    raise ValueError(f"software_middle_model_decide {key} must be non-negative integer")
+            if "model_hint" in ar and not isinstance(ar.get("model_hint"), str):
+                raise ValueError("software_middle_model_decide model_hint must be string")
         elif a == "model_admission_status":
             if ar:
                 for k in ar:
