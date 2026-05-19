@@ -237,8 +237,19 @@ class ActionDTO(BaseModel):
                 value = ar.get(key)
                 if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
                     raise ValueError(f"software_middle_model_decide {key} must be non-negative integer")
-            if "model_hint" in ar and not isinstance(ar.get("model_hint"), str):
-                raise ValueError("software_middle_model_decide model_hint must be string")
+            for key in ("model_hint", "trace_output_path", "source_trace_id"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"software_middle_model_decide {key} must be string")
+            if "final_accepted" in ar and not isinstance(ar.get("final_accepted"), bool):
+                raise ValueError("software_middle_model_decide final_accepted must be boolean")
+            for key in ("latency_saved_ms", "quality_delta"):
+                value = ar.get(key)
+                if value is not None and (
+                    isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value))
+                ):
+                    raise ValueError(f"software_middle_model_decide {key} must be finite number")
+            if "outcome" in ar and not isinstance(ar.get("outcome"), dict):
+                raise ValueError("software_middle_model_decide outcome must be object")
         elif a == "model_admission_status":
             if ar:
                 for k in ar:

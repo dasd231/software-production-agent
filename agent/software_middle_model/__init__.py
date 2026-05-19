@@ -7,5 +7,13 @@ to shortcut or prioritize expensive software-engineering rules.
 
 from .accelerator import MiddleModelInput, decide_with_middle_model
 from .program import build_software_middle_model_plan
+from .traces import append_middle_model_trace, build_middle_model_trace, load_middle_model_traces
 
-__all__ = ["MiddleModelInput", "build_software_middle_model_plan", "decide_with_middle_model"]
+__all__ = [
+    "MiddleModelInput",
+    "append_middle_model_trace",
+    "build_middle_model_trace",
+    "build_software_middle_model_plan",
+    "decide_with_middle_model",
+    "load_middle_model_traces",
+]

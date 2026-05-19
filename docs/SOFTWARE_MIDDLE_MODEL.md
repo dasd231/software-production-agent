@@ -23,6 +23,7 @@ agent/software_middle_model/
   __init__.py
   schema.py        # input schema and normalized signals
   accelerator.py   # CPU-only deterministic fallback decision
+  traces.py        # JSONL trace records for future supervised training
   program.py       # roadmap and integration contract
 ```
 
@@ -38,7 +39,7 @@ Read-only planning action.
 
 ### `software_middle_model_decide`
 
-Side-effect-free decision action.
+Decision action. It is side-effect-free by default; if `trace_output_path` is provided, it also appends one JSONL trace record under the workspace.
 
 ```json
 {
@@ -53,7 +54,13 @@ Side-effect-free decision action.
     ],
     "confidence_threshold": 0.78,
     "margin_threshold": 0.12,
-    "rule_budget_ms": 250
+    "rule_budget_ms": 250,
+    "trace_output_path": "middle_model/traces.jsonl",
+    "final_accepted": true,
+    "latency_saved_ms": 100,
+    "quality_delta": 0.0,
+    "source_trace_id": "run-001",
+    "outcome": {"grade": "accepted"}
   }
 }
 ```
@@ -74,6 +81,45 @@ Return contract:
 }
 ```
 
+
+## Trace collection
+
+The first practical job for this module is data accumulation.  Every accepted or rejected shortcut can become a future supervised example.
+
+Python API:
+
+```python
+from agent.software_middle_model import (
+    build_middle_model_trace,
+    append_middle_model_trace,
+    load_middle_model_traces,
+)
+```
+
+Trace JSONL schema:
+
+```json
+{
+  "schema": "software_middle_model_trace.v1",
+  "trace_id": "uuid",
+  "source_trace_id": "run-001",
+  "task": "evidence_selection",
+  "features": {},
+  "candidates": [],
+  "decision": {},
+  "ranked_candidates": [],
+  "labels": {
+    "final_accepted": true,
+    "shortcut_success": true,
+    "selected_candidate_id": "fast_candidate",
+    "should_run_expensive_rules": false,
+    "latency_saved_ms": 100.0,
+    "quality_delta": 0.0
+  }
+}
+```
+
+Keep traces small and auditable.  Do not store secrets, private code, or large raw documents in middle-model traces.
 ## Safety policy
 
 The module never claims final authority for high-risk tasks.
@@ -133,3 +179,4 @@ Later, replace the deterministic scorer inside `accelerator.py` with your traine
 - output schema
 - confidence/margin/reason fields
 - high-risk fallback behavior
+

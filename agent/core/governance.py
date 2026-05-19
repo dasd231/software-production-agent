@@ -55,7 +55,7 @@ ACTION_GOVERNANCE: dict[str, ActionGovernanceSpec] = {
     "model_admission_renew": ActionGovernanceSpec(("model:admit",), "medium"),
     "model_route_plan": ActionGovernanceSpec(("model:route",), "low"),
     "software_middle_model_plan": ActionGovernanceSpec(("model:read",), "low"),
-    "software_middle_model_decide": ActionGovernanceSpec(("model:route",), "low"),
+    "software_middle_model_decide": ActionGovernanceSpec(("model:route", "workspace:write"), "low"),
     "enterprise_stack_plan": ActionGovernanceSpec(("workspace:read",), "low"),
     "industrial_maturity_plan": ActionGovernanceSpec(("workspace:read",), "low"),
     "enterprise_readiness_check": ActionGovernanceSpec(("workspace:read",), "low"),
