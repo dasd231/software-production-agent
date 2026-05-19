@@ -765,3 +765,11 @@ python -m pytest tests -q
 ## 疑问与更新
 
 与 `AIread.md` 冲突之处以 **`AIread.md` 为准**；需扩展协议或阶段枚举时，请由你更新 `AIread.md` 后同步改本仓库对应模块。
+
+## Collaboration tracks
+
+This repository is organized as a three-track project: employment-grade engineering, competition-ready reproducibility, and paper-oriented evaluation. See:
+
+- [Big-slam collaboration guide](docs/COLLABORATION_BIG_SLAM.md)
+- [GitHub collaboration setup](docs/GITHUB_COLLABORATION_SETUP.md)
+- [Roadmap](ROADMAP.md)

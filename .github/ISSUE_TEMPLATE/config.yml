@@ -1,0 +1,5 @@
+﻿blank_issues_enabled: true
+contact_links:
+  - name: Collaboration Guide
+    url: https://github.com/dasd231/software-production-agent/blob/master/docs/COLLABORATION_BIG_SLAM.md
+    about: Read ownership, branch, and delivery conventions before opening broad work.

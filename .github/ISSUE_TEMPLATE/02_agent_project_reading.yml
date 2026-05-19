@@ -1,0 +1,27 @@
+﻿name: B - Agent project reading / RAG
+description: Project understanding, research chain, evidence, memory, or user-feedback work.
+title: "[B][Agent] "
+labels: ["area: agent", "track: employment", "track: competition"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should the Agent become better at?
+      placeholder: e.g. Generate an evidence-cited architecture report for a local repo.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and safety requirements
+      value: |
+        - [ ] Claims cite local/project evidence when possible
+        - [ ] Evidence text is isolated from executable instructions
+        - [ ] Long context is budgeted rather than blindly appended
+        - [ ] Unsatisfied outputs do not enter long-term memory
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests / demo
+      placeholder: python -m pytest tests/test_research*.py -q

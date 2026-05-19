@@ -1,0 +1,26 @@
+﻿name: C - GitHub data / model / eval flywheel
+description: Corpus ranking, projectization, training bundle, distillation, benchmark, or paper experiment.
+title: "[C][ModelEval] "
+labels: ["area: data", "area: eval", "track: paper", "track: competition"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What data/model/evaluation capability should this add?
+      placeholder: e.g. Add architecture-summary benchmark metrics and feedback deltas.
+    validations:
+      required: true
+  - type: textarea
+    id: leakage
+    attributes:
+      label: Data boundaries
+      value: |
+        - [ ] `benchmark_holdout` is excluded from training data
+        - [ ] Data source, license, route, and label reason are recorded
+        - [ ] Distillation source and usage boundary are recorded
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Metrics
+      placeholder: recall@k, MRR, citation precision, answer F1, hallucination rate...

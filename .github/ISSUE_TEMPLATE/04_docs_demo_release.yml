@@ -1,0 +1,26 @@
+﻿name: Documentation / demo / release
+description: Docs, examples, diagrams, resume story, competition package, or paper draft work.
+title: "[Docs] "
+labels: ["area: docs"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should this document/demo help readers do or understand?
+    validations:
+      required: true
+  - type: dropdown
+    id: output
+    attributes:
+      label: Output type
+      options:
+        - README / quickstart
+        - Architecture
+        - Deployment / operations
+        - Resume story
+        - Competition submission
+        - Paper outline / related work
+        - Example report / demo
+    validations:
+      required: true

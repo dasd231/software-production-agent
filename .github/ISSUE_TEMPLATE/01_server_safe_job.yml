@@ -1,0 +1,30 @@
+﻿name: A - Server-safe job / infra
+description: Long-running server job, resource guard, status, deployment, or operations work.
+title: "[A][Infra] "
+labels: ["area: infra", "track: employment"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What server/job capability should this add or improve?
+      placeholder: e.g. Add GPU occupancy guard before any training-like task.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Files or modules expected to change.
+      placeholder: agent/corpus_intelligence/cli.py, scheduler.py, scripts/...
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] CPU-first by default
+        - [ ] No automatic heavy GPU work
+        - [ ] Status/log output is machine-readable
+        - [ ] Tests or dry-run command included
+    validations:
+      required: true
