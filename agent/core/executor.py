@@ -110,10 +110,14 @@ from agent.project_model.repo_memory import RepoMemoryBuildInput, build_repo_mem
 from agent.project_model.task_synthesis import ProjectTaskSynthesisInput, synthesize_project_tasks
 from agent.software_middle_model import (
     MiddleModelInput,
+    MiddleModelDatasetExportInput,
+    MiddleModelServerHandoffInput,
     append_middle_model_trace,
     build_middle_model_trace,
     build_software_middle_model_plan,
     decide_with_middle_model,
+    export_middle_model_trace_dataset,
+    prepare_middle_model_server_handoff,
 )
 from agent.training.studio import (
     build_ablation_plan,
@@ -561,6 +565,44 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
         if trace_write is not None:
             result["trace"] = trace_write
         return result
+
+    if name == "software_middle_model_dataset_export":
+        output_raw = Path(str(_require(args, "output_dir")))
+        result = export_middle_model_trace_dataset(
+            MiddleModelDatasetExportInput(
+                trace_paths=tuple(
+                    (Path(item) if Path(item).is_absolute() else workspace / Path(item))
+                    for item in _string_tuple_arg(args, "trace_paths")
+                ),
+                output_dir=output_raw if output_raw.is_absolute() else workspace / output_raw,
+                base_model=str(args.get("base_model", "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B") or ""),
+                dataset_format=str(args.get("dataset_format", "messages") or "messages"),
+                eval_ratio=float(args.get("eval_ratio", 0.15)),
+                min_traces=int(args.get("min_traces", 1)),
+                max_examples=int(args.get("max_examples", 2000)),
+                notes=str(args.get("notes", "") or ""),
+            )
+        )
+        return {"ok": bool(result.validation.get("ok")), "action": name, **result.to_dict()}
+
+    if name == "software_middle_model_server_handoff":
+        training_raw = Path(str(_require(args, "training_dir")))
+        output_raw = Path(str(_require(args, "output_dir")))
+        result = prepare_middle_model_server_handoff(
+            MiddleModelServerHandoffInput(
+                training_dir=training_raw if training_raw.is_absolute() else workspace / training_raw,
+                output_dir=output_raw if output_raw.is_absolute() else workspace / output_raw,
+                base_model=str(args.get("base_model", "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B") or ""),
+                adapter_name=str(args.get("adapter_name", "software-middle-model-lora") or "software-middle-model-lora"),
+                min_train_examples=int(args.get("min_train_examples", 1)),
+                max_seq_length=int(args.get("max_seq_length", 1024)),
+                learning_rate=float(args.get("learning_rate", 2e-4)),
+                epochs=float(args.get("epochs", 1.0)),
+                cpu_threads=int(args.get("cpu_threads", 4)),
+                max_gpu_memory_gb=float(args.get("max_gpu_memory_gb", 12.0)),
+            )
+        )
+        return {"ok": bool(result.handoff_ready), "action": name, **result.to_dict()}
 
     if name == "enterprise_stack_plan":
         plan = build_enterprise_stack_plan(

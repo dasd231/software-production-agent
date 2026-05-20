@@ -82,6 +82,85 @@ Return contract:
 ```
 
 
+
+### `software_middle_model_dataset_export`
+
+Export JSONL traces into the first train/eval dataset that `backup_model_train` can consume.
+
+```json
+{
+  "type": "action",
+  "action": "software_middle_model_dataset_export",
+  "args": {
+    "trace_paths": ["middle_model/traces.jsonl"],
+    "output_dir": "training_runs/software-middle-first",
+    "base_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+    "eval_ratio": 0.15,
+    "min_traces": 1,
+    "max_examples": 2000
+  }
+}
+```
+
+Outputs:
+
+```text
+training_runs/software-middle-first/
+  dataset.jsonl
+  train.jsonl
+  eval.jsonl
+  raw_examples.jsonl
+  data_card.md
+  quality_report.json
+  sample_quality_report.json
+  governance_report.json
+  training_plan.json
+  dataset_snapshot_manifest.json
+  middle_model_dataset_manifest.json
+```
+
+### `software_middle_model_server_handoff`
+
+Prepare the first server training package without launching training.
+
+```json
+{
+  "type": "action",
+  "action": "software_middle_model_server_handoff",
+  "args": {
+    "training_dir": "training_runs/software-middle-first",
+    "output_dir": "model_runs/software-middle-first",
+    "base_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+    "adapter_name": "software-middle-model-lora",
+    "min_train_examples": 1,
+    "max_seq_length": 1024,
+    "cpu_threads": 4,
+    "max_gpu_memory_gb": 12.0
+  }
+}
+```
+
+Outputs:
+
+```text
+model_runs/software-middle-first/
+  backup_training_spec.json
+  training_job_spec.json
+  training_job_manifest.json
+  launch_command.txt
+  training_resource_policy.json
+  server_preflight_action.json
+  SERVER_HANDOFF.md
+  software_middle_model_server_handoff.json
+```
+
+Server launch remains manual by design:
+
+```bash
+python -m agent.training.backup_trainer --config model_runs/software-middle-first/backup_training_spec.json --dry-run
+# only after shared-server preflight passes:
+python -m agent.training.backup_trainer --config model_runs/software-middle-first/backup_training_spec.json
+```
 ## Trace collection
 
 The first practical job for this module is data accumulation.  Every accepted or rejected shortcut can become a future supervised example.
@@ -179,4 +258,5 @@ Later, replace the deterministic scorer inside `accelerator.py` with your traine
 - output schema
 - confidence/margin/reason fields
 - high-risk fallback behavior
+
 

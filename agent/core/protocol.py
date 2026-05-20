@@ -64,6 +64,8 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "model_route_plan",
         "software_middle_model_plan",
         "software_middle_model_decide",
+        "software_middle_model_dataset_export",
+        "software_middle_model_server_handoff",
         "enterprise_stack_plan",
         "distributed_platform_plan",
         "distributed_workload_catalog",
@@ -250,6 +252,40 @@ class ActionDTO(BaseModel):
                     raise ValueError(f"software_middle_model_decide {key} must be finite number")
             if "outcome" in ar and not isinstance(ar.get("outcome"), dict):
                 raise ValueError("software_middle_model_decide outcome must be object")
+        elif a == "software_middle_model_dataset_export":
+            value = ar.get("trace_paths")
+            if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                raise ValueError("software_middle_model_dataset_export requires trace_paths string array")
+            if "output_dir" not in ar or not isinstance(ar.get("output_dir"), str):
+                raise ValueError("software_middle_model_dataset_export requires string output_dir")
+            for key in ("base_model", "dataset_format", "notes"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"software_middle_model_dataset_export {key} must be string")
+            if "eval_ratio" in ar:
+                value = ar.get("eval_ratio")
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                    raise ValueError("software_middle_model_dataset_export eval_ratio must be finite number")
+            for key in ("min_traces", "max_examples"):
+                value = ar.get(key)
+                if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+                    raise ValueError(f"software_middle_model_dataset_export {key} must be non-negative integer")
+        elif a == "software_middle_model_server_handoff":
+            for key in ("training_dir", "output_dir"):
+                if key not in ar or not isinstance(ar.get(key), str):
+                    raise ValueError(f"software_middle_model_server_handoff requires string {key}")
+            for key in ("base_model", "adapter_name"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"software_middle_model_server_handoff {key} must be string")
+            for key in ("min_train_examples", "max_seq_length", "cpu_threads"):
+                value = ar.get(key)
+                if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+                    raise ValueError(f"software_middle_model_server_handoff {key} must be non-negative integer")
+            for key in ("learning_rate", "epochs", "max_gpu_memory_gb"):
+                value = ar.get(key)
+                if value is not None and (
+                    isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value))
+                ):
+                    raise ValueError(f"software_middle_model_server_handoff {key} must be finite number")
         elif a == "model_admission_status":
             if ar:
                 for k in ar:

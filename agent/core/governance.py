@@ -56,6 +56,8 @@ ACTION_GOVERNANCE: dict[str, ActionGovernanceSpec] = {
     "model_route_plan": ActionGovernanceSpec(("model:route",), "low"),
     "software_middle_model_plan": ActionGovernanceSpec(("model:read",), "low"),
     "software_middle_model_decide": ActionGovernanceSpec(("model:route", "workspace:write"), "low"),
+    "software_middle_model_dataset_export": ActionGovernanceSpec(("dataset:write",), "medium"),
+    "software_middle_model_server_handoff": ActionGovernanceSpec(("dataset:read", "model:write"), "high", requires_confirmation=True),
     "enterprise_stack_plan": ActionGovernanceSpec(("workspace:read",), "low"),
     "industrial_maturity_plan": ActionGovernanceSpec(("workspace:read",), "low"),
     "enterprise_readiness_check": ActionGovernanceSpec(("workspace:read",), "low"),
