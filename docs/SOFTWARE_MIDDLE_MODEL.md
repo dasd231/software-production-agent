@@ -27,6 +27,27 @@ agent/software_middle_model/
   program.py       # roadmap and integration contract
 ```
 
+
+## CLI quick path
+
+Once traces exist, the first server-ready package can be prepared without writing action JSON.
+
+```bash
+python -m agent.software_middle_model.cli export-dataset \
+  --trace-path middle_model/traces.jsonl \
+  --output-dir training_runs/software-middle-first \
+  --min-traces 1 \
+  --eval-ratio 0.15
+
+python -m agent.software_middle_model.cli server-handoff \
+  --training-dir training_runs/software-middle-first \
+  --output-dir model_runs/software-middle-first \
+  --adapter-name software-middle-model-lora \
+  --min-train-examples 1 \
+  --max-seq-length 1024
+```
+
+Then move/sync the repo plus `training_runs/software-middle-first` and `model_runs/software-middle-first` to the GPU server.  On the server, read `model_runs/software-middle-first/SERVER_HANDOFF.md`, run the preflight, run dry-run, and only then launch.
 ## Actions
 
 ### `software_middle_model_plan`
@@ -258,5 +279,6 @@ Later, replace the deterministic scorer inside `accelerator.py` with your traine
 - output schema
 - confidence/margin/reason fields
 - high-risk fallback behavior
+
 
 

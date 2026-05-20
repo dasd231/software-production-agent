@@ -252,3 +252,43 @@ def test_software_middle_model_protocol_and_guarded_permissions(tmp_path: Path) 
     assert blocked_handoff["error_code"] == "CONFIRMATION_REQUIRED"
     assert blocked["ok"] is False
     assert blocked["error_code"] == "PERMISSION_DENIED"
+
+
+def test_software_middle_model_cli_exports_dataset_and_handoff(tmp_path: Path) -> None:
+    from agent.software_middle_model.cli import main
+
+    trace_path = tmp_path / "middle" / "traces.jsonl"
+    for suffix in ("one", "two"):
+        _append_demo_trace(trace_path, suffix=suffix)
+
+    dataset_code = main(
+        [
+            "export-dataset",
+            "--trace-path",
+            str(trace_path),
+            "--output-dir",
+            str(tmp_path / "training"),
+            "--min-traces",
+            "2",
+            "--eval-ratio",
+            "0.5",
+        ]
+    )
+    handoff_code = main(
+        [
+            "server-handoff",
+            "--training-dir",
+            str(tmp_path / "training"),
+            "--output-dir",
+            str(tmp_path / "model"),
+            "--min-train-examples",
+            "1",
+            "--max-seq-length",
+            "512",
+        ]
+    )
+
+    assert dataset_code == 0
+    assert handoff_code == 0
+    assert (tmp_path / "training" / "middle_model_dataset_manifest.json").exists()
+    assert (tmp_path / "model" / "SERVER_HANDOFF.md").exists()
