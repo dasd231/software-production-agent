@@ -6,6 +6,7 @@ to shortcut or prioritize expensive software-engineering rules.
 """
 
 from .accelerator import MiddleModelInput, decide_with_middle_model
+from .bootstrap import MiddleModelBootstrapInput, bootstrap_middle_model_first_round, ensure_seed_traces
 from .dataset import MiddleModelDatasetExportInput, export_middle_model_trace_dataset
 from .program import build_software_middle_model_plan
 from .server_handoff import MiddleModelServerHandoffInput, prepare_middle_model_server_handoff
@@ -13,12 +14,15 @@ from .traces import append_middle_model_trace, build_middle_model_trace, load_mi
 
 __all__ = [
     "MiddleModelInput",
+    "MiddleModelBootstrapInput",
     "MiddleModelDatasetExportInput",
     "MiddleModelServerHandoffInput",
     "append_middle_model_trace",
     "build_middle_model_trace",
     "build_software_middle_model_plan",
+    "bootstrap_middle_model_first_round",
     "decide_with_middle_model",
+    "ensure_seed_traces",
     "export_middle_model_trace_dataset",
     "load_middle_model_traces",
     "prepare_middle_model_server_handoff",

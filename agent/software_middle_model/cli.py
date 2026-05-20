@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .bootstrap import MiddleModelBootstrapInput, bootstrap_middle_model_first_round
 from .dataset import MiddleModelDatasetExportInput, export_middle_model_trace_dataset
 from .server_handoff import MiddleModelServerHandoffInput, prepare_middle_model_server_handoff
 
@@ -40,6 +41,18 @@ def main(argv: list[str] | None = None) -> int:
     handoff.add_argument("--cpu-threads", type=int, default=4)
     handoff.add_argument("--max-gpu-memory-gb", type=float, default=12.0)
 
+    bootstrap = sub.add_parser("bootstrap-first-round", help="Create seed traces, dataset, and server handoff in one safe step")
+    bootstrap.add_argument("--output-root", required=True)
+    bootstrap.add_argument("--trace-path", default="", help="Optional existing trace JSONL path")
+    bootstrap.add_argument("--min-traces", type=int, default=8)
+    bootstrap.add_argument("--base-model", default="deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B")
+    bootstrap.add_argument("--adapter-name", default="software-middle-model-lora")
+    bootstrap.add_argument("--eval-ratio", type=float, default=0.25)
+    bootstrap.add_argument("--max-seq-length", type=int, default=1024)
+    bootstrap.add_argument("--cpu-threads", type=int, default=4)
+    bootstrap.add_argument("--max-gpu-memory-gb", type=float, default=12.0)
+    bootstrap.add_argument("--no-seed-traces", action="store_true", help="Require existing traces instead of generating bootstrap seeds")
+
     args = parser.parse_args(argv)
     if args.command == "export-dataset":
         result = export_middle_model_trace_dataset(
@@ -73,6 +86,25 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         payload = {"ok": bool(result.handoff_ready), **result.to_dict()}
+        _print(payload)
+        return 0 if payload["ok"] else 2
+    if args.command == "bootstrap-first-round":
+        trace_path = Path(args.trace_path) if str(args.trace_path or "").strip() else None
+        result = bootstrap_middle_model_first_round(
+            MiddleModelBootstrapInput(
+                output_root=Path(args.output_root),
+                trace_path=trace_path,
+                min_traces=int(args.min_traces),
+                base_model=str(args.base_model),
+                adapter_name=str(args.adapter_name),
+                eval_ratio=float(args.eval_ratio),
+                max_seq_length=int(args.max_seq_length),
+                cpu_threads=int(args.cpu_threads),
+                max_gpu_memory_gb=float(args.max_gpu_memory_gb),
+                generate_seed_traces=not bool(args.no_seed_traces),
+            )
+        )
+        payload = {"ok": bool(result.ready_for_server), **result.to_dict()}
         _print(payload)
         return 0 if payload["ok"] else 2
     return 2

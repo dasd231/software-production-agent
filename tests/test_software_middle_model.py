@@ -292,3 +292,35 @@ def test_software_middle_model_cli_exports_dataset_and_handoff(tmp_path: Path) -
     assert handoff_code == 0
     assert (tmp_path / "training" / "middle_model_dataset_manifest.json").exists()
     assert (tmp_path / "model" / "SERVER_HANDOFF.md").exists()
+
+
+def test_middle_model_bootstrap_first_round_cli(tmp_path: Path) -> None:
+    from agent.software_middle_model.bootstrap import bootstrap_middle_model_first_round, MiddleModelBootstrapInput
+    from agent.software_middle_model.cli import main
+
+    direct = bootstrap_middle_model_first_round(
+        MiddleModelBootstrapInput(
+            output_root=tmp_path / "direct_bootstrap",
+            min_traces=4,
+            max_seq_length=512,
+        )
+    )
+    cli_code = main(
+        [
+            "bootstrap-first-round",
+            "--output-root",
+            str(tmp_path / "cli_bootstrap"),
+            "--min-traces",
+            "4",
+            "--max-seq-length",
+            "512",
+        ]
+    )
+
+    assert direct.ready_for_server is True
+    assert direct.validation["seed_report"]["generated"] == 4
+    assert Path(direct.dataset["files"]["train"]).exists()
+    assert Path(direct.handoff["files"]["server_handoff"]).exists()
+    assert cli_code == 0
+    assert (tmp_path / "cli_bootstrap" / "middle_model" / "traces.jsonl").exists()
+    assert (tmp_path / "cli_bootstrap" / "model_runs" / "software-middle-first" / "SERVER_HANDOFF.md").exists()

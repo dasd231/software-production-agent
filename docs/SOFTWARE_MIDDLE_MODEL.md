@@ -28,6 +28,41 @@ agent/software_middle_model/
 ```
 
 
+
+## Server one-command bootstrap
+
+If the server does not yet have enough real middle-model traces, use this once to create a smoke-training package.  It generates synthetic bootstrap traces only for validating the training path; do not use the result as a final model-quality claim.
+
+```bash
+python -m agent.software_middle_model.cli bootstrap-first-round \
+  --output-root /data/ThreadModel/software_middle_first \
+  --min-traces 8 \
+  --adapter-name software-middle-model-lora \
+  --max-seq-length 1024 \
+  --cpu-threads 4 \
+  --max-gpu-memory-gb 12
+```
+
+Then read:
+
+```bash
+cat /data/ThreadModel/software_middle_first/model_runs/software-middle-first/SERVER_HANDOFF.md
+```
+
+Dry-run on the server:
+
+```bash
+python -m agent.training.backup_trainer \
+  --config /data/ThreadModel/software_middle_first/model_runs/software-middle-first/backup_training_spec.json \
+  --dry-run
+```
+
+Only launch after `nvidia-smi` is idle and the shared-server preflight is admitted:
+
+```bash
+python -m agent.training.backup_trainer \
+  --config /data/ThreadModel/software_middle_first/model_runs/software-middle-first/backup_training_spec.json
+```
 ## CLI quick path
 
 Once traces exist, the first server-ready package can be prepared without writing action JSON.
@@ -279,6 +314,7 @@ Later, replace the deterministic scorer inside `accelerator.py` with your traine
 - output schema
 - confidence/margin/reason fields
 - high-risk fallback behavior
+
 
 
 
