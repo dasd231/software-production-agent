@@ -18,6 +18,8 @@ def test_platform_api_health_and_resources(tmp_path: Path) -> None:
 
     health = client.get("/healthz")
     ready = client.get("/readyz")
+    startup = client.get("/startupz")
+    metrics = client.get("/metrics")
     resources = client.get("/api/resources?type=model_runtime")
     integrations = client.get("/api/integrations")
     figma_plan = client.post(
@@ -32,9 +34,15 @@ def test_platform_api_health_and_resources(tmp_path: Path) -> None:
 
     assert health.status_code == 200
     assert health.json()["service"] == "software-production-agent-platform"
+    assert health.json()["schema"] == "app_health_snapshot.v1"
     assert ready.status_code == 200
+    assert ready.json()["health"]["ready"] is True
     assert ready.json()["model_runtime"]["schema"] == "model_runtime_status.v1"
     assert ready.json()["model_admission"]["schema"] == "model_admission_status.v1"
+    assert startup.status_code == 200
+    assert startup.json()["startup_complete"] is True
+    assert metrics.status_code == 200
+    assert "agent_platform_up 1" in metrics.text
     assert resources.status_code == 200
     assert resources.json()["schema"] == "resource_registry.v1"
     assert integrations.status_code == 200

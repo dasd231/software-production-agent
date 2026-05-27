@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,7 @@ from agent.evidence.ledger import build_evidence_ledger
 from agent.intent.compiler import compile_intent
 from agent.integrations.embedding import build_integration_embed_plan, list_integration_catalog
 from agent.llm.runtime import model_runtime_status
+from agent.operations import evaluate_health_checks
 from agent.resources.registry import discover_resources
 from agent.scheduler.admission import PoolAdmissionController
 from agent.scheduler.routing import build_model_route_plan, list_model_pools
@@ -96,6 +98,65 @@ def _paths(raw: list[str]) -> tuple[Path, ...]:
     return tuple(Path(x) for x in raw if str(x).strip())
 
 
+def _timed_check(name: str, *, critical: bool, timeout_ms: float, fn: Any) -> dict[str, Any]:
+    started = time.perf_counter()
+    detail = ""
+    try:
+        ok = bool(fn())
+    except Exception as exc:  # pragma: no cover - defensive health reporting.
+        ok = False
+        detail = f"{type(exc).__name__}: {exc}"[:300]
+    return {
+        "name": name,
+        "ok": ok,
+        "critical": critical,
+        "latency_ms": round((time.perf_counter() - started) * 1000.0, 2),
+        "timeout_ms": timeout_ms,
+        "detail": detail,
+    }
+
+
+def _platform_health_snapshot(app: FastAPI, *, include_dependencies: bool) -> dict[str, Any]:
+    root = _root(app)
+    checks: list[dict[str, Any]] = [
+        _timed_check("process", critical=True, timeout_ms=50, fn=lambda: True),
+    ]
+    if include_dependencies:
+        runtime = model_runtime_status("main_deepseek", probe=False)
+        admission = app.state.model_admission.snapshot()
+        checks.extend(
+            [
+                _timed_check("workspace_fs", critical=True, timeout_ms=100, fn=lambda: root.exists() and root.is_dir()),
+                _timed_check("event_log_writer", critical=True, timeout_ms=100, fn=lambda: root.exists() and os.access(root, os.W_OK)),
+                _timed_check("model_router", critical=False, timeout_ms=500, fn=lambda: runtime.get("schema") == "model_runtime_status.v1"),
+                _timed_check("model_admission", critical=True, timeout_ms=100, fn=lambda: admission.get("schema") == "model_admission_status.v1"),
+                _timed_check("resource_registry", critical=False, timeout_ms=300, fn=lambda: True),
+            ]
+        )
+    snapshot = evaluate_health_checks(checks)
+    snapshot["service"] = "software-production-agent-platform"
+    snapshot["runs_root"] = str(root)
+    return snapshot
+
+
+def _prometheus_metrics(app: FastAPI) -> str:
+    admission = app.state.model_admission.snapshot()
+    lines = [
+        "# HELP agent_platform_up Platform process liveness.",
+        "# TYPE agent_platform_up gauge",
+        "agent_platform_up 1",
+        "# HELP agent_model_admission_leases Active model-pool leases.",
+        "# TYPE agent_model_admission_leases gauge",
+        f"agent_model_admission_leases {int(admission.get('leases_total', 0))}",
+        "# HELP agent_model_pool_active_leases Active leases by model pool.",
+        "# TYPE agent_model_pool_active_leases gauge",
+    ]
+    for pool in admission.get("pools", []):
+        name = str(pool.get("pool", "unknown")).replace('"', "")
+        lines.append(f'agent_model_pool_active_leases{{pool="{name}"}} {int(pool.get("active_leases", 0))}')
+    return "\n".join(lines) + "\n"
+
+
 def _auth_dependency(authorization: str | None = Header(default=None)) -> None:
     expected = os.environ.get("AGENT_PLATFORM_API_TOKEN", "").strip()
     if not expected:
@@ -116,17 +177,33 @@ def create_app(runs_root: Path | None = None) -> FastAPI:
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
-        return {"ok": True, "service": "software-production-agent-platform", "runs_root": app.state.runs_root}
+        snapshot = _platform_health_snapshot(app, include_dependencies=False)
+        return {"ok": snapshot["live"], **snapshot}
 
     @app.get("/readyz")
-    def readyz() -> dict[str, Any]:
+    def readyz(response: Response) -> dict[str, Any]:
         root = _root(app)
+        snapshot = _platform_health_snapshot(app, include_dependencies=True)
+        if not bool(snapshot.get("ready")):
+            response.status_code = 503
         return {
-            "ok": root.exists(),
+            "ok": snapshot["ready"],
+            "health": snapshot,
             "runs_root": str(root),
             "model_runtime": model_runtime_status("main_deepseek", probe=False),
             "model_admission": app.state.model_admission.snapshot(),
         }
+
+    @app.get("/startupz")
+    def startupz(response: Response) -> dict[str, Any]:
+        snapshot = _platform_health_snapshot(app, include_dependencies=True)
+        if not bool(snapshot.get("startup_complete")):
+            response.status_code = 503
+        return {"ok": snapshot["startup_complete"], **snapshot}
+
+    @app.get("/metrics")
+    def metrics() -> Response:
+        return Response(content=_prometheus_metrics(app), media_type="text/plain; version=0.0.4")
 
     @app.get("/api/resources")
     def api_resources(

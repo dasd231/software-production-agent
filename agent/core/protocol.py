@@ -103,6 +103,20 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "industrial_maturity_plan",
         "enterprise_readiness_check",
         "workflow_validate",
+        "k8s_sandbox_plan",
+        "context_pv_plan",
+        "resilience_plan",
+        "business_rule_compile",
+        "automation_scorecard_plan",
+        "graph_runtime_plan",
+        "graph_events_ingest",
+        "operations_readiness_plan",
+        "cloud_native_deep_dive_plan",
+        "enterprise_workflow_compile",
+        "enterprise_workflow_query",
+        "command_api_plan",
+        "local_training_run",
+        "skill_runtime_plan",
         "innovation_radar",
         "intent_compile",
         "workflow_dry_run",
@@ -286,6 +300,19 @@ class ActionDTO(BaseModel):
                     isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value))
                 ):
                     raise ValueError(f"software_middle_model_server_handoff {key} must be finite number")
+        elif a == "skill_runtime_plan":
+            if "goal" not in ar or not isinstance(ar.get("goal"), str):
+                raise ValueError("skill_runtime_plan requires string goal")
+            for key in ("output_schema_name", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"skill_runtime_plan {key} must be string")
+            for key in ("required_skill_ids", "explicit_scope", "known_evidence_ids"):
+                if key in ar:
+                    value = ar.get(key)
+                    if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                        raise ValueError(f"skill_runtime_plan {key} must be string array")
+            if "sample_output" in ar and not isinstance(ar.get("sample_output"), (dict, str)):
+                raise ValueError("skill_runtime_plan sample_output must be object or string")
         elif a == "model_admission_status":
             if ar:
                 for k in ar:
@@ -682,6 +709,148 @@ class ActionDTO(BaseModel):
         elif a == "workflow_validate":
             if "spec" not in ar or not isinstance(ar.get("spec"), dict):
                 raise ValueError("workflow_validate requires object spec")
+        elif a == "k8s_sandbox_plan":
+            if "command" not in ar or not isinstance(ar.get("command"), str):
+                raise ValueError("k8s_sandbox_plan requires string command")
+            for key in ("namespace", "image", "network", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"k8s_sandbox_plan {key} must be string")
+            for key in ("active_deadline_seconds", "ttl_seconds_after_finished"):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                        raise ValueError(f"k8s_sandbox_plan {key} must be positive integer")
+            for key in ("cpu_request", "cpu_limit", "memory_request", "memory_limit"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"k8s_sandbox_plan {key} must be string")
+        elif a == "context_pv_plan":
+            if "text" not in ar or not isinstance(ar.get("text"), str):
+                raise ValueError("context_pv_plan requires string text")
+            for key in ("query", "output_path", "namespace", "tenant", "version"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"context_pv_plan {key} must be string")
+            for key in (
+                "single_pv_token_threshold",
+                "target_slice_tokens",
+                "max_slice_tokens",
+                "overlap_tokens",
+                "hot_tier_token_budget",
+                "warm_tier_token_budget",
+                "route_top_k",
+                "replica_factor_critical",
+            ):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                        raise ValueError(f"context_pv_plan {key} must be non-negative integer")
+            for key in ("render_k8s", "include_text"):
+                if key in ar and not isinstance(ar.get(key), bool):
+                    raise ValueError(f"context_pv_plan {key} must be boolean")
+        elif a == "resilience_plan":
+            for key in ("surface", "payment_provider", "threat_level", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"resilience_plan {key} must be string")
+            if "payment_enabled" in ar and not isinstance(ar.get("payment_enabled"), bool):
+                raise ValueError("resilience_plan payment_enabled must be boolean")
+        elif a == "business_rule_compile":
+            if "rules" not in ar or not isinstance(ar.get("rules"), str):
+                raise ValueError("business_rule_compile requires string rules")
+            for key in ("domain_hint", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"business_rule_compile {key} must be string")
+        elif a == "automation_scorecard_plan":
+            if "output_path" in ar and not isinstance(ar.get("output_path"), str):
+                raise ValueError("automation_scorecard_plan output_path must be string")
+            for key in ("demand_count", "observation_days"):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                        raise ValueError(f"automation_scorecard_plan {key} must be positive integer")
+            for key in ("include_agent_failures", "third_party_review"):
+                if key in ar and not isinstance(ar.get(key), bool):
+                    raise ValueError(f"automation_scorecard_plan {key} must be boolean")
+            if "evidence" in ar and not isinstance(ar.get("evidence"), dict):
+                raise ValueError("automation_scorecard_plan evidence must be object")
+        elif a == "graph_runtime_plan":
+            for key in ("goal", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"graph_runtime_plan {key} must be string")
+            if "include_cypher" in ar and not isinstance(ar.get("include_cypher"), bool):
+                raise ValueError("graph_runtime_plan include_cypher must be boolean")
+        elif a == "graph_events_ingest":
+            if "events_path" not in ar or not isinstance(ar.get("events_path"), str):
+                raise ValueError("graph_events_ingest requires string events_path")
+            for key in ("query", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"graph_events_ingest {key} must be string")
+            if "include_cypher" in ar and not isinstance(ar.get("include_cypher"), bool):
+                raise ValueError("graph_events_ingest include_cypher must be boolean")
+            for key in ("top_k", "neighbor_budget"):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                        raise ValueError(f"graph_events_ingest {key} must be positive integer")
+        elif a == "operations_readiness_plan":
+            for key in ("service_name", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"operations_readiness_plan {key} must be string")
+            if "replicas" in ar:
+                value = ar.get("replicas")
+                if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                    raise ValueError("operations_readiness_plan replicas must be positive integer")
+            if "slo_target" in ar:
+                value = ar.get("slo_target")
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                    raise ValueError("operations_readiness_plan slo_target must be finite number")
+            for key in ("checks", "agents", "tasks"):
+                if key in ar and not isinstance(ar.get(key), list):
+                    raise ValueError(f"operations_readiness_plan {key} must be array")
+        elif a == "cloud_native_deep_dive_plan":
+            for key in ("focus", "kubernetes_version", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"cloud_native_deep_dive_plan {key} must be string")
+            if "include_sources" in ar and not isinstance(ar.get("include_sources"), bool):
+                raise ValueError("cloud_native_deep_dive_plan include_sources must be boolean")
+        elif a == "enterprise_workflow_compile":
+            if "spec" in ar and not isinstance(ar.get("spec"), dict):
+                raise ValueError("enterprise_workflow_compile spec must be object")
+            for key in ("goal", "domain", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"enterprise_workflow_compile {key} must be string")
+            if "include_delivery_plan" in ar and not isinstance(ar.get("include_delivery_plan"), bool):
+                raise ValueError("enterprise_workflow_compile include_delivery_plan must be boolean")
+        elif a == "enterprise_workflow_query":
+            if "query" not in ar or not isinstance(ar.get("query"), str):
+                raise ValueError("enterprise_workflow_query requires string query")
+            if "spec" in ar and not isinstance(ar.get("spec"), dict):
+                raise ValueError("enterprise_workflow_query spec must be object")
+            for key in ("goal", "domain", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"enterprise_workflow_query {key} must be string")
+            for key in ("top_k", "neighbor_budget"):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                        raise ValueError(f"enterprise_workflow_query {key} must be positive integer")
+        elif a == "command_api_plan":
+            for key in ("goal", "focus", "output_path"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"command_api_plan {key} must be string")
+            if "include_cypher" in ar and not isinstance(ar.get("include_cypher"), bool):
+                raise ValueError("command_api_plan include_cypher must be boolean")
+        elif a == "local_training_run":
+            for key in ("target", "output_dir"):
+                if key in ar and not isinstance(ar.get(key), str):
+                    raise ValueError(f"local_training_run {key} must be string")
+            for key in ("middle_trace_paths", "github_ranking_paths"):
+                if key in ar:
+                    value = ar.get(key)
+                    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+                        raise ValueError(f"local_training_run {key} must be string array")
+            if "epochs" in ar:
+                value = ar.get("epochs")
+                if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                    raise ValueError("local_training_run epochs must be positive integer")
         elif a == "innovation_radar":
             if "roots" in ar:
                 value = ar.get("roots")

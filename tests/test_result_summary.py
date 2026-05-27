@@ -15,6 +15,31 @@ def test_result_summary_for_failed_command() -> None:
     assert "stderr_head" in s
 
 
+def test_result_summary_includes_supervisor_fields() -> None:
+    s = _result_summary(
+        {
+            "action": "run_command",
+            "ok": False,
+            "preflight": {
+                "status": "allowed",
+                "risk_level": "high",
+                "supervisor": {
+                    "status": "allowed",
+                    "risk_level": "high",
+                    "sandbox_recommended": True,
+                    "sandbox_required": False,
+                },
+            },
+        }
+    )
+
+    assert s["preflight_status"] == "allowed"
+    assert s["supervisor_status"] == "allowed"
+    assert s["supervisor_risk_level"] == "high"
+    assert s["sandbox_recommended"] is True
+    assert s["sandbox_required"] is False
+
+
 def test_result_summary_for_finish() -> None:
     s = _result_summary({"action": "finish", "ok": True, "reason": "done"})
     assert s == {"action": "finish", "ok": True, "reason": "done"}

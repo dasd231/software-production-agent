@@ -61,6 +61,9 @@ from agent.chains.model_training import BackupModelTrainInput, prepare_backup_mo
 from agent.chains.registry import get_chain, list_chains
 from agent.chains.research import ResearchChainInput, run_research_chain
 from agent.chains.training import TrainingPrepareInput, prepare_fine_tuning_dataset
+from agent.cloud_native import build_cloud_native_deep_dive_plan
+from agent.command_api import build_command_api_plan
+from agent.context_pv import ContextPVPolicy, manifest_to_jsonl as context_pv_manifest_to_jsonl, plan_context_pv, render_context_pv_bundle
 from agent.corpus_intelligence.feedback import build_corpus_feedback_report
 from agent.corpus_intelligence.flywheel import CorpusFlywheelInput, run_corpus_flywheel_cycle
 from agent.corpus_intelligence.program import build_github_corpus_program
@@ -92,12 +95,22 @@ from agent.distributed.dispatch import build_distributed_job_plan
 from agent.distributed.workloads import list_distributed_workloads
 from agent.enterprise.maturity import build_industrial_maturity_plan
 from agent.enterprise.readiness import build_enterprise_readiness_report
+from agent.evaluation.automation_scorecard import build_automation_scorecard, evaluate_scorecard_evidence
+from agent.graph_runtime import (
+    build_graph_runtime_plan,
+    graph_rag_query,
+    load_agent_events_graph,
+    render_cypher_import_bundle,
+    review_policy_versions,
+)
 from agent.innovation.radar import build_innovation_radar
 from agent.intent.compiler import compile_intent
 from agent.integrations.embedding import build_integration_embed_plan, list_integration_catalog
+from agent.local_training import run_local_training
 from agent.llm.runtime import model_runtime_status
 from agent.learning.web_search import search_web
 from agent.mcp.adapter import default_mcp_capabilities, invoke_mcp_tool
+from agent.operations import build_operations_readiness_plan
 from agent.policies.loader import CommandPolicyError, assert_command_policy
 from agent.project_model.program import build_project_model_program
 from agent.project_model.holdout_benchmark import (
@@ -127,15 +140,21 @@ from agent.training.studio import (
 from agent.training.rounds import build_first_training_round_plan
 from agent.training.resource_guard import build_training_resource_policy, run_server_resource_preflight
 from agent.resources.registry import discover_resources
+from agent.resilience import build_resilience_plan
+from agent.rule_compiler import compile_business_rules
 from agent.runtime.production_check import run_production_checks
 from agent.scheduler.admission import get_global_admission_controller
 from agent.scheduler.routing import build_model_route_plan
+from agent.skill_runtime import build_skill_runtime_plan
+from agent.sandbox.k8s_job import K8sSandboxResources, K8sSandboxSpec, manifest_to_jsonl, render_sandbox_bundle
 from agent.solution_library.publish import publish_solution_from_run
+from agent.supervisor.policy import review_action
 from agent.evaluation.feedback import build_research_feedback_report
 from agent.tools import file_tools
 from agent.tools import git_tools
 from agent.tools.workspace_index import build_workspace_index
 from agent.tools.shell_tools import run_shell
+from agent.workflow import compile_enterprise_workflow, query_enterprise_workflow_contract
 from agent.workflows.dry_run import dry_run_workflow
 from agent.workflows.spec import validate_workflow_spec
 
@@ -294,6 +313,14 @@ def _classify_failed_result(result: dict[str, Any]) -> tuple[str, bool, str]:
     return "TOOL_FAILURE", action in {"run_command", "web_search", "mcp_call"}, "inspect_result_or_use_fallback"
 
 
+def _supervisor_error_code(status: str) -> str:
+    if status == "human_required":
+        return "SUPERVISOR_HUMAN_REQUIRED"
+    if status == "sandbox_required":
+        return "SUPERVISOR_SANDBOX_REQUIRED"
+    return "SUPERVISOR_DENIED"
+
+
 def run_action_guarded(
     workspace: Path,
     action_obj: dict[str, Any],
@@ -314,6 +341,14 @@ def run_action_guarded(
             granted_permissions=lim.granted_permissions,
             confirmed_actions=lim.confirmed_actions,
         )
+        supervision = review_action(
+            action_name,
+            args,
+            workspace=workspace,
+            granted_permissions=lim.granted_permissions,
+            confirmed_actions=lim.confirmed_actions,
+        )
+        preflight["supervisor"] = supervision.to_dict()
         if not preflight["allowed"]:
             code = str(preflight.get("error_code") or "PERMISSION_DENIED")
             recommended = (
@@ -327,6 +362,17 @@ def run_action_guarded(
                 error=str(preflight.get("status", "preflight_denied")),
                 retryable=False,
                 recommended_action=recommended,
+                preflight=preflight,
+                duration_ms=_duration_ms(started),
+            )
+        if not supervision.allowed:
+            code = _supervisor_error_code(supervision.status)
+            return _error_envelope(
+                action=action_name,
+                error_code=code,
+                error=supervision.reason,
+                retryable=False,
+                recommended_action=supervision.recommended_action,
                 preflight=preflight,
                 duration_ms=_duration_ms(started),
             )
@@ -1034,6 +1080,598 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
     if name == "workflow_dry_run":
         dry_run = dry_run_workflow(args.get("spec") or {}, workspace)
         return {"ok": bool(dry_run.get("ok")), "action": name, "dry_run": dry_run}
+
+    if name == "k8s_sandbox_plan":
+        command = str(_require(args, "command"))
+        resources = K8sSandboxResources(
+            cpu_request=str(args.get("cpu_request", "100m") or "100m"),
+            cpu_limit=str(args.get("cpu_limit", "500m") or "500m"),
+            memory_request=str(args.get("memory_request", "128Mi") or "128Mi"),
+            memory_limit=str(args.get("memory_limit", "512Mi") or "512Mi"),
+        )
+        sandbox_spec = K8sSandboxSpec(
+            namespace=str(args.get("namespace", "agent-sandbox") or "agent-sandbox"),
+            image=str(args.get("image", "python:3.12-slim") or "python:3.12-slim"),
+            network=str(args.get("network", "none") or "none"),
+            active_deadline_seconds=int(args.get("active_deadline_seconds", 300) or 300),
+            ttl_seconds_after_finished=int(args.get("ttl_seconds_after_finished", 600) or 600),
+            resources=resources,
+        )
+        action_for_job = {"type": "action", "action": "run_command", "args": {"command": command}}
+        manifest_docs = render_sandbox_bundle(action_for_job, spec=sandbox_spec)
+        manifest_text = manifest_to_jsonl(manifest_docs)
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("k8s_sandbox_plan output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(manifest_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(manifest_text.encode("utf-8"))}
+        result: dict[str, Any] = {
+            "ok": True,
+            "action": name,
+            "sandbox": sandbox_spec.to_dict(),
+            "manifest": manifest_docs,
+            "manifest_text": manifest_text,
+            "doc_count": len(manifest_docs),
+        }
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "context_pv_plan":
+        text = str(_require(args, "text"))
+        policy = ContextPVPolicy(
+            tenant=str(args.get("tenant", "default") or "default"),
+            namespace=str(args.get("namespace", "context-pv") or "context-pv"),
+            single_pv_token_threshold=int(args.get("single_pv_token_threshold", 4096) or 4096),
+            target_slice_tokens=int(args.get("target_slice_tokens", 2048) or 2048),
+            max_slice_tokens=int(args.get("max_slice_tokens", 3072) or 3072),
+            overlap_tokens=int(args.get("overlap_tokens", 256) or 256),
+            hot_tier_token_budget=int(args.get("hot_tier_token_budget", 8192) or 8192),
+            warm_tier_token_budget=int(args.get("warm_tier_token_budget", 32768) or 32768),
+            route_top_k=int(args.get("route_top_k", 6) or 6),
+            replica_factor_critical=int(args.get("replica_factor_critical", 2) or 2),
+        ).normalized()
+        plan = plan_context_pv(
+            text,
+            query=str(args.get("query", "") or ""),
+            policy=policy,
+            version=str(args.get("version", "v1") or "v1"),
+        )
+        include_text = bool(args.get("include_text", False))
+        plan_dict = plan.to_dict(include_text=include_text)
+        k8s_docs: list[dict[str, Any]] = []
+        if bool(args.get("render_k8s", True)):
+            k8s_docs = render_context_pv_bundle(plan)
+            plan_dict["k8s"] = {
+                "doc_count": len(k8s_docs),
+                "kinds": [str(doc.get("kind", "")) for doc in k8s_docs],
+                "manifest_text": context_pv_manifest_to_jsonl(k8s_docs),
+            }
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("context_pv_plan output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(plan_dict, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        result: dict[str, Any] = {
+            "ok": True,
+            "action": name,
+            "plan": plan_dict,
+            "summary": {
+                "manifest_id": plan.manifest.manifest_id,
+                "total_tokens": plan.manifest.total_tokens,
+                "slice_count": len(plan.manifest.slices),
+                "placement_count": len(plan.manifest.placements),
+                "merkle_root": plan.manifest.merkle_root,
+                "routed_slice_ids": list(plan.load_plan.get("required_slice_ids", [])),
+                "k8s_doc_count": len(k8s_docs),
+            },
+        }
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "resilience_plan":
+        plan = build_resilience_plan(
+            surface=str(args.get("surface", "software-production-agent") or "software-production-agent"),
+            payment_enabled=bool(args.get("payment_enabled", True)),
+            payment_provider=str(args.get("payment_provider", "generic") or "generic"),
+            threat_level=str(args.get("threat_level", "internet") or "internet"),
+        )
+        plan_dict = plan.to_dict()
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("resilience_plan output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(plan_dict, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        result: dict[str, Any] = {
+            "ok": True,
+            "action": name,
+            "plan": plan_dict,
+            "summary": {
+                "surface": plan.surface,
+                "threat_level": plan.threat_level,
+                "payment_enabled": bool(plan.payment.get("enabled")),
+                "chaos_drill_count": len(plan.chaos_drills),
+                "attack_layer_count": len(plan.attack_resistance.get("layers", [])),
+                "rate_limit_count": len(plan.anti_crawl.get("rate_limits", [])),
+            },
+        }
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "business_rule_compile":
+        compilation = compile_business_rules(
+            str(_require(args, "rules")),
+            domain_hint=str(args.get("domain_hint", "") or ""),
+        )
+        compiled = compilation.to_dict()
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("business_rule_compile output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(compiled, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        result: dict[str, Any] = {
+            "ok": compilation.ok,
+            "action": name,
+            "compilation": compiled,
+            "summary": {
+                "domain": compilation.domain,
+                "entity_count": len(compilation.entities),
+                "state_count": len(compilation.states),
+                "transition_count": len(compilation.transitions),
+                "api_count": len(compilation.api_contracts),
+                "finding_count": len(compilation.findings),
+            },
+        }
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "automation_scorecard_plan":
+        scorecard = build_automation_scorecard(
+            demand_count=int(args.get("demand_count", 10) or 10),
+            observation_days=int(args.get("observation_days", 30) or 30),
+            include_agent_failures=bool(args.get("include_agent_failures", True)),
+            third_party_review=bool(args.get("third_party_review", True)),
+        )
+        evidence = args.get("evidence") if isinstance(args.get("evidence"), dict) else {}
+        review = evaluate_scorecard_evidence(evidence) if evidence else {"schema": "automation_scorecard_evidence_review.v1", "ok": True, "findings": []}
+        payload = {"scorecard": scorecard, "evidence_review": review}
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("automation_scorecard_plan output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(payload, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        result: dict[str, Any] = {
+            "ok": bool(review.get("ok", True)),
+            "action": name,
+            **payload,
+            "summary": {
+                "metric_count": len(scorecard.get("metrics", [])),
+                "anti_cheat_count": len(scorecard.get("anti_cheat_rules", [])),
+                "evidence_findings": len(review.get("findings", [])),
+                "experiment_demands": scorecard.get("experiment", {}).get("minimum_real_demands"),
+                "observation_days": scorecard.get("experiment", {}).get("observation_days"),
+            },
+        }
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "graph_runtime_plan":
+        plan = build_graph_runtime_plan(
+            str(args.get("goal", "软件生产 Agent 图运行时二改") or "软件生产 Agent 图运行时二改"),
+            include_cypher=bool(args.get("include_cypher", True)),
+        )
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("graph_runtime_plan output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(plan, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        summary = {
+            "modification_count": len(plan.get("langgraph_second_modifications", [])),
+            "runtime_node_count": len(plan.get("runtime_graph", {}).get("nodes", [])),
+            "runtime_edge_count": len(plan.get("runtime_graph", {}).get("edges", [])),
+            "graph_label_count": len(plan.get("graph_db_schema", {}).get("node_labels", [])),
+            "graph_query_count": len(plan.get("graph_query_catalog", [])),
+        }
+        result: dict[str, Any] = {"ok": True, "action": name, "plan": plan, "summary": summary}
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "graph_events_ingest":
+        events_path = _optional_path_arg(workspace, args, "events_path")
+        if events_path is None:
+            raise ExecutorError("graph_events_ingest requires events_path")
+        try:
+            events_path.relative_to(workspace.resolve())
+        except ValueError as exc:
+            raise ExecutorError("graph_events_ingest events_path must stay inside workspace") from exc
+        if not events_path.exists():
+            raise ExecutorError(f"graph_events_ingest events_path not found: {events_path}")
+        graph, ingest_summary = load_agent_events_graph(events_path)
+        query = str(args.get("query", "") or "")
+        rag_result = (
+            graph_rag_query(
+                graph,
+                query,
+                top_k=int(args.get("top_k", 5) or 5),
+                neighbor_budget=int(args.get("neighbor_budget", 12) or 12),
+            )
+            if query.strip()
+            else {}
+        )
+        payload = {
+            "schema": "graph_events_ingest_result.v1",
+            "summary": ingest_summary,
+            "graph": graph.to_dict(),
+            "graph_rag": rag_result,
+            "policy_review": review_policy_versions(graph),
+            "cypher_seed": graph.to_cypher_seed() if bool(args.get("include_cypher", True)) else "",
+            "graph_store_import": render_cypher_import_bundle(graph, dialect="neo4j"),
+        }
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("graph_events_ingest output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(payload, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        summary = {
+            **ingest_summary,
+            "graph_rag_anchor_count": len(rag_result.get("anchor_nodes", [])) if isinstance(rag_result, dict) else 0,
+            "cypher_included": bool(payload.get("cypher_seed")),
+        }
+        result: dict[str, Any] = {"ok": True, "action": name, **payload, "summary": summary}
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "operations_readiness_plan":
+        plan = build_operations_readiness_plan(
+            service_name=str(args.get("service_name", "software-production-agent") or "software-production-agent"),
+            replicas=int(args.get("replicas", 3) or 3),
+            slo_target=float(args.get("slo_target", 0.995) or 0.995),
+            checks=args.get("checks") if isinstance(args.get("checks"), list) else None,
+            agents=args.get("agents") if isinstance(args.get("agents"), list) else None,
+            tasks=args.get("tasks") if isinstance(args.get("tasks"), list) else None,
+        )
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("operations_readiness_plan output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(plan, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        health_snapshot = plan.get("health", {}).get("snapshot", {})
+        failover_summary = plan.get("multi_agent", {}).get("failover_decision", {}).get("summary", {})
+        result = {
+            "ok": str(health_snapshot.get("status")) != "unhealthy",
+            "action": name,
+            "plan": plan,
+            "summary": {
+                "health_status": health_snapshot.get("status"),
+                "ready": bool(health_snapshot.get("ready", False)),
+                "monitoring_metric_count": len(plan.get("monitoring", {}).get("agent_specific_metrics", [])),
+                "alert_count": len(plan.get("monitoring", {}).get("alerts", [])),
+                "healthy_agent_count": failover_summary.get("healthy_count", 0),
+                "reassignment_count": failover_summary.get("reassignment_count", 0),
+                "dead_letter_count": failover_summary.get("dead_letter_count", 0),
+            },
+        }
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "cloud_native_deep_dive_plan":
+        plan = build_cloud_native_deep_dive_plan(
+            focus=str(args.get("focus", "agent-platform") or "agent-platform"),
+            kubernetes_version=str(args.get("kubernetes_version", "v1.36") or "v1.36"),
+            include_sources=bool(args.get("include_sources", True)),
+        )
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("cloud_native_deep_dive_plan output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(plan, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        k8s = plan.get("kubernetes_resource_scheduling", {})
+        storage = k8s.get("storage_control_plane", {}) if isinstance(k8s, dict) else {}
+        result = {
+            "ok": True,
+            "action": name,
+            "plan": plan,
+            "summary": {
+                "focus": plan.get("focus"),
+                "source_count": len(plan.get("sources", [])) if isinstance(plan.get("sources"), list) else 0,
+                "collapse_route_count": len(
+                    plan.get("multi_agent_similarity_collapse", {}).get("route", [])
+                )
+                if isinstance(plan.get("multi_agent_similarity_collapse"), dict)
+                else 0,
+                "etcd_algorithm_count": len(plan.get("etcd_memory_optimization", {}).get("algorithms", []))
+                if isinstance(plan.get("etcd_memory_optimization"), dict)
+                else 0,
+                "scheduler_extension_count": len(k8s.get("scheduler_framework", {}).get("cycle", []))
+                if isinstance(k8s, dict)
+                else 0,
+                "storage_controller_count": len(storage.get("pv_controller", {}).get("workers", []))
+                if isinstance(storage, dict)
+                else 0,
+                "prometheus_metric_count": len(plan.get("prometheus_scorecard", {}).get("metrics", []))
+                if isinstance(plan.get("prometheus_scorecard"), dict)
+                else 0,
+            },
+        }
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "enterprise_workflow_compile":
+        contract = compile_enterprise_workflow(
+            args.get("spec") if isinstance(args.get("spec"), dict) else None,
+            goal=str(args.get("goal", "企业级多智能体工作流") or "企业级多智能体工作流"),
+            domain=str(args.get("domain", "bio_research") or "bio_research"),
+            include_delivery_plan=bool(args.get("include_delivery_plan", True)),
+        )
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("enterprise_workflow_compile output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(contract, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        assessment = contract.get("assessment", {}) if isinstance(contract.get("assessment"), dict) else {}
+        risk_counts = assessment.get("risk_counts", {}) if isinstance(assessment.get("risk_counts"), dict) else {}
+        result = {
+            "ok": bool(contract.get("ok")) and str(assessment.get("readiness")) != "blocked",
+            "action": name,
+            "contract": contract,
+            "summary": {
+                "workflow_name": contract.get("workflow", {}).get("name")
+                if isinstance(contract.get("workflow"), dict)
+                else "",
+                "node_count": len(contract.get("nodes", [])) if isinstance(contract.get("nodes"), list) else 0,
+                "edge_count": len(contract.get("edges", [])) if isinstance(contract.get("edges"), list) else 0,
+                "score": assessment.get("score"),
+                "readiness": assessment.get("readiness"),
+                "finding_count": assessment.get("finding_count"),
+                "high_risk_count": int(risk_counts.get("high", 0) or 0) + int(risk_counts.get("critical", 0) or 0),
+                "delivery_stage_count": len(contract.get("enterprise_delivery_plan", []))
+                if isinstance(contract.get("enterprise_delivery_plan"), list)
+                else 0,
+                "graph_node_count": len(contract.get("graph_projection", {}).get("nodes", []))
+                if isinstance(contract.get("graph_projection"), dict)
+                else 0,
+                "graph_edge_count": len(contract.get("graph_projection", {}).get("edges", []))
+                if isinstance(contract.get("graph_projection"), dict)
+                else 0,
+                "cypher_bytes": len(str(contract.get("cypher_seed", "")).encode("utf-8")),
+                "mermaid_bytes": len(str(contract.get("mermaid", "")).encode("utf-8")),
+            },
+        }
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "enterprise_workflow_query":
+        contract = compile_enterprise_workflow(
+            args.get("spec") if isinstance(args.get("spec"), dict) else None,
+            goal=str(args.get("goal", "企业级多智能体工作流") or "企业级多智能体工作流"),
+            domain=str(args.get("domain", "bio_research") or "bio_research"),
+            include_delivery_plan=True,
+        )
+        query_result = query_enterprise_workflow_contract(
+            contract,
+            str(args.get("query", "") or ""),
+            top_k=int(args.get("top_k", 5) or 5),
+            neighbor_budget=int(args.get("neighbor_budget", 12) or 12),
+        )
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("enterprise_workflow_query output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(query_result, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        result = {
+            "ok": True,
+            "action": name,
+            "query_result": query_result,
+            "summary": {
+                "readiness": query_result.get("readiness"),
+                "score": query_result.get("score"),
+                "insight_count": len(query_result.get("insights", []))
+                if isinstance(query_result.get("insights"), list)
+                else 0,
+                "anchor_count": len(query_result.get("graph_rag", {}).get("anchor_nodes", []))
+                if isinstance(query_result.get("graph_rag"), dict)
+                else 0,
+                "subgraph_node_count": len(query_result.get("graph_rag", {}).get("subgraph", {}).get("nodes", []))
+                if isinstance(query_result.get("graph_rag"), dict)
+                and isinstance(query_result.get("graph_rag", {}).get("subgraph"), dict)
+                else 0,
+            },
+        }
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "command_api_plan":
+        plan = build_command_api_plan(
+            goal=str(args.get("goal", "大项目级 AgentOS CommandAPI") or "大项目级 AgentOS CommandAPI"),
+            focus=str(args.get("focus", "large_project_cohesion") or "large_project_cohesion"),
+            include_cypher=bool(args.get("include_cypher", True)),
+        )
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("command_api_plan output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(plan, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        result = {
+            "ok": True,
+            "action": name,
+            "plan": plan,
+            "summary": {
+                "command_count": len(plan.get("commands", [])) if isinstance(plan.get("commands"), list) else 0,
+                "bounded_context_count": len(plan.get("bounded_contexts", []))
+                if isinstance(plan.get("bounded_contexts"), list)
+                else 0,
+                "anti_looseness_rule_count": len(plan.get("anti_looseness_rules", []))
+                if isinstance(plan.get("anti_looseness_rules"), list)
+                else 0,
+                "graph_node_count": len(plan.get("graph_projection", {}).get("nodes", []))
+                if isinstance(plan.get("graph_projection"), dict)
+                else 0,
+                "cypher_bytes": len(str(plan.get("cypher_seed", "")).encode("utf-8")),
+                "mermaid_bytes": len(str(plan.get("mermaid", "")).encode("utf-8")),
+            },
+        }
+        if write_result is not None:
+            result["write"] = write_result
+        return result
+
+    if name == "skill_runtime_plan":
+        plan = build_skill_runtime_plan(
+            str(args.get("goal", "获取 SkillBundle 并防止任务/格式/思维链幻化") or "获取 SkillBundle 并防止任务/格式/思维链幻化"),
+            required_skill_ids=_string_tuple_arg(args, "required_skill_ids"),
+            explicit_scope=_string_tuple_arg(args, "explicit_scope"),
+            output_schema_name=str(args.get("output_schema_name", "guarded_agent_response.v1") or "guarded_agent_response.v1"),
+            sample_output=args.get("sample_output"),
+            known_evidence_ids=_string_tuple_arg(args, "known_evidence_ids"),
+        )
+        output_path = _optional_path_arg(workspace, args, "output_path")
+        write_result: dict[str, Any] | None = None
+        if output_path is not None:
+            try:
+                output_path.relative_to(workspace.resolve())
+            except ValueError as exc:
+                raise ExecutorError("skill_runtime_plan output_path must stay inside workspace") from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_text = json.dumps(plan, ensure_ascii=False, indent=2)
+            output_path.write_text(output_text, encoding="utf-8")
+            write_result = {"path": str(output_path), "bytes": len(output_text.encode("utf-8"))}
+        selected = plan.get("bundle", {}).get("selected_skills", []) if isinstance(plan.get("bundle"), dict) else []
+        validation = plan.get("validation", {}) if isinstance(plan.get("validation"), dict) else {}
+        return {
+            "ok": bool(validation.get("ok", True)),
+            "action": name,
+            "plan": plan,
+            "summary": {
+                "selected_skill_count": len(selected),
+                "validation_ok": validation.get("ok", None),
+                "violation_count": len(validation.get("violations", [])) if isinstance(validation.get("violations"), list) else 0,
+            },
+            "write": write_result or {},
+        }
+
+    if name == "local_training_run":
+        output_dir = _optional_path_arg(workspace, args, "output_dir") or (workspace / "local_training_runs")
+        try:
+            output_dir.relative_to(workspace.resolve())
+        except ValueError as exc:
+            raise ExecutorError("local_training_run output_dir must stay inside workspace") from exc
+        middle_trace_paths = tuple(
+            path if path.is_absolute() else (workspace / path)
+            for path in _path_tuple_arg(args, "middle_trace_paths")
+        )
+        github_ranking_paths = tuple(
+            path if path.is_absolute() else (workspace / path)
+            for path in _path_tuple_arg(args, "github_ranking_paths")
+        )
+        manifest = run_local_training(
+            target=str(args.get("target", "both") or "both"),
+            output_dir=output_dir,
+            middle_trace_paths=middle_trace_paths,
+            github_ranking_paths=github_ranking_paths,
+            epochs=int(args.get("epochs", 30) or 30),
+        )
+        result = {
+            "ok": True,
+            "action": name,
+            "manifest": manifest,
+            "summary": {
+                "target": manifest.get("target"),
+                "output_dir": manifest.get("output_dir"),
+                "middle_status": manifest.get("results", {}).get("middle_model", {}).get("status")
+                if isinstance(manifest.get("results"), dict)
+                else "",
+                "github_status": manifest.get("results", {}).get("github_evaluator", {}).get("status")
+                if isinstance(manifest.get("results"), dict)
+                else "",
+                "middle_examples": manifest.get("results", {}).get("middle_model", {}).get("training_examples", 0)
+                if isinstance(manifest.get("results"), dict)
+                else 0,
+                "github_examples": manifest.get("results", {}).get("github_evaluator", {}).get("training_examples", 0)
+                if isinstance(manifest.get("results"), dict)
+                else 0,
+            },
+        }
+        return result
 
     if name == "evidence_ledger":
         ledger = build_evidence_ledger(

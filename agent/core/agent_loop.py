@@ -173,6 +173,12 @@ def _result_summary(result: dict[str, Any]) -> dict[str, Any]:
     if isinstance(preflight, dict):
         summary["preflight_status"] = preflight.get("status")
         summary["risk_level"] = preflight.get("risk_level")
+        supervisor = preflight.get("supervisor")
+        if isinstance(supervisor, dict):
+            summary["supervisor_status"] = supervisor.get("status")
+            summary["supervisor_risk_level"] = supervisor.get("risk_level")
+            summary["sandbox_recommended"] = bool(supervisor.get("sandbox_recommended", False))
+            summary["sandbox_required"] = bool(supervisor.get("sandbox_required", False))
     stderr = str(result.get("stderr", "")).strip()
     if stderr:
         summary["stderr_head"] = stderr[:180]
@@ -198,6 +204,114 @@ def _result_summary(result: dict[str, Any]) -> dict[str, Any]:
             summary["evaluation_score"] = evaluation.get("overall_score")
         if "grade" in evaluation:
             summary["evaluation_grade"] = evaluation.get("grade")
+    if summary["action"] == "context_pv_plan":
+        pv_summary = result.get("summary")
+        if isinstance(pv_summary, dict):
+            for key in ("manifest_id", "total_tokens", "slice_count", "placement_count", "k8s_doc_count"):
+                if key in pv_summary:
+                    summary[key] = pv_summary.get(key)
+    if summary["action"] == "resilience_plan":
+        resilience_summary = result.get("summary")
+        if isinstance(resilience_summary, dict):
+            for key in ("surface", "threat_level", "payment_enabled", "chaos_drill_count"):
+                if key in resilience_summary:
+                    summary[key] = resilience_summary.get(key)
+    if summary["action"] == "business_rule_compile":
+        rule_summary = result.get("summary")
+        if isinstance(rule_summary, dict):
+            for key in ("domain", "entity_count", "state_count", "transition_count", "api_count", "finding_count"):
+                if key in rule_summary:
+                    summary[key] = rule_summary.get(key)
+    if summary["action"] == "automation_scorecard_plan":
+        scorecard_summary = result.get("summary")
+        if isinstance(scorecard_summary, dict):
+            for key in ("metric_count", "anti_cheat_count", "evidence_findings", "experiment_demands", "observation_days"):
+                if key in scorecard_summary:
+                    summary[key] = scorecard_summary.get(key)
+    if summary["action"] == "graph_runtime_plan":
+        graph_summary = result.get("summary")
+        if isinstance(graph_summary, dict):
+            for key in ("modification_count", "runtime_node_count", "runtime_edge_count", "graph_label_count", "graph_query_count"):
+                if key in graph_summary:
+                    summary[key] = graph_summary.get(key)
+    if summary["action"] == "graph_events_ingest":
+        ingest_summary = result.get("summary")
+        if isinstance(ingest_summary, dict):
+            for key in ("event_count", "run_count", "node_count", "edge_count", "failed_actions", "human_reviews", "graph_rag_anchor_count"):
+                if key in ingest_summary:
+                    summary[key] = ingest_summary.get(key)
+    if summary["action"] == "operations_readiness_plan":
+        ops_summary = result.get("summary")
+        if isinstance(ops_summary, dict):
+            for key in (
+                "health_status",
+                "ready",
+                "monitoring_metric_count",
+                "alert_count",
+                "healthy_agent_count",
+                "reassignment_count",
+                "dead_letter_count",
+            ):
+                if key in ops_summary:
+                    summary[key] = ops_summary.get(key)
+    if summary["action"] == "cloud_native_deep_dive_plan":
+        cloud_summary = result.get("summary")
+        if isinstance(cloud_summary, dict):
+            for key in (
+                "focus",
+                "source_count",
+                "collapse_route_count",
+                "etcd_algorithm_count",
+                "scheduler_extension_count",
+                "storage_controller_count",
+                "prometheus_metric_count",
+            ):
+                if key in cloud_summary:
+                    summary[key] = cloud_summary.get(key)
+    if summary["action"] == "enterprise_workflow_compile":
+        workflow_summary = result.get("summary")
+        if isinstance(workflow_summary, dict):
+            for key in (
+                "workflow_name",
+                "node_count",
+                "edge_count",
+                "score",
+                "readiness",
+                "finding_count",
+                "high_risk_count",
+                "delivery_stage_count",
+                "graph_node_count",
+                "graph_edge_count",
+                "cypher_bytes",
+                "mermaid_bytes",
+            ):
+                if key in workflow_summary:
+                    summary[key] = workflow_summary.get(key)
+    if summary["action"] == "enterprise_workflow_query":
+        workflow_query_summary = result.get("summary")
+        if isinstance(workflow_query_summary, dict):
+            for key in ("readiness", "score", "insight_count", "anchor_count", "subgraph_node_count"):
+                if key in workflow_query_summary:
+                    summary[key] = workflow_query_summary.get(key)
+    if summary["action"] == "command_api_plan":
+        command_summary = result.get("summary")
+        if isinstance(command_summary, dict):
+            for key in (
+                "command_count",
+                "bounded_context_count",
+                "anti_looseness_rule_count",
+                "graph_node_count",
+                "cypher_bytes",
+                "mermaid_bytes",
+            ):
+                if key in command_summary:
+                    summary[key] = command_summary.get(key)
+    if summary["action"] == "local_training_run":
+        training_summary = result.get("summary")
+        if isinstance(training_summary, dict):
+            for key in ("target", "output_dir", "middle_status", "github_status", "middle_examples", "github_examples"):
+                if key in training_summary:
+                    summary[key] = training_summary.get(key)
     return summary
 
 
@@ -243,6 +357,115 @@ def _action_summary(action_obj: dict[str, Any]) -> dict[str, Any]:
             summary["command_head"] = cmd[:120]
         if "timeout" in args:
             summary["timeout"] = args.get("timeout")
+    elif summary["action"] == "k8s_sandbox_plan":
+        cmd = args.get("command")
+        if isinstance(cmd, str):
+            summary["command_head"] = cmd[:120]
+        for key in ("namespace", "image", "network", "output_path"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key] = value
+    elif summary["action"] == "context_pv_plan":
+        text = args.get("text")
+        if isinstance(text, str):
+            summary["text_chars"] = len(text)
+        query = args.get("query")
+        if isinstance(query, str):
+            summary["query_head"] = query[:120]
+        for key in ("namespace", "tenant", "output_path", "version"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key] = value
+    elif summary["action"] == "resilience_plan":
+        for key in ("surface", "payment_provider", "threat_level", "output_path"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key] = value
+        if "payment_enabled" in args:
+            summary["payment_enabled"] = bool(args.get("payment_enabled"))
+    elif summary["action"] == "business_rule_compile":
+        rules = args.get("rules")
+        if isinstance(rules, str):
+            summary["rules_head"] = rules[:120]
+            summary["rules_chars"] = len(rules)
+        for key in ("domain_hint", "output_path"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key] = value
+    elif summary["action"] == "automation_scorecard_plan":
+        for key in ("output_path",):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key] = value
+        for key in ("demand_count", "observation_days"):
+            if key in args:
+                summary[key] = args.get(key)
+    elif summary["action"] == "graph_runtime_plan":
+        goal = args.get("goal")
+        if isinstance(goal, str):
+            summary["goal_head"] = goal[:120]
+        output_path = args.get("output_path")
+        if isinstance(output_path, str):
+            summary["output_path"] = output_path
+        if "include_cypher" in args:
+            summary["include_cypher"] = bool(args.get("include_cypher"))
+    elif summary["action"] == "graph_events_ingest":
+        for key in ("events_path", "query", "output_path"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key if key != "query" else "query_head"] = value[:120] if key == "query" else value
+        if "include_cypher" in args:
+            summary["include_cypher"] = bool(args.get("include_cypher"))
+    elif summary["action"] == "operations_readiness_plan":
+        for key in ("service_name", "output_path"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key] = value
+        if "replicas" in args:
+            summary["replicas"] = args.get("replicas")
+    elif summary["action"] == "cloud_native_deep_dive_plan":
+        for key in ("focus", "kubernetes_version", "output_path"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key] = value
+        if "include_sources" in args:
+            summary["include_sources"] = bool(args.get("include_sources"))
+    elif summary["action"] == "enterprise_workflow_compile":
+        for key in ("goal", "domain", "output_path"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key if key != "goal" else "goal_head"] = value[:120] if key == "goal" else value
+        if "include_delivery_plan" in args:
+            summary["include_delivery_plan"] = bool(args.get("include_delivery_plan"))
+        if isinstance(args.get("spec"), dict):
+            nodes = args["spec"].get("nodes")
+            summary["spec_node_count"] = len(nodes) if isinstance(nodes, list) else 0
+    elif summary["action"] == "enterprise_workflow_query":
+        for key in ("query", "goal", "domain", "output_path"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key if key not in {"query", "goal"} else f"{key}_head"] = value[:120]
+        for key in ("top_k", "neighbor_budget"):
+            if key in args:
+                summary[key] = args.get(key)
+    elif summary["action"] == "command_api_plan":
+        for key in ("goal", "focus", "output_path"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key if key != "goal" else "goal_head"] = value[:120] if key == "goal" else value
+        if "include_cypher" in args:
+            summary["include_cypher"] = bool(args.get("include_cypher"))
+    elif summary["action"] == "local_training_run":
+        for key in ("target", "output_dir"):
+            value = args.get(key)
+            if isinstance(value, str):
+                summary[key] = value
+        for key in ("middle_trace_paths", "github_ranking_paths"):
+            value = args.get(key)
+            if isinstance(value, list):
+                summary[f"{key}_count"] = len(value)
+        if "epochs" in args:
+            summary["epochs"] = args.get("epochs")
     elif summary["action"] == "list_files":
         pat = args.get("pattern")
         if isinstance(pat, str):
