@@ -31,8 +31,12 @@ def test_context_chain_returns_structure_and_summary(tmp_path: Path) -> None:
     )
 
     assert result.structure["rag_hints"][0]["path"] == "app.py"
+    assert result.structure["context_budget_plan"]["schema"] == "context_budget_plan.v1"
+    assert result.structure["context_budget_plan"]["messages"]
     assert result.summary["rag_hints"] == 1
     assert result.summary["rag_sources"] == {"local_workspace": 1}
+    assert result.summary["context_budget_input_budget"] > 0
+    assert result.summary["context_budget_over_budget"] is False
 
 
 def test_build_context_query_uses_recent_errors() -> None:
@@ -52,4 +56,3 @@ def test_build_context_query_uses_recent_errors() -> None:
 
     assert "missing_symbol" in query
     assert "Traceback" in query
-
