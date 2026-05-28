@@ -435,6 +435,53 @@ def test_product_ui_downloads_artifact_zip_without_agent_internals(tmp_path: Pat
     assert ".agent_events.jsonl" not in names
 
 
+def test_simple_frontend_catalog_preview_and_package_download(tmp_path: Path) -> None:
+    app = create_app(runs_root=tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    home = client.get("/")
+    assert home.status_code == 200
+    home_text = home.get_data(as_text=True)
+    assert "Software Studio" in home_text
+    assert "Download ZIP" in home_text
+    assert "Reusable solutions" in home_text
+
+    catalog = client.get("/api/simple-solutions")
+    assert catalog.status_code == 200
+    catalog_json = catalog.get_json()
+    assert catalog_json["schema"] == "simple_solution_catalog.v1"
+    assert any(row["title"] == "Library Management System" for row in catalog_json["solutions"])
+
+    prompt = "Build a clean library management system with books, readers, borrowing and returns."
+    preview = client.post("/api/simple-preview", json={"prompt": prompt})
+    assert preview.status_code == 200
+    preview_json = preview.get_json()
+    assert preview_json["preview_id"].startswith("preview_")
+    assert "Books &amp; readers" in preview_json["html"]
+
+    package = client.post(
+        "/api/simple-package",
+        json={
+            "title": preview_json["title"],
+            "prompt": prompt,
+            "html": preview_json["html"],
+        },
+    )
+    assert package.status_code == 200
+    assert package.mimetype == "application/zip"
+    with zipfile.ZipFile(BytesIO(package.data)) as zf:
+        names = set(zf.namelist())
+        readme = zf.read("README.md").decode("utf-8")
+    assert "frontend/index.html" in names
+    assert "docs/PRODUCT_SPEC.md" in names
+    assert "docs/API_CONTRACT.yaml" in names
+    assert "docs/DELIVERY_CHECKLIST.md" in names
+    assert "solution_manifest.json" in names
+    assert ".agent_state.json" not in names
+    assert "Software Studio" in readme
+
+
 def test_product_ui_groq_llm_requires_groq_key(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     app = create_app(runs_root=tmp_path)

@@ -1,0 +1,57 @@
+{
+  "schema": "solution_manifest.v1",
+  "schema_version": "solution_manifest.v2",
+  "source_type": "curated_demo",
+  "acceptance_status": "curated",
+  "accepted_by": "software-studio-curator",
+  "accepted_at": "2026-05-28T00:00:00+08:00",
+  "template": "Library Management System",
+  "goal": "A mature library management system covering book catalog, reader profiles, borrowing, returns, renewals, reservations, overdue fines, RBAC, dashboard reports and audit logs.",
+  "demo_prompt": "Build a clean library management system with books, readers, borrowing, returns, renewals, reservations, overdue fines, role permissions, dashboard reports and audit logs.",
+  "stack": "Spring Boot + Vue + MySQL + Redis + Static Preview",
+  "retrieval_tags": [
+    "library-management",
+    "book-catalog",
+    "reader-management",
+    "borrowing-circulation",
+    "return-renewal",
+    "reservation",
+    "overdue-fine",
+    "rbac",
+    "audit-log",
+    "dashboard",
+    "crud",
+    "mysql"
+  ],
+  "architecture_tags": [
+    "management-system",
+    "domain-workflow",
+    "state-machine",
+    "rbac",
+    "audit-log",
+    "reporting"
+  ],
+  "artifact_hints": [
+    "README.md",
+    "docs/SOLUTION_BACKUP.md",
+    "docs/PRODUCT_SPEC.md",
+    "docs/API_CONTRACT.yaml",
+    "docs/DATABASE_SCHEMA.md",
+    "preview/index.html"
+  ],
+  "quality_score": 9.35,
+  "quality": {
+    "score": 9.35,
+    "grade": "A",
+    "reasons": [
+      "clear domain entities",
+      "auditable circulation workflow",
+      "role-aware operations",
+      "downloadable demo package friendly",
+      "good showcase value"
+    ]
+  },
+  "reuse_boundary": "Reuse domain decomposition, API contract, dashboard layout, workflow checks and test strategy. Replace sample data before production.",
+  "training_eligible": true,
+  "embedding_indexed": false
+}

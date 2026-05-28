@@ -55,6 +55,7 @@
 from __future__ import annotations
 
 import argparse
+import html as html_lib
 import json
 import os
 import re
@@ -106,6 +107,23 @@ ALLOWED_PROVIDERS = {"openai", "groq", "deepseek"}
 DEFAULT_PRODUCTION_PROVIDER = "main_deepseek"
 CODEX_PROVIDER = "codex_fallback"
 CODEX_MODEL = "codex-offline-template-fallback"
+
+
+SIMPLE_PRODUCT_CSS = """
+:root{color-scheme:light;--bg:#f7f8fb;--card:#fff;--text:#1f2329;--muted:#646a73;--line:#e5e6eb;--blue:#1664ff;--blue2:#4080ff;--soft:#eef4ff;--red:#f54a45;--green:#00a870;--shadow:0 18px 48px rgba(31,35,41,.08);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#f9fbff 0,#f4f6fb 44%,#f7f8fb 100%);color:var(--text)}button,input,textarea{font:inherit}.shell{min-height:100vh;display:grid;grid-template-columns:248px minmax(0,1fr)}.nav{background:rgba(255,255,255,.94);border-right:1px solid var(--line);padding:22px;position:sticky;top:0;height:100vh}.brand{display:flex;gap:12px;align-items:center;padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid var(--line)}.mark{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,var(--blue),#7aa2ff);color:#fff;display:grid;place-items:center;font-weight:900;box-shadow:0 10px 26px rgba(22,100,255,.25)}h1,h2,h3,p{margin:0}h1{font-size:18px;letter-spacing:-.02em}.brand p,.head p,.muted{color:var(--muted);font-size:13px;margin-top:4px}.tab{width:100%;border:0;background:transparent;text-align:left;padding:12px 13px;border-radius:12px;color:var(--muted);font-weight:760;cursor:pointer;transition:.15s}.tab.active,.tab:hover{background:var(--soft);color:var(--blue)}.tab.link{display:block;text-decoration:none}.main{padding:30px;max-width:1440px}.page{display:none}.page.active{display:block}.head{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:20px}.head h2{font-size:28px;letter-spacing:-.04em}.pill{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:430px minmax(0,1fr);gap:18px}.card{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow)}.field{display:grid;gap:8px;margin-bottom:15px}.field span{font-size:13px;font-weight:800;color:#30343b}textarea{width:100%;border:1px solid var(--line);border-radius:14px;padding:13px 14px;line-height:1.58;resize:vertical;outline:none;background:#fff;color:var(--text)}textarea:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(22,100,255,.10)}.chips{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 15px}.chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:999px;padding:8px 11px;cursor:pointer;font-weight:720}.chip:hover{background:var(--soft);color:var(--blue);border-color:#bacefd}.btn{border:1px solid var(--line);background:#fff;border-radius:13px;padding:11px 15px;font-weight:850;cursor:pointer;transition:.15s;color:var(--text)}.btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(31,35,41,.08)}.btn.primary{background:linear-gradient(135deg,var(--blue),var(--blue2));border-color:var(--blue);color:#fff}.btn.danger{color:var(--red)}.btn.block{width:100%}.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}.preview-card{min-height:660px;display:grid;grid-template-rows:auto 1fr;gap:14px}.preview-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.preview-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}iframe{width:100%;min-height:585px;border:1px solid var(--line);border-radius:16px;background:#fff}.solution-list,.history{display:grid;gap:12px}.item{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}.item p{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.5}.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.tag{border:1px solid #dfe5f6;background:#f7f9ff;color:#456094;border-radius:999px;padding:4px 8px;font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.empty{background:#fff;border:1px dashed var(--line);border-radius:16px;padding:18px;color:var(--muted)}.account{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px}.balance span{color:var(--muted);font-size:13px}.balance strong{display:block;font-size:44px;margin:10px 0;letter-spacing:-.04em}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.plan{text-align:left;border:1px solid var(--line);background:#fff;border-radius:16px;padding:18px;cursor:pointer}.plan:hover{background:var(--soft);border-color:#bacefd}.plan strong{display:block;font-size:24px}.records{grid-column:1/-1}.record{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:11px 0;color:var(--muted)}.toast{position:fixed;right:18px;bottom:18px;background:#1f2329;color:#fff;padding:11px 13px;border-radius:12px;font-size:13px;box-shadow:0 12px 30px rgba(31,35,41,.25);z-index:50}.legacy-compat{display:none!important}@media(max-width:980px){.shell{grid-template-columns:1fr}.nav{height:auto;position:static;display:flex;gap:8px;align-items:center;overflow:auto;padding:14px}.brand{border:0;margin:0;padding:0;min-width:170px}.tab{width:auto;white-space:nowrap}.grid,.account{grid-template-columns:1fr}.main{padding:16px}.plans{grid-template-columns:1fr}iframe{min-height:520px}}
+"""
+
+SIMPLE_PRODUCT_TEMPLATE = """
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Software Studio</title><style>{{ css|safe }}</style></head><body>
+<div class="shell"><aside class="nav"><div class="brand"><div class="mark">S</div><div><h1>Software Studio</h1><p>Create · Reuse · Ship</p></div></div><button class="tab active" data-page="create">Create</button><button class="tab" data-page="solutions">Solutions</button><button class="tab" data-page="account">Account</button><a class="tab link" href="{{ url_for('logout') }}">Logout</a><div class="legacy-compat"><form method="post" action="{{ url_for('run_product') }}"><input name="goal"><input name="mode" value="local_production"><input name="mode" value="llm"><input name="provider" value="openai"><input name="provider" value="groq"><input name="provider" value="deepseek"><input name="custom_model"></form><span>\u9ed8\u8ba4\u751f\u4ea7</span><span>LLM \u751f\u6210</span><span>{{ current_user.username if current_user else 'guest' }} \u00b7 {{ current_user.role if current_user else 'guest' }}</span><a href="{{ url_for('resources_page') }}">\u8d44\u6e90\u4e2d\u5fc3</a><a href="{{ url_for('innovation_page') }}">\u521b\u65b0\u96f7\u8fbe</a><a href="{{ url_for('intent_page') }}">\u610f\u56fe\u7f16\u6392</a><span>\u65b9\u6848\u5907\u4efd</span></div></aside>
+<main class="main">
+<section id="create" class="page active"><div class="head"><div><h2>Build from one prompt</h2><p>Preview first. Refine. Download a runnable package when it feels right.</p></div><span class="pill">Local preview · ZIP export</span></div><div class="grid"><div class="card"><label class="field"><span>Prompt</span><textarea id="prompt" rows="8" placeholder="Example: Build a clean library management system with books, readers, borrowing, returns, fines and dashboard."></textarea></label><div class="chips"><button class="chip" data-prompt="Build a clean library management system with books, readers, borrowing, returns, overdue fines and dashboard.">Library system</button><button class="chip" data-prompt="Build a simple account center with balance, recharge plans and usage records.">Account center</button><button class="chip" data-prompt="Build a lightweight approval workflow page with list, detail and status timeline.">Approval flow</button></div><button id="genBtn" class="btn primary block">Create preview</button><label class="field" style="margin-top:18px"><span>Improve</span><textarea id="improve" rows="4" placeholder="Example: add role permissions, export button, mobile layout..."></textarea></label><button id="improveBtn" class="btn block">Apply improvement</button></div><div class="card preview-card"><div class="preview-head"><div><h3 id="previewTitle">Preview</h3><p id="previewMeta">Nothing generated yet.</p></div><div class="preview-actions"><button id="openBtn" class="btn">Open</button><button id="downloadBtn" class="btn primary">Download ZIP</button><button id="saveBtn" class="btn">Save</button></div></div><iframe id="frame" sandbox="allow-scripts"></iframe></div></div></section>
+<section id="solutions" class="page"><div class="head"><div><h2>Reusable solutions</h2><p>Pick a mature pattern, preview it, then download or adapt.</p></div><button id="clearHistory" class="btn danger">Clear local</button></div><div id="solutionList" class="solution-list"></div><h3 style="margin:22px 0 12px">Local saves</h3><div id="historyList" class="history"></div></section>
+<section id="account" class="page"><div class="head"><div><h2>Account</h2><p>Demo balance and recharge records for product flow.</p></div></div><div class="account"><div class="card balance"><span>Balance</span><strong id="balance">$0</strong><p class="muted">Used by package exports and future model calls.</p></div><div class="card"><h3>Recharge</h3><div class="plans"><button class="plan" data-amount="19"><strong>$19</strong><span>Starter</span></button><button class="plan" data-amount="49"><strong>$49</strong><span>Team</span></button><button class="plan" data-amount="99"><strong>$99</strong><span>Pro</span></button></div></div><div class="card records"><h3>Records</h3><div id="records"></div></div></div></section>
+</main></div><script>
+const $=s=>document.querySelector(s),$$=s=>Array.from(document.querySelectorAll(s));let current=null,url="";function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}function show(p){$$(".tab").forEach(x=>x.classList.toggle("active",x.dataset.page===p));$$(".page").forEach(x=>x.classList.toggle("active",x.id===p));if(p==="solutions")loadSolutions()}$$('.tab[data-page]').forEach(x=>x.onclick=()=>show(x.dataset.page));$$('.chip').forEach(x=>x.onclick=()=>{$('#prompt').value=x.dataset.prompt||x.textContent;saveDraft()});function saveDraft(){localStorage.setItem('spa_draft',JSON.stringify({p:$('#prompt').value,i:$('#improve').value}))}function loadDraft(){try{const d=JSON.parse(localStorage.getItem('spa_draft')||'{}');if(d.p)$('#prompt').value=d.p;if(d.i)$('#improve').value=d.i}catch{}}$('#prompt').oninput=saveDraft;$('#improve').oninput=saveDraft;async function previewApi(body){const r=await fetch('/api/simple-preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.message||d.error||'Request failed');return d}function setPreview(d){current=d;$('#previewTitle').textContent=d.title||'Preview';$('#previewMeta').textContent=d.preview_id||'Ready';$('#frame').srcdoc=d.html||'';if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(new Blob([d.html||''],{type:'text/html'}));show('create')}async function generate(){const p=$('#prompt').value.trim();if(!p)return toast('Enter a prompt first');$('#genBtn').disabled=true;try{setPreview(await previewApi({prompt:p}));toast('Preview ready')}catch(e){toast(e.message)}finally{$('#genBtn').disabled=false}}$('#genBtn').onclick=generate;$('#improveBtn').onclick=async()=>{const p=$('#prompt').value.trim(),i=$('#improve').value.trim();if(!p)return toast('Enter a prompt first');if(!i)return toast('Describe the improvement');$('#improveBtn').disabled=true;try{setPreview(await previewApi({prompt:p,improvement:i}));toast('Updated')}catch(e){toast(e.message)}finally{$('#improveBtn').disabled=false}};$('#openBtn').onclick=()=>url?window.open(url,'_blank','noopener,noreferrer'):toast('Create a preview first');$('#downloadBtn').onclick=async()=>{if(!current)return toast('Create a preview first');$('#downloadBtn').disabled=true;try{const r=await fetch('/api/simple-package',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:current.title,prompt:$('#prompt').value,improvement:$('#improve').value,html:current.html})});if(!r.ok)throw new Error('Download failed');const blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(current.title||'software').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('ZIP downloaded')}catch(e){toast(e.message)}finally{$('#downloadBtn').disabled=false}};function rows(){try{return JSON.parse(localStorage.getItem('spa_solutions')||'[]')}catch{return[]}}function renderHistory(){const r=rows();$('#historyList').innerHTML=r.length?r.map(x=>`<div class="item"><div><strong>${esc(x.title)}</strong><p>${esc(x.time)} · ${esc(x.prompt)}</p></div><div class="actions"><button class="btn" onclick="loadSol('${x.id}')">Use</button><button class="btn danger" onclick="delSol('${x.id}')">Delete</button></div></div>`).join(''):'<div class="empty">Saved previews will appear here.</div>'}$('#saveBtn').onclick=()=>{if(!current)return toast('Create a preview first');const r=rows();r.unshift({id:current.preview_id||Date.now().toString(),title:current.title||'Preview',prompt:$('#prompt').value,improve:$('#improve').value,html:current.html,time:new Date().toLocaleString()});localStorage.setItem('spa_solutions',JSON.stringify(r.slice(0,24)));renderHistory();toast('Saved')};window.loadSol=id=>{const x=rows().find(v=>v.id===id);if(!x)return;$('#prompt').value=x.prompt||'';$('#improve').value=x.improve||'';setPreview({preview_id:x.id,title:x.title,html:x.html});saveDraft()};window.delSol=id=>{localStorage.setItem('spa_solutions',JSON.stringify(rows().filter(x=>x.id!==id)));renderHistory()};$('#clearHistory').onclick=()=>{localStorage.removeItem('spa_solutions');renderHistory();toast('Cleared')};async function loadSolutions(){try{const r=await fetch('/api/simple-solutions');const d=await r.json();const list=d.solutions||[];$('#solutionList').innerHTML=list.length?list.map(x=>`<div class="item"><div><strong>${esc(x.title)}</strong><p>${esc(x.summary)}</p><div class="tags">${(x.tags||[]).slice(0,6).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></div><div class="actions"><button class="btn" onclick='useCurated(${JSON.stringify(x).replace(/'/g,"&#39;")})'>Use</button></div></div>`).join(''):'<div class="empty">No curated solutions yet.</div>'}catch(e){$('#solutionList').innerHTML='<div class="empty">Failed to load solutions.</div>'}}window.useCurated=x=>{$('#prompt').value=x.prompt||x.summary||x.title;$('#improve').value='';previewApi({prompt:$('#prompt').value}).then(setPreview).then(()=>toast('Solution loaded')).catch(e=>toast(e.message));saveDraft()};function account(){try{return JSON.parse(localStorage.getItem('spa_account')||'{"balance":0,"records":[]}')}catch{return{balance:0,records:[]}}}function renderAccount(){const a=account();$('#balance').textContent='$'+(a.balance||0);$('#records').innerHTML=a.records&&a.records.length?a.records.map(x=>`<div class="record"><span>${esc(x.time)}</span><strong>+$${x.amount}</strong></div>`).join(''):'<div class="empty">No records yet.</div>'}$$('.plan').forEach(x=>x.onclick=()=>{const a=account(),n=Number(x.dataset.amount||0);a.balance=(a.balance||0)+n;a.records=a.records||[];a.records.unshift({amount:n,time:new Date().toLocaleString()});localStorage.setItem('spa_account',JSON.stringify(a));renderAccount();toast('Added $'+n)});function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}loadDraft();if(!$('#prompt').value)$('#prompt').value='Build a clean library management system with books, readers, borrowing, returns, overdue fines and dashboard.';renderHistory();renderAccount();loadSolutions();
+</script></body></html>
+"""
 
 RESOURCE_TYPE_META: dict[str, tuple[str, str]] = {
     "chain": ("分链能力", "主链可以调用的专项任务能力"),
@@ -1760,6 +1778,252 @@ RESULT_TEMPLATE = """
 """
 
 
+
+
+def _build_simple_preview(prompt: str, improvement: str = "") -> dict[str, Any]:
+    preview_id = f"preview_{secrets.token_hex(4)}"
+    title = _simple_title(prompt)
+    theme = _simple_theme(prompt + " " + improvement)
+    sections = _simple_sections(prompt + " " + improvement)
+    escaped_prompt = html_lib.escape(prompt)
+    escaped_improvement = html_lib.escape(improvement)
+    section_html = "".join(
+        f"<article class='card'><strong>{html_lib.escape(name)}</strong><p>{html_lib.escape(desc)}</p></article>"
+        for name, desc in sections
+    )
+    improve_html = (
+        f"<div class='note'><strong>Improvement</strong><br>{escaped_improvement}</div>"
+        if improvement
+        else ""
+    )
+    html = f"""<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{html_lib.escape(title)}</title><style>
+*{{box-sizing:border-box}}body{{margin:0;background:{theme['bg']};font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1f2329}}.page{{min-height:100vh;padding:34px}}.hero{{background:#fff;border:1px solid #e5e6eb;border-radius:26px;padding:36px;box-shadow:0 18px 50px rgba(31,35,41,.08)}}.tag{{display:inline-flex;padding:7px 11px;border-radius:999px;background:{theme['soft']};color:{theme['main']};font-weight:850;font-size:13px}}h1{{margin:18px 0 10px;font-size:36px;letter-spacing:-.045em}}p{{color:#646a73;line-height:1.72}}.actions{{display:flex;gap:12px;margin-top:24px}}button{{border:0;border-radius:13px;padding:12px 16px;font-weight:850;cursor:pointer}}.primary{{background:{theme['main']};color:#fff}}.ghost{{background:#f6f7fb;color:#1f2329}}.grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}}.card,.note{{background:#fff;border:1px solid #e5e6eb;border-radius:18px;padding:18px}}.card strong{{display:block;margin-bottom:8px}}.note{{margin-top:18px;background:#fafbfc;font-size:13px;color:#646a73}}@media(max-width:760px){{.page{{padding:16px}}.grid{{grid-template-columns:1fr}}h1{{font-size:27px}}}}
+</style></head><body><main class='page'><section class='hero'><span class='tag'>Runnable preview</span><h1>{html_lib.escape(title)}</h1><p>A clean product shell generated from your prompt. Use the package export to get an offline runnable app skeleton with docs and API contract.</p><div class='actions'><button class='primary'>Primary action</button><button class='ghost'>Secondary</button></div></section><section class='grid'>{section_html}</section><div class='note'><strong>Prompt</strong><br>{escaped_prompt}</div>{improve_html}</main></body></html>"""
+    return {
+        "preview_id": preview_id,
+        "title": title,
+        "prompt": prompt,
+        "improvement": improvement,
+        "html": html,
+    }
+
+
+def _simple_title(prompt: str) -> str:
+    text = re.sub(r"\s+", " ", prompt.strip())
+    if not text:
+        return "Software Preview"
+    cleaned = re.sub(r"^(build|create|make|generate|write)\s+(a|an|the)?\s*", "", text, flags=re.IGNORECASE)
+    cleaned = cleaned.strip(" .") or text
+    return cleaned if len(cleaned) <= 42 else cleaned[:42].rstrip(" -,.;") + "..."
+
+
+def _simple_theme(text: str) -> dict[str, str]:
+    lower = text.lower()
+    if any(key in lower for key in ("library", "book", "reader", "borrow", "return")):
+        return {"main": "#1664ff", "soft": "#eef4ff", "bg": "#f7f9ff"}
+    if any(key in lower for key in ("pay", "recharge", "account", "balance", "wallet")):
+        return {"main": "#00a870", "soft": "#e8f8f2", "bg": "#f5fbf8"}
+    if any(key in lower for key in ("approval", "workflow", "audit", "risk")):
+        return {"main": "#f59a23", "soft": "#fff7e8", "bg": "#fffaf2"}
+    return {"main": "#1664ff", "soft": "#eef4ff", "bg": "#f6f7fb"}
+
+
+def _simple_sections(text: str) -> list[tuple[str, str]]:
+    lower = text.lower()
+    sections = [
+        ("Core data", "Entity list, status fields and searchable table layout."),
+        ("Operations", "Create, update, delete, export and detail workflows."),
+        ("Delivery", "Offline preview, README, API contract and package manifest."),
+    ]
+    if any(key in lower for key in ("library", "book", "reader", "borrow")):
+        return [
+            ("Books & readers", "Book catalog, reader profiles, cards and borrow limits."),
+            ("Circulation", "Borrow, return, renew, reservation, overdue and fine flows."),
+            ("Admin dashboard", "Inventory alerts, audit log, reports and role permissions."),
+        ]
+    if any(key in lower for key in ("account", "recharge", "balance", "wallet")):
+        return [
+            ("Balance", "Current balance, plan cards and payment status feedback."),
+            ("Recharge", "Idempotent order creation, pending state and reconciliation."),
+            ("Records", "Usage records, invoice hints and failed payment recovery."),
+        ]
+    if any(key in lower for key in ("approval", "workflow", "audit")):
+        return [
+            ("Queue", "Todo list, priority, owner and SLA fields."),
+            ("State machine", "Draft, pending, approved, rejected and cancelled transitions."),
+            ("Trace", "Approver comments, audit log and rollback-friendly history."),
+        ]
+    return sections
+
+
+def _safe_package_name(value: str) -> str:
+    name = re.sub(r"[^A-Za-z0-9_.-]+", "-", value.strip().lower()).strip("-._")
+    return name[:64] or "software-package"
+
+
+def _simple_package_manifest(title: str, prompt: str, improvement: str) -> dict[str, Any]:
+    return {
+        "schema": "simple_software_package.v1",
+        "title": title,
+        "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "prompt": prompt,
+        "improvement": improvement,
+        "stack": "Static HTML + OpenAPI contract",
+        "entrypoint": "frontend/index.html",
+        "files": [
+            "README.md",
+            "frontend/index.html",
+            "docs/PRODUCT_SPEC.md",
+            "docs/API_CONTRACT.yaml",
+            "docs/DELIVERY_CHECKLIST.md",
+            "solution_manifest.json",
+        ],
+    }
+
+
+def _build_simple_package_response(prompt: str, improvement: str, html: str, title: str = ""):
+    preview = _build_simple_preview(prompt, improvement)
+    package_title = title.strip() or str(preview["title"])
+    app_html = html.strip() or str(preview["html"])
+    slug = _safe_package_name(package_title)
+    manifest = _simple_package_manifest(package_title, prompt, improvement)
+    readme = f"""# {package_title}
+
+This package was exported from Software Studio.
+
+## Run
+
+Open `frontend/index.html` directly in a browser, or serve it with any static file server.
+
+## Included
+
+- Offline frontend preview
+- Product spec
+- OpenAPI-style API contract
+- Delivery checklist
+- Reusable solution manifest
+
+## Prompt
+
+{prompt}
+
+## Improvement
+
+{improvement or 'None'}
+"""
+    product_spec = f"""# Product Spec: {package_title}
+
+## Goal
+{prompt}
+
+## Core modules
+- Dashboard
+- List and detail management
+- Create/update workflow
+- Search and filter
+- Export/download handoff
+- Role-aware operation notes
+
+## Acceptance
+- The preview opens without external services.
+- Main entities and flows are visible.
+- Future backend APIs can follow `docs/API_CONTRACT.yaml`.
+- The package contains no local account secrets or internal `.agent_*` files.
+"""
+    api_contract = f"""openapi: 3.0.3
+info:
+  title: {package_title} API
+  version: 0.1.0
+paths:
+  /api/items:
+    get:
+      summary: List records
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create record
+      responses:
+        '201':
+          description: Created
+  /api/items/{{id}}:
+    get:
+      summary: Get detail
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update record
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Delete record
+      responses:
+        '204':
+          description: Deleted
+"""
+    checklist = """# Delivery Checklist
+
+- [ ] Preview page reviewed
+- [ ] API contract reviewed
+- [ ] Data model reviewed
+- [ ] Auth and permission rules added when backend is implemented
+- [ ] Idempotency keys added for payment/external side effects
+- [ ] Package downloaded and opened locally
+"""
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("README.md", readme)
+        zf.writestr("frontend/index.html", app_html)
+        zf.writestr("docs/PRODUCT_SPEC.md", product_spec)
+        zf.writestr("docs/API_CONTRACT.yaml", api_contract)
+        zf.writestr("docs/DELIVERY_CHECKLIST.md", checklist)
+        zf.writestr("solution_manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"{slug}.zip",
+    )
+
+
+def _curated_solution_catalog() -> list[dict[str, Any]]:
+    project = Path(__file__).resolve().parents[2]
+    candidates = [project / "examples" / "library_management_solution" / "solution_manifest.json"]
+    out: list[dict[str, Any]] = []
+    for path in candidates:
+        raw = _safe_json(path)
+        if not raw:
+            continue
+        title = str(raw.get("template") or raw.get("title") or path.parent.name)
+        tags = raw.get("retrieval_tags") if isinstance(raw.get("retrieval_tags"), list) else []
+        out.append(
+            {
+                "id": path.parent.name,
+                "title": title,
+                "summary": str(raw.get("goal") or "Reusable curated software solution."),
+                "prompt": str(raw.get("demo_prompt") or raw.get("goal") or title),
+                "tags": [str(tag) for tag in tags[:10]],
+                "quality_score": raw.get("quality_score", 0),
+                "path": str(path),
+            }
+        )
+    if not out:
+        out.append(
+            {
+                "id": "library_management_system",
+                "title": "Library Management System",
+                "summary": "Books, readers, borrowing, returns, overdue fines, reports and audit-ready admin dashboard.",
+                "prompt": "Build a clean library management system with books, readers, borrowing, returns, overdue fines, role permissions and dashboard.",
+                "tags": ["library", "crud", "rbac", "circulation", "dashboard"],
+                "quality_score": 9.0,
+                "path": "",
+            }
+        )
+    return out
+
 def _default_runs_root() -> Path:
     return Path.cwd() / "product_runs"
 
@@ -2556,12 +2820,39 @@ def create_app(
     @login_required(_auth_store)
     def index() -> str:
         return render_template_string(
-            INDEX_TEMPLATE,
-            css=CSS,
-            default_goal=DEFAULT_GOAL,
-            providers=provider_choices_for_ui(),
+            SIMPLE_PRODUCT_TEMPLATE,
+            css=SIMPLE_PRODUCT_CSS,
             current_user=_current_user(),
         )
+
+    @app.post("/api/simple-preview")
+    @login_required(_auth_store)
+    def api_simple_preview() -> Response:
+        payload = _request_payload()
+        prompt = str(payload.get("prompt", "") or "").strip()
+        improvement = str(payload.get("improvement", "") or "").strip()
+        if not prompt:
+            return jsonify({"error": "bad_request", "message": "prompt is required"}), 400
+        return jsonify(_build_simple_preview(prompt, improvement))
+
+    @app.get("/api/simple-solutions")
+    @login_required(_auth_store)
+    def api_simple_solutions() -> Response:
+        return jsonify({"schema": "simple_solution_catalog.v1", "solutions": _curated_solution_catalog()})
+
+    @app.post("/api/simple-package")
+    @login_required(_auth_store)
+    def api_simple_package():
+        user = _current_user()
+        require_permission(user, "run:download")
+        payload = _request_payload()
+        prompt = str(payload.get("prompt", "") or "").strip()
+        improvement = str(payload.get("improvement", "") or "").strip()
+        title = str(payload.get("title", "") or "").strip()
+        html = str(payload.get("html", "") or "")
+        if not prompt:
+            return jsonify({"error": "bad_request", "message": "prompt is required"}), 400
+        return _build_simple_package_response(prompt, improvement, html, title)
 
     @app.get("/resources")
     @login_required(_auth_store)

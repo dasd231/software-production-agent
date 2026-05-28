@@ -1,0 +1,34 @@
+openapi: 3.0.3
+info:
+  title: Library Management System API
+  version: 0.1.0
+paths:
+  /api/books:
+    get:
+      summary: Search books
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create book
+      responses:
+        '201': { description: Created }
+  /api/readers:
+    get:
+      summary: Search readers
+      responses:
+        '200': { description: OK }
+  /api/borrow-orders:
+    post:
+      summary: Borrow a book copy
+      responses:
+        '201': { description: Borrowed }
+  /api/borrow-orders/{id}/return:
+    post:
+      summary: Return a book and calculate overdue fine
+      responses:
+        '200': { description: Returned }
+  /api/dashboard/summary:
+    get:
+      summary: Dashboard metrics
+      responses:
+        '200': { description: OK }
