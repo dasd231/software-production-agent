@@ -58,9 +58,12 @@ import argparse
 import html as html_lib
 import json
 import os
+import queue as queue_lib
 import re
 import secrets
 import shutil
+import threading
+import time
 import zipfile
 from io import BytesIO
 from dataclasses import replace
@@ -103,26 +106,207 @@ MODE_ALIASES = {
     "codex_handoff": "local_production",
     "llm_planner": "llm",
 }
-ALLOWED_PROVIDERS = {"openai", "groq", "deepseek"}
+ALLOWED_PROVIDERS = {"openai", "groq", "deepseek", "main_deepseek"}
 DEFAULT_PRODUCTION_PROVIDER = "main_deepseek"
 CODEX_PROVIDER = "codex_fallback"
 CODEX_MODEL = "codex-offline-template-fallback"
+FREE_TOKEN_QUOTA = 80_000
+TOKEN_PER_YUAN = 2_000
 
 
 SIMPLE_PRODUCT_CSS = """
-:root{color-scheme:light;--bg:#f7f8fb;--card:#fff;--text:#1f2329;--muted:#646a73;--line:#e5e6eb;--blue:#1664ff;--blue2:#4080ff;--soft:#eef4ff;--red:#f54a45;--green:#00a870;--shadow:0 18px 48px rgba(31,35,41,.08);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#f9fbff 0,#f4f6fb 44%,#f7f8fb 100%);color:var(--text)}button,input,textarea{font:inherit}.shell{min-height:100vh;display:grid;grid-template-columns:248px minmax(0,1fr)}.nav{background:rgba(255,255,255,.94);border-right:1px solid var(--line);padding:22px;position:sticky;top:0;height:100vh}.brand{display:flex;gap:12px;align-items:center;padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid var(--line)}.mark{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,var(--blue),#7aa2ff);color:#fff;display:grid;place-items:center;font-weight:900;box-shadow:0 10px 26px rgba(22,100,255,.25)}h1,h2,h3,p{margin:0}h1{font-size:18px;letter-spacing:-.02em}.brand p,.head p,.muted{color:var(--muted);font-size:13px;margin-top:4px}.tab{width:100%;border:0;background:transparent;text-align:left;padding:12px 13px;border-radius:12px;color:var(--muted);font-weight:760;cursor:pointer;transition:.15s}.tab.active,.tab:hover{background:var(--soft);color:var(--blue)}.tab.link{display:block;text-decoration:none}.main{padding:30px;max-width:1440px}.page{display:none}.page.active{display:block}.head{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:20px}.head h2{font-size:28px;letter-spacing:-.04em}.pill{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:430px minmax(0,1fr);gap:18px}.card{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow)}.field{display:grid;gap:8px;margin-bottom:15px}.field span{font-size:13px;font-weight:800;color:#30343b}textarea{width:100%;border:1px solid var(--line);border-radius:14px;padding:13px 14px;line-height:1.58;resize:vertical;outline:none;background:#fff;color:var(--text)}textarea:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(22,100,255,.10)}.chips{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 15px}.chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:999px;padding:8px 11px;cursor:pointer;font-weight:720}.chip:hover{background:var(--soft);color:var(--blue);border-color:#bacefd}.btn{border:1px solid var(--line);background:#fff;border-radius:13px;padding:11px 15px;font-weight:850;cursor:pointer;transition:.15s;color:var(--text)}.btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(31,35,41,.08)}.btn.primary{background:linear-gradient(135deg,var(--blue),var(--blue2));border-color:var(--blue);color:#fff}.btn.danger{color:var(--red)}.btn.block{width:100%}.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}.preview-card{min-height:660px;display:grid;grid-template-rows:auto 1fr;gap:14px}.preview-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.preview-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}iframe{width:100%;min-height:585px;border:1px solid var(--line);border-radius:16px;background:#fff}.solution-list,.history{display:grid;gap:12px}.item{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}.item p{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.5}.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.tag{border:1px solid #dfe5f6;background:#f7f9ff;color:#456094;border-radius:999px;padding:4px 8px;font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.empty{background:#fff;border:1px dashed var(--line);border-radius:16px;padding:18px;color:var(--muted)}.account{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px}.balance span{color:var(--muted);font-size:13px}.balance strong{display:block;font-size:44px;margin:10px 0;letter-spacing:-.04em}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.plan{text-align:left;border:1px solid var(--line);background:#fff;border-radius:16px;padding:18px;cursor:pointer}.plan:hover{background:var(--soft);border-color:#bacefd}.plan strong{display:block;font-size:24px}.records{grid-column:1/-1}.record{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:11px 0;color:var(--muted)}.toast{position:fixed;right:18px;bottom:18px;background:#1f2329;color:#fff;padding:11px 13px;border-radius:12px;font-size:13px;box-shadow:0 12px 30px rgba(31,35,41,.25);z-index:50}.legacy-compat{display:none!important}@media(max-width:980px){.shell{grid-template-columns:1fr}.nav{height:auto;position:static;display:flex;gap:8px;align-items:center;overflow:auto;padding:14px}.brand{border:0;margin:0;padding:0;min-width:170px}.tab{width:auto;white-space:nowrap}.grid,.account{grid-template-columns:1fr}.main{padding:16px}.plans{grid-template-columns:1fr}iframe{min-height:520px}}
+:root{color-scheme:light;--bg:#f7f8fb;--card:#fff;--text:#1f2329;--muted:#646a73;--line:#e5e6eb;--blue:#1664ff;--blue2:#4080ff;--soft:#eef4ff;--red:#f54a45;--green:#00a870;--shadow:0 18px 48px rgba(31,35,41,.07);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#fafcff 0,#f4f6fb 48%,#f7f8fb 100%);color:var(--text)}button,input,textarea{font:inherit}.shell{min-height:100vh;display:grid;grid-template-columns:208px minmax(0,1fr)}.nav{background:rgba(255,255,255,.96);border-right:1px solid var(--line);padding:20px 16px;position:sticky;top:0;height:100vh}.brand{display:flex;gap:11px;align-items:center;padding:2px 4px 18px;margin-bottom:18px;border-bottom:1px solid var(--line)}.mark{width:40px;height:40px;border-radius:14px;background:linear-gradient(135deg,var(--blue),#7aa2ff);color:#fff;display:grid;place-items:center;font-weight:900;box-shadow:0 10px 26px rgba(22,100,255,.23)}h1,h2,h3,p{margin:0}h1{font-size:17px;letter-spacing:-.02em}.brand p,.head p,.muted{color:var(--muted);font-size:13px;margin-top:4px}.tab{width:100%;border:0;background:transparent;text-align:left;padding:11px 12px;border-radius:12px;color:var(--muted);font-weight:760;cursor:pointer;transition:.15s}.tab.active,.tab:hover{background:var(--soft);color:var(--blue)}.tab.link{display:block;text-decoration:none}.main{padding:28px;max-width:1520px}.page{display:none}.page.active{display:block}.head{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:18px}.head h2{font-size:27px;letter-spacing:-.04em}.pill{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;color:var(--muted);font-size:13px;white-space:nowrap}.grid{display:grid;grid-template-columns:minmax(340px,.72fr) minmax(560px,1.28fr);gap:18px;align-items:stretch}.card{background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:20px;padding:19px;box-shadow:var(--shadow)}.field{display:grid;gap:8px;margin-bottom:14px}.field span{font-size:13px;font-weight:800;color:#30343b}textarea{width:100%;border:1px solid var(--line);border-radius:14px;padding:13px 14px;line-height:1.58;resize:vertical;outline:none;background:#fff;color:var(--text)}textarea:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(22,100,255,.10)}.chips{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 14px}.chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:999px;padding:8px 11px;cursor:pointer;font-weight:720}.chip:hover{background:var(--soft);color:var(--blue);border-color:#bacefd}.btn{border:1px solid var(--line);background:#fff;border-radius:13px;padding:10px 14px;font-weight:850;cursor:pointer;transition:.15s;color:var(--text)}.btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(31,35,41,.08)}.btn.primary{background:linear-gradient(135deg,var(--blue),var(--blue2));border-color:var(--blue);color:#fff}.btn.danger{color:var(--red)}.btn.block{width:100%}.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}.preview-card{min-height:680px;display:grid;grid-template-rows:auto 1fr;gap:13px}.preview-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.preview-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}iframe{width:100%;min-height:604px;border:1px solid var(--line);border-radius:16px;background:#fff}.solution-list,.history{display:grid;gap:12px}.item{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}.item p{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.5}.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.tag{border:1px solid #dfe5f6;background:#f7f9ff;color:#456094;border-radius:999px;padding:4px 8px;font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.empty{background:#fff;border:1px dashed var(--line);border-radius:16px;padding:18px;color:var(--muted)}.account{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px}.balance span{color:var(--muted);font-size:13px}.balance strong{display:block;font-size:42px;margin:10px 0;letter-spacing:-.04em}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.plan{text-align:left;border:1px solid var(--line);background:#fff;border-radius:16px;padding:18px;cursor:pointer}.plan:hover{background:var(--soft);border-color:#bacefd}.plan strong{display:block;font-size:24px}.records{grid-column:1/-1}.record{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:11px 0;color:var(--muted)}.toast{position:fixed;right:18px;bottom:18px;background:#1f2329;color:#fff;padding:11px 13px;border-radius:12px;font-size:13px;box-shadow:0 12px 30px rgba(31,35,41,.25);z-index:50}.legacy-compat{display:none!important}@media(max-width:1080px){.shell{grid-template-columns:1fr}.nav{height:auto;position:static;display:flex;gap:8px;align-items:center;overflow:auto;padding:14px}.brand{border:0;margin:0;padding:0;min-width:150px}.tab{width:auto;white-space:nowrap}.main{padding:16px}.grid,.account{grid-template-columns:1fr}.plans{grid-template-columns:1fr}iframe{min-height:520px}.preview-card{min-height:590px}}
+.runtime-box{display:grid;gap:10px;border:1px solid var(--line);border-radius:16px;background:#fbfcff;padding:13px;margin:6px 0 14px}.runtime-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.runtime-head span{font-size:12px;color:var(--muted)}.radio-card{display:flex;gap:8px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:13px;padding:10px 11px;font-weight:800;cursor:pointer}.radio-card em{font-style:normal;color:var(--muted);font-size:12px;margin-left:auto;font-weight:650}.api-options{display:grid;grid-template-columns:1fr 1fr;gap:10px}.api-options label{display:grid;gap:6px;color:var(--muted);font-size:12px;font-weight:760}.api-options select,.api-options input{height:38px;border:1px solid var(--line);border-radius:11px;padding:0 10px;background:#fff;color:var(--text);outline:none}.token-card{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 14px}.token-card div{border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px}.token-card span{display:block;color:var(--muted);font-size:12px}.token-card strong{display:block;margin-top:5px;font-size:18px}.job-box{margin-top:14px;border:1px solid var(--line);border-radius:15px;background:#fff;padding:12px}.job-box p{color:var(--muted);font-size:13px;margin-top:6px}.bar{height:8px;background:#eef1f7;border-radius:999px;overflow:hidden;margin-top:10px}.bar span{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--blue),#65b5ff);transition:width .25s}.record strong{color:var(--text)}@media(max-width:1080px){.api-options,.token-card{grid-template-columns:1fr}}
+
 """
 
 SIMPLE_PRODUCT_TEMPLATE = """
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Software Studio</title><style>{{ css|safe }}</style></head><body>
-<div class="shell"><aside class="nav"><div class="brand"><div class="mark">S</div><div><h1>Software Studio</h1><p>Create · Reuse · Ship</p></div></div><button class="tab active" data-page="create">Create</button><button class="tab" data-page="solutions">Solutions</button><button class="tab" data-page="account">Account</button><a class="tab link" href="{{ url_for('logout') }}">Logout</a><div class="legacy-compat"><form method="post" action="{{ url_for('run_product') }}"><input name="goal"><input name="mode" value="local_production"><input name="mode" value="llm"><input name="provider" value="openai"><input name="provider" value="groq"><input name="provider" value="deepseek"><input name="custom_model"></form><span>\u9ed8\u8ba4\u751f\u4ea7</span><span>LLM \u751f\u6210</span><span>{{ current_user.username if current_user else 'guest' }} \u00b7 {{ current_user.role if current_user else 'guest' }}</span><a href="{{ url_for('resources_page') }}">\u8d44\u6e90\u4e2d\u5fc3</a><a href="{{ url_for('innovation_page') }}">\u521b\u65b0\u96f7\u8fbe</a><a href="{{ url_for('intent_page') }}">\u610f\u56fe\u7f16\u6392</a><span>\u65b9\u6848\u5907\u4efd</span></div></aside>
-<main class="main">
-<section id="create" class="page active"><div class="head"><div><h2>Build from one prompt</h2><p>Preview first. Refine. Download a runnable package when it feels right.</p></div><span class="pill">Local preview · ZIP export</span></div><div class="grid"><div class="card"><label class="field"><span>Prompt</span><textarea id="prompt" rows="8" placeholder="Example: Build a clean library management system with books, readers, borrowing, returns, fines and dashboard."></textarea></label><div class="chips"><button class="chip" data-prompt="Build a clean library management system with books, readers, borrowing, returns, overdue fines and dashboard.">Library system</button><button class="chip" data-prompt="Build a simple account center with balance, recharge plans and usage records.">Account center</button><button class="chip" data-prompt="Build a lightweight approval workflow page with list, detail and status timeline.">Approval flow</button></div><button id="genBtn" class="btn primary block">Create preview</button><label class="field" style="margin-top:18px"><span>Improve</span><textarea id="improve" rows="4" placeholder="Example: add role permissions, export button, mobile layout..."></textarea></label><button id="improveBtn" class="btn block">Apply improvement</button></div><div class="card preview-card"><div class="preview-head"><div><h3 id="previewTitle">Preview</h3><p id="previewMeta">Nothing generated yet.</p></div><div class="preview-actions"><button id="openBtn" class="btn">Open</button><button id="downloadBtn" class="btn primary">Download ZIP</button><button id="saveBtn" class="btn">Save</button></div></div><iframe id="frame" sandbox="allow-scripts"></iframe></div></div></section>
-<section id="solutions" class="page"><div class="head"><div><h2>Reusable solutions</h2><p>Pick a mature pattern, preview it, then download or adapt.</p></div><button id="clearHistory" class="btn danger">Clear local</button></div><div id="solutionList" class="solution-list"></div><h3 style="margin:22px 0 12px">Local saves</h3><div id="historyList" class="history"></div></section>
-<section id="account" class="page"><div class="head"><div><h2>Account</h2><p>Demo balance and recharge records for product flow.</p></div></div><div class="account"><div class="card balance"><span>Balance</span><strong id="balance">$0</strong><p class="muted">Used by package exports and future model calls.</p></div><div class="card"><h3>Recharge</h3><div class="plans"><button class="plan" data-amount="19"><strong>$19</strong><span>Starter</span></button><button class="plan" data-amount="49"><strong>$49</strong><span>Team</span></button><button class="plan" data-amount="99"><strong>$99</strong><span>Pro</span></button></div></div><div class="card records"><h3>Records</h3><div id="records"></div></div></div></section>
-</main></div><script>
-const $=s=>document.querySelector(s),$$=s=>Array.from(document.querySelectorAll(s));let current=null,url="";function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}function show(p){$$(".tab").forEach(x=>x.classList.toggle("active",x.dataset.page===p));$$(".page").forEach(x=>x.classList.toggle("active",x.id===p));if(p==="solutions")loadSolutions()}$$('.tab[data-page]').forEach(x=>x.onclick=()=>show(x.dataset.page));$$('.chip').forEach(x=>x.onclick=()=>{$('#prompt').value=x.dataset.prompt||x.textContent;saveDraft()});function saveDraft(){localStorage.setItem('spa_draft',JSON.stringify({p:$('#prompt').value,i:$('#improve').value}))}function loadDraft(){try{const d=JSON.parse(localStorage.getItem('spa_draft')||'{}');if(d.p)$('#prompt').value=d.p;if(d.i)$('#improve').value=d.i}catch{}}$('#prompt').oninput=saveDraft;$('#improve').oninput=saveDraft;async function previewApi(body){const r=await fetch('/api/simple-preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.message||d.error||'Request failed');return d}function setPreview(d){current=d;$('#previewTitle').textContent=d.title||'Preview';$('#previewMeta').textContent=d.preview_id||'Ready';$('#frame').srcdoc=d.html||'';if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(new Blob([d.html||''],{type:'text/html'}));show('create')}async function generate(){const p=$('#prompt').value.trim();if(!p)return toast('Enter a prompt first');$('#genBtn').disabled=true;try{setPreview(await previewApi({prompt:p}));toast('Preview ready')}catch(e){toast(e.message)}finally{$('#genBtn').disabled=false}}$('#genBtn').onclick=generate;$('#improveBtn').onclick=async()=>{const p=$('#prompt').value.trim(),i=$('#improve').value.trim();if(!p)return toast('Enter a prompt first');if(!i)return toast('Describe the improvement');$('#improveBtn').disabled=true;try{setPreview(await previewApi({prompt:p,improvement:i}));toast('Updated')}catch(e){toast(e.message)}finally{$('#improveBtn').disabled=false}};$('#openBtn').onclick=()=>url?window.open(url,'_blank','noopener,noreferrer'):toast('Create a preview first');$('#downloadBtn').onclick=async()=>{if(!current)return toast('Create a preview first');$('#downloadBtn').disabled=true;try{const r=await fetch('/api/simple-package',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:current.title,prompt:$('#prompt').value,improvement:$('#improve').value,html:current.html})});if(!r.ok)throw new Error('Download failed');const blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(current.title||'software').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('ZIP downloaded')}catch(e){toast(e.message)}finally{$('#downloadBtn').disabled=false}};function rows(){try{return JSON.parse(localStorage.getItem('spa_solutions')||'[]')}catch{return[]}}function renderHistory(){const r=rows();$('#historyList').innerHTML=r.length?r.map(x=>`<div class="item"><div><strong>${esc(x.title)}</strong><p>${esc(x.time)} · ${esc(x.prompt)}</p></div><div class="actions"><button class="btn" onclick="loadSol('${x.id}')">Use</button><button class="btn danger" onclick="delSol('${x.id}')">Delete</button></div></div>`).join(''):'<div class="empty">Saved previews will appear here.</div>'}$('#saveBtn').onclick=()=>{if(!current)return toast('Create a preview first');const r=rows();r.unshift({id:current.preview_id||Date.now().toString(),title:current.title||'Preview',prompt:$('#prompt').value,improve:$('#improve').value,html:current.html,time:new Date().toLocaleString()});localStorage.setItem('spa_solutions',JSON.stringify(r.slice(0,24)));renderHistory();toast('Saved')};window.loadSol=id=>{const x=rows().find(v=>v.id===id);if(!x)return;$('#prompt').value=x.prompt||'';$('#improve').value=x.improve||'';setPreview({preview_id:x.id,title:x.title,html:x.html});saveDraft()};window.delSol=id=>{localStorage.setItem('spa_solutions',JSON.stringify(rows().filter(x=>x.id!==id)));renderHistory()};$('#clearHistory').onclick=()=>{localStorage.removeItem('spa_solutions');renderHistory();toast('Cleared')};async function loadSolutions(){try{const r=await fetch('/api/simple-solutions');const d=await r.json();const list=d.solutions||[];$('#solutionList').innerHTML=list.length?list.map(x=>`<div class="item"><div><strong>${esc(x.title)}</strong><p>${esc(x.summary)}</p><div class="tags">${(x.tags||[]).slice(0,6).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></div><div class="actions"><button class="btn" onclick='useCurated(${JSON.stringify(x).replace(/'/g,"&#39;")})'>Use</button></div></div>`).join(''):'<div class="empty">No curated solutions yet.</div>'}catch(e){$('#solutionList').innerHTML='<div class="empty">Failed to load solutions.</div>'}}window.useCurated=x=>{$('#prompt').value=x.prompt||x.summary||x.title;$('#improve').value='';previewApi({prompt:$('#prompt').value}).then(setPreview).then(()=>toast('Solution loaded')).catch(e=>toast(e.message));saveDraft()};function account(){try{return JSON.parse(localStorage.getItem('spa_account')||'{"balance":0,"records":[]}')}catch{return{balance:0,records:[]}}}function renderAccount(){const a=account();$('#balance').textContent='$'+(a.balance||0);$('#records').innerHTML=a.records&&a.records.length?a.records.map(x=>`<div class="record"><span>${esc(x.time)}</span><strong>+$${x.amount}</strong></div>`).join(''):'<div class="empty">No records yet.</div>'}$$('.plan').forEach(x=>x.onclick=()=>{const a=account(),n=Number(x.dataset.amount||0);a.balance=(a.balance||0)+n;a.records=a.records||[];a.records.unshift({amount:n,time:new Date().toLocaleString()});localStorage.setItem('spa_account',JSON.stringify(a));renderAccount();toast('Added $'+n)});function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}loadDraft();if(!$('#prompt').value)$('#prompt').value='Build a clean library management system with books, readers, borrowing, returns, overdue fines and dashboard.';renderHistory();renderAccount();loadSolutions();
-</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>软件工坊</title>
+  <style>{{ css|safe }}</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="nav">
+    <div class="brand">
+      <div class="mark">S</div>
+      <div>
+        <h1>软件工坊</h1>
+        <p>生成 · 复用 · 交付</p>
+      </div>
+    </div>
+    <button class="tab active" data-page="create">创建</button>
+    <button class="tab" data-page="solutions">方案库</button>
+    <button class="tab" data-page="account">账户</button>
+    <a class="tab link" href="{{ url_for('logout') }}">退出</a>
+    <div class="legacy-compat">
+      <span>Software Studio</span><span>Download ZIP</span><span>Reusable solutions</span>
+      <form method="post" action="{{ url_for('run_product') }}">
+        <input name="goal">
+        <input name="mode" value="local_production"><input name="mode" value="llm">
+        <input name="provider" value="openai"><input name="provider" value="groq"><input name="provider" value="deepseek">
+        <input name="custom_model">
+      </form>
+      <span>默认生产</span><span>LLM 生成</span>
+      <span>{{ current_user.username if current_user else 'guest' }} · {{ current_user.role if current_user else 'guest' }}</span>
+      <a href="{{ url_for('resources_page') }}">资源中心</a>
+      <a href="{{ url_for('innovation_page') }}">创新雷达</a>
+      <a href="{{ url_for('intent_page') }}">意图编排</a>
+      <span>方案备份</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section id="create" class="page active">
+      <div class="head">
+        <div>
+          <h2>输入需求，生成可预览软件</h2>
+          <p>先看沙盒预览；满意后下载 ZIP，不满意就在同一页继续改。</p>
+        </div>
+        <span class="pill" id="queuePill">队列空闲</span>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <label class="field">
+            <span>需求描述</span>
+            <textarea id="prompt" rows="7" placeholder="例如：做一个图书管理系统，包含图书、读者、借阅、归还、续借、预约、逾期罚款、权限和数据看板。"></textarea>
+          </label>
+
+          <div class="chips">
+            <button class="chip" data-prompt="做一个图书管理系统，包含图书、读者、借阅、归还、续借、预约、逾期罚款、权限和数据看板。">图书管理系统</button>
+            <button class="chip" data-prompt="做一个审批流程页面，包含待办列表、详情、状态流转、审批轨迹和异常退回。">审批流程</button>
+            <button class="chip" data-prompt="做一个个人中心页面，包含余额、充值套餐、消费记录和订单状态。">个人中心</button>
+          </div>
+
+          <div class="runtime-box">
+            <div class="runtime-head"><strong>生成方式</strong><span id="tokenHint">本地模式不扣真实 token</span></div>
+            <label class="radio-card"><input type="radio" name="model_source_ui" value="local" checked> 本地部署模型 <em>仅用于路由和切片</em></label>
+            <label class="radio-card"><input type="radio" name="model_source_ui" value="api"> API 调用 <em>按估算额度准入</em></label>
+            <div id="apiOptions" class="api-options" hidden>
+              <label>服务商
+                <select id="provider">
+                  <option value="deepseek">DeepSeek API</option>
+                  <option value="openai">OpenAI API</option>
+                  <option value="groq">Groq API</option>
+                  <option value="main_deepseek">主 DeepSeek 服务</option>
+                </select>
+              </label>
+              <label>模型
+                <input id="model" placeholder="默认模型即可，可留空">
+              </label>
+            </div>
+          </div>
+
+          <div class="token-card">
+            <div><span>估算输入</span><strong id="inputTokens">-</strong></div>
+            <div><span>预计总量</span><strong id="totalTokens">-</strong></div>
+            <div><span>剩余额度</span><strong id="remainTokens">-</strong></div>
+          </div>
+
+          <button id="genBtn" class="btn primary block">加入队列并生成预览</button>
+
+          <label class="field" style="margin-top:18px">
+            <span>继续改进</span>
+            <textarea id="improve" rows="4" placeholder="例如：增加角色权限、导出按钮、移动端适配……"></textarea>
+          </label>
+          <button id="improveBtn" class="btn block">应用改进</button>
+
+          <div class="job-box">
+            <strong>任务状态</strong>
+            <p id="jobStatus">暂无任务。</p>
+            <div class="bar"><span id="jobBar"></span></div>
+          </div>
+        </div>
+
+        <div class="card preview-card">
+          <div class="preview-head">
+            <div>
+              <h3 id="previewTitle">沙盒预览</h3>
+              <p id="previewMeta">还没有生成内容。</p>
+            </div>
+            <div class="preview-actions">
+              <button id="openBtn" class="btn">新窗口</button>
+              <button id="downloadBtn" class="btn primary">下载 ZIP</button>
+              <button id="saveBtn" class="btn">保存</button>
+            </div>
+          </div>
+          <iframe id="frame" sandbox="allow-scripts"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <section id="solutions" class="page">
+      <div class="head">
+        <div><h2>成熟方案库</h2><p>用于展示、复用和二次改造的可行方案。</p></div>
+        <button id="clearHistory" class="btn danger">清空本地保存</button>
+      </div>
+      <div id="solutionList" class="solution-list"></div>
+      <h3 style="margin:22px 0 12px">本地保存</h3>
+      <div id="historyList" class="history"></div>
+    </section>
+
+    <section id="account" class="page">
+      <div class="head"><div><h2>个人中心和充值</h2><p>免费额度、API 调用额度和消费记录在这里统一看。</p></div></div>
+      <div class="account">
+        <div class="card balance">
+          <span>可用 token</span><strong id="balance">-</strong>
+          <p class="muted" id="quotaText">加载中...</p>
+        </div>
+        <div class="card">
+          <h3>充值套餐</h3>
+          <div class="plans">
+            <button class="plan" data-amount="19"><strong>¥19</strong><span>38,000 tokens</span></button>
+            <button class="plan" data-amount="49"><strong>¥49</strong><span>98,000 tokens</span></button>
+            <button class="plan" data-amount="99"><strong>¥99</strong><span>198,000 tokens</span></button>
+          </div>
+        </div>
+        <div class="card records"><h3>订单与消耗</h3><div id="records"></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+const $=s=>document.querySelector(s),$$=s=>Array.from(document.querySelectorAll(s));
+let current=null, previewUrl='', activeJob='';
+function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2400)}
+function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function show(p){$$('.tab').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));if(p==='solutions')loadSolutions();if(p==='account')loadBilling()}
+$$('.tab[data-page]').forEach(x=>x.onclick=()=>show(x.dataset.page));
+function selectedSource(){return document.querySelector('input[name="model_source_ui"]:checked')?.value||'local'}
+function payload(extra={}){return {prompt:$('#prompt').value.trim(),improvement:$('#improve').value.trim(),model_source:selectedSource(),provider:$('#provider').value,model:$('#model').value.trim(),...extra}}
+function saveDraft(){localStorage.setItem('spa_draft',JSON.stringify({p:$('#prompt').value,i:$('#improve').value,source:selectedSource(),provider:$('#provider').value,model:$('#model').value}))}
+function loadDraft(){try{const d=JSON.parse(localStorage.getItem('spa_draft')||'{}');if(d.p)$('#prompt').value=d.p;if(d.i)$('#improve').value=d.i;if(d.source){const r=document.querySelector(`input[name="model_source_ui"][value="${d.source}"]`);if(r)r.checked=true}if(d.provider)$('#provider').value=d.provider;if(d.model)$('#model').value=d.model}catch{}}
+function refreshRuntime(){const api=selectedSource()==='api';$('#apiOptions').hidden=!api;$('#tokenHint').textContent=api?'API 模式会先检查额度':'本地模式不扣真实 token';saveDraft();updateTokenPlan()}
+$$('input[name="model_source_ui"]').forEach(x=>x.onchange=refreshRuntime);$('#provider').onchange=refreshRuntime;$('#model').oninput=saveDraft;
+$$('.chip').forEach(x=>x.onclick=()=>{$('#prompt').value=x.dataset.prompt||x.textContent;saveDraft();updateTokenPlan()});
+$('#prompt').oninput=()=>{saveDraft();debouncedPlan()};$('#improve').oninput=()=>{saveDraft();debouncedPlan()};
+let planTimer=null;function debouncedPlan(){clearTimeout(planTimer);planTimer=setTimeout(updateTokenPlan,350)}
+async function postJson(url, body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let d={};try{d=await r.json()}catch{};if(!r.ok)throw Object.assign(new Error(d.message||d.error||'请求失败'),{body:d,status:r.status});return d}
+async function updateTokenPlan(){const p=$('#prompt').value.trim();if(!p)return;try{const d=await postJson('/api/token-plan',payload());$('#inputTokens').textContent=d.estimate.input_tokens.toLocaleString();$('#totalTokens').textContent=d.estimate.estimated_total_tokens.toLocaleString();$('#remainTokens').textContent=d.billing.remaining_tokens.toLocaleString();$('#queuePill').textContent=d.model_source==='api'?'API 调用 · 额度校验':'本地部署 · 路由切片'}catch(e){}}
+function setPreview(d){current=d;$('#previewTitle').textContent=d.title||'沙盒预览';$('#previewMeta').textContent=d.preview_id?`已生成 · ${d.preview_id}`:'已生成';$('#frame').srcdoc=d.html||'';if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(new Blob([d.html||''],{type:'text/html'}));show('create')}
+async function submitJob(){const p=$('#prompt').value.trim();if(!p)return toast('先输入需求');$('#genBtn').disabled=true;try{const d=await postJson('/api/simple-jobs',payload());activeJob=d.job.job_id;toast(d.notification||'已加入队列');pollJob(activeJob)}catch(e){if(e.status===402)toast('额度不足，请先充值');else toast(e.message)}finally{$('#genBtn').disabled=false;loadBilling()}}
+async function pollJob(id){if(!id)return;try{const r=await fetch('/api/simple-jobs/'+encodeURIComponent(id));const d=await r.json();$('#jobStatus').textContent=`${d.status||'-'} · ${d.notifications?.[0]||''}`;$('#jobBar').style.width=Math.max(Number(d.progress||0),3)+'%';if(d.status==='finished'){setPreview(d.result.preview);toast('预览已生成');loadBilling();return}if(d.status==='failed'){toast(d.error||'任务失败');return}setTimeout(()=>pollJob(id),650)}catch(e){toast('任务状态获取失败')}};
+$('#genBtn').onclick=submitJob;$('#improveBtn').onclick=submitJob;
+$('#openBtn').onclick=()=>previewUrl?window.open(previewUrl,'_blank','noopener,noreferrer'):toast('先生成预览');
+$('#downloadBtn').onclick=async()=>{if(!current)return toast('先生成预览');$('#downloadBtn').disabled=true;try{const r=await fetch('/api/simple-package',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:current.title,prompt:$('#prompt').value,improvement:$('#improve').value,html:current.html})});if(!r.ok)throw new Error('下载失败');const blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(current.title||'software').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g,'-').replace(/^-|-$/g,'')+'.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('ZIP 已下载')}catch(e){toast(e.message)}finally{$('#downloadBtn').disabled=false}};
+function rows(){try{return JSON.parse(localStorage.getItem('spa_solutions')||'[]')}catch{return[]}}
+function renderHistory(){const r=rows();$('#historyList').innerHTML=r.length?r.map(x=>`<div class="item"><div><strong>${esc(x.title)}</strong><p>${esc(x.time)} · ${esc(x.prompt)}</p></div><div class="actions"><button class="btn" onclick="loadSol('${x.id}')">使用</button><button class="btn danger" onclick="delSol('${x.id}')">删除</button></div></div>`).join(''):'<div class="empty">保存后的预览会出现在这里。</div>'}
+$('#saveBtn').onclick=()=>{if(!current)return toast('先生成预览');const r=rows();r.unshift({id:current.preview_id||Date.now().toString(),title:current.title||'沙盒预览',prompt:$('#prompt').value,improve:$('#improve').value,html:current.html,time:new Date().toLocaleString('zh-CN')});localStorage.setItem('spa_solutions',JSON.stringify(r.slice(0,24)));renderHistory();toast('已保存')};
+window.loadSol=id=>{const x=rows().find(v=>v.id===id);if(!x)return;$('#prompt').value=x.prompt||'';$('#improve').value=x.improve||'';setPreview({preview_id:x.id,title:x.title,html:x.html});saveDraft();updateTokenPlan()};
+window.delSol=id=>{localStorage.setItem('spa_solutions',JSON.stringify(rows().filter(x=>x.id!==id)));renderHistory()};$('#clearHistory').onclick=()=>{localStorage.removeItem('spa_solutions');renderHistory();toast('已清空')};
+async function loadSolutions(){try{const r=await fetch('/api/simple-solutions');const d=await r.json();const list=d.solutions||[];$('#solutionList').innerHTML=list.length?list.map(x=>`<div class="item"><div><strong>${esc(x.title)}</strong><p>${esc(x.summary)}</p><div class="tags">${(x.tags||[]).slice(0,6).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></div><div class="actions"><button class="btn" onclick='useCurated(${JSON.stringify(x).replace(/'/g,"&#39;")})'>使用</button></div></div>`).join(''):'<div class="empty">还没有成熟方案。</div>'}catch(e){$('#solutionList').innerHTML='<div class="empty">方案加载失败。</div>'}}
+window.useCurated=x=>{$('#prompt').value=x.prompt||x.summary||x.title;$('#improve').value='';saveDraft();updateTokenPlan();submitJob()};
+async function loadBilling(){try{const r=await fetch('/api/billing');const d=await r.json();$('#balance').textContent=(d.remaining_tokens||0).toLocaleString();$('#quotaText').textContent=`免费 ${Number(d.free_quota||0).toLocaleString()} · 已购 ${Number(d.purchased_tokens||0).toLocaleString()} · 已用 ${Number(d.used_tokens||0).toLocaleString()}`;const orders=(d.orders||[]).slice().reverse(),events=(d.token_events||[]).slice().reverse();const orderHtml=orders.map(x=>`<div class="record"><span>${esc(x.created_at)} · ${esc(x.status)}</span><strong>¥${esc(x.amount_yuan)} / ${Number(x.tokens||0).toLocaleString()} tokens</strong></div>`).join('');const eventHtml=events.map(x=>`<div class="record"><span>${esc(x.created_at)} · ${esc(x.reason)}</span><strong>-${Number(x.amount||0).toLocaleString()}</strong></div>`).join('');$('#records').innerHTML=orderHtml+eventHtml||'<div class="empty">暂无订单和消耗记录。</div>'}catch(e){}}
+$$('.plan').forEach(x=>x.onclick=async()=>{const amount=Number(x.dataset.amount||0);try{const order=await postJson('/api/payment/orders',{amount_yuan:amount});const paid=await postJson('/api/payment/orders/'+order.order.order_id+'/confirm',{});toast(paid.notification||'充值成功');loadBilling();updateTokenPlan()}catch(e){toast(e.message)}});
+loadDraft();refreshRuntime();if(!$('#prompt').value)$('#prompt').value='做一个图书管理系统，包含图书、读者、借阅、归还、续借、预约、逾期罚款、权限和数据看板。';renderHistory();loadBilling();loadSolutions();updateTokenPlan();
+</script>
+</body>
+</html>
 """
 
 RESOURCE_TYPE_META: dict[str, tuple[str, str]] = {
@@ -233,6 +417,347 @@ class DefaultProductionBrain(AgentBrain):
                 "reason": self.last_fallback_reason[:500],
             }
             return self.fallback.fix(error_text, goal, plan, state, session=session)
+
+
+_BILLING_LOCK = threading.RLock()
+
+
+class ProductTaskQueue:
+    """Small in-process queue for UI jobs.
+
+    It keeps the frontend responsive and gives the project a real queue
+    boundary without forcing every preview click to block on a full agent run.
+    Production can swap the backend for Redis/Celery/RQ while keeping the API
+    shape stable.
+    """
+
+    def __init__(self, processor) -> None:
+        self._processor = processor
+        self._jobs: dict[str, dict[str, Any]] = {}
+        self._queue: queue_lib.Queue[str] = queue_lib.Queue()
+        self._lock = threading.RLock()
+        self._worker = threading.Thread(target=self._run, name="product-ui-job-worker", daemon=True)
+        self._worker.start()
+
+    def submit(self, payload: dict[str, Any]) -> dict[str, Any]:
+        job_id = f"job_{secrets.token_hex(8)}"
+        now = _now_iso()
+        job = {
+            "schema": "product_job.v1",
+            "job_id": job_id,
+            "status": "queued",
+            "created_at": now,
+            "updated_at": now,
+            "progress": 0,
+            "payload": dict(payload),
+            "result": {},
+            "error": "",
+            "notifications": ["任务已进入队列"],
+        }
+        with self._lock:
+            self._jobs[job_id] = job
+        self._queue.put(job_id)
+        return dict(job)
+
+    def get(self, job_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            job = self._jobs.get(str(job_id or ""))
+            return json.loads(json.dumps(job, ensure_ascii=False)) if job else None
+
+    def list(self, *, limit: int = 20) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = sorted(self._jobs.values(), key=lambda row: str(row.get("created_at", "")), reverse=True)
+            return json.loads(json.dumps(rows[: max(int(limit), 1)], ensure_ascii=False))
+
+    def snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            counts: dict[str, int] = {}
+            for job in self._jobs.values():
+                status = str(job.get("status", "unknown"))
+                counts[status] = counts.get(status, 0) + 1
+            return {
+                "schema": "product_job_queue.v1",
+                "queued_size": self._queue.qsize(),
+                "counts": counts,
+                "jobs": self.list(limit=20),
+            }
+
+    def _patch(self, job_id: str, **updates: Any) -> None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if not job:
+                return
+            job.update(updates)
+            job["updated_at"] = _now_iso()
+
+    def _run(self) -> None:
+        while True:
+            job_id = self._queue.get()
+            try:
+                self._patch(job_id, status="running", progress=25, notifications=["任务开始执行"])
+                job = self.get(job_id) or {}
+                result = self._processor(job)
+                self._patch(job_id, status="finished", progress=100, result=result, notifications=["任务已完成"])
+            except Exception as exc:  # pragma: no cover - defensive worker boundary
+                self._patch(
+                    job_id,
+                    status="failed",
+                    progress=100,
+                    error=f"{type(exc).__name__}: {exc}",
+                    notifications=["任务失败，请调整需求后重试"],
+                )
+            finally:
+                self._queue.task_done()
+
+
+def _now_iso() -> str:
+    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+def _estimate_tokens(*texts: str, output_tokens: int = 0) -> int:
+    joined = "\n".join(str(text or "") for text in texts)
+    cjk = sum(1 for ch in joined if "\u4e00" <= ch <= "\u9fff")
+    ascii_chars = max(len(joined) - cjk, 0)
+    estimated = int(ascii_chars / 4 + cjk * 1.15 + max(int(output_tokens), 0))
+    return max(1, estimated)
+
+
+def _billing_path(root: Path) -> Path:
+    return root / ".agent_billing.json"
+
+
+def _load_billing(root: Path) -> dict[str, Any]:
+    try:
+        raw = json.loads(_billing_path(root).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raw = {}
+    if not isinstance(raw, dict):
+        raw = {}
+    raw.setdefault("schema", "billing.v1")
+    raw.setdefault("accounts", {})
+    return raw
+
+
+def _save_billing(root: Path, data: dict[str, Any]) -> None:
+    path = _billing_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _account_key(user: Any | None) -> str:
+    return str(getattr(user, "id", "") or getattr(user, "username", "") or "anonymous")
+
+
+def _ensure_billing_account(data: dict[str, Any], user: Any | None) -> dict[str, Any]:
+    accounts = data.setdefault("accounts", {})
+    key = _account_key(user)
+    account = accounts.setdefault(
+        key,
+        {
+            "user_id": key,
+            "username": str(getattr(user, "username", "") or "anonymous"),
+            "free_quota": FREE_TOKEN_QUOTA,
+            "purchased_tokens": 0,
+            "used_tokens": 0,
+            "orders": [],
+            "token_events": [],
+            "created_at": _now_iso(),
+        },
+    )
+    account.setdefault("free_quota", FREE_TOKEN_QUOTA)
+    account.setdefault("purchased_tokens", 0)
+    account.setdefault("used_tokens", 0)
+    account.setdefault("orders", [])
+    account.setdefault("token_events", [])
+    return account
+
+
+def _billing_snapshot(root: Path, user: Any | None) -> dict[str, Any]:
+    with _BILLING_LOCK:
+        data = _load_billing(root)
+        account = _ensure_billing_account(data, user)
+        _save_billing(root, data)
+        total = int(account.get("free_quota", 0)) + int(account.get("purchased_tokens", 0))
+        used = int(account.get("used_tokens", 0))
+        remaining = max(total - used, 0)
+        return {
+            "schema": "billing_snapshot.v1",
+            "username": str(account.get("username", "")),
+            "free_quota": int(account.get("free_quota", 0)),
+            "purchased_tokens": int(account.get("purchased_tokens", 0)),
+            "used_tokens": used,
+            "remaining_tokens": remaining,
+            "total_tokens": total,
+            "low_quota": remaining < max(int(total * 0.15), 3_000),
+            "orders": list(account.get("orders", []))[-20:],
+            "token_events": list(account.get("token_events", []))[-20:],
+        }
+
+
+def _consume_tokens(
+    root: Path,
+    user: Any | None,
+    amount: int,
+    *,
+    reason: str,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    amount = max(int(amount), 1)
+    with _BILLING_LOCK:
+        data = _load_billing(root)
+        account = _ensure_billing_account(data, user)
+        total = int(account.get("free_quota", 0)) + int(account.get("purchased_tokens", 0))
+        used = int(account.get("used_tokens", 0))
+        remaining = max(total - used, 0)
+        if amount > remaining:
+            _save_billing(root, data)
+            return {
+                "ok": False,
+                "reason": "insufficient_tokens",
+                "required_tokens": amount,
+                "remaining_tokens": remaining,
+                "billing": _billing_snapshot(root, user),
+            }
+        account["used_tokens"] = used + amount
+        event = {
+            "event_id": f"tok_{secrets.token_hex(6)}",
+            "created_at": _now_iso(),
+            "amount": amount,
+            "reason": reason,
+            "metadata": dict(metadata or {}),
+        }
+        account.setdefault("token_events", []).append(event)
+        _save_billing(root, data)
+    snapshot = _billing_snapshot(root, user)
+    return {
+        "ok": True,
+        "event": event,
+        "used_tokens": amount,
+        "billing": snapshot,
+        "notification": f"本次消耗约 {amount} tokens，剩余 {snapshot['remaining_tokens']} tokens",
+    }
+
+
+def _create_payment_order(root: Path, user: Any | None, amount_yuan: int) -> dict[str, Any]:
+    amount_yuan = max(int(amount_yuan), 1)
+    order = {
+        "order_id": f"pay_{secrets.token_hex(8)}",
+        "created_at": _now_iso(),
+        "amount_yuan": amount_yuan,
+        "tokens": amount_yuan * TOKEN_PER_YUAN,
+        "status": "pending",
+        "channel": "demo_wallet",
+        "idempotency_key": f"{_account_key(user)}:{amount_yuan}:{int(time.time())}",
+    }
+    with _BILLING_LOCK:
+        data = _load_billing(root)
+        account = _ensure_billing_account(data, user)
+        account.setdefault("orders", []).append(order)
+        _save_billing(root, data)
+    return {"schema": "payment_order.v1", "order": order, "billing": _billing_snapshot(root, user)}
+
+
+def _confirm_payment_order(root: Path, user: Any | None, order_id: str) -> dict[str, Any]:
+    with _BILLING_LOCK:
+        data = _load_billing(root)
+        account = _ensure_billing_account(data, user)
+        target = None
+        for order in account.setdefault("orders", []):
+            if str(order.get("order_id", "")) == str(order_id):
+                target = order
+                break
+        if not target:
+            return {"schema": "payment_confirm.v1", "ok": False, "reason": "order_not_found"}
+        if target.get("status") != "paid":
+            target["status"] = "paid"
+            target["paid_at"] = _now_iso()
+            account["purchased_tokens"] = int(account.get("purchased_tokens", 0)) + int(target.get("tokens", 0))
+        _save_billing(root, data)
+    return {
+        "schema": "payment_confirm.v1",
+        "ok": True,
+        "order": target,
+        "billing": _billing_snapshot(root, user),
+        "notification": f"支付成功，到账 {target.get('tokens', 0)} tokens",
+    }
+
+
+def _model_source(value: Any) -> str:
+    raw = str(value or "local").strip().lower()
+    return "api" if raw in {"api", "llm", "cloud", "remote"} else "local"
+
+
+def _build_product_token_plan(
+    root: Path,
+    user: Any | None,
+    *,
+    prompt: str,
+    improvement: str = "",
+    model_source: str = "local",
+    provider: str = DEFAULT_PRODUCTION_PROVIDER,
+    model: str = "",
+    max_output_tokens: int = 1400,
+) -> dict[str, Any]:
+    source = _model_source(model_source)
+    provider_name = normalise_provider(provider or DEFAULT_PRODUCTION_PROVIDER)
+    prompt_text = "\n".join(part for part in (prompt, improvement) if part)
+    estimated_input = _estimate_tokens(prompt, improvement)
+    estimated_total = _estimate_tokens(prompt, improvement, output_tokens=max_output_tokens)
+    route_plan = build_model_route_plan(
+        prompt[:280] or DEFAULT_GOAL,
+        prompt=prompt_text,
+        max_output_tokens=max_output_tokens,
+        business_type="product_ui",
+        require_json=False,
+    )
+    billing = _billing_snapshot(root, user)
+    billable = source == "api"
+    can_run = (not billable) or int(billing.get("remaining_tokens", 0)) >= estimated_total
+    return {
+        "schema": "product_token_plan.v1",
+        "model_source": source,
+        "provider": provider_name,
+        "model": str(model or ""),
+        "estimate": {
+            "input_tokens": estimated_input,
+            "max_output_tokens": int(max_output_tokens),
+            "estimated_total_tokens": estimated_total,
+        },
+        "billing_policy": {
+            "billable": billable,
+            "local_policy": "本地部署模型只用于路由选择和上下文切片，不扣真实 token",
+            "api_policy": "API 调用先按估算做准入，真实 usage 可在模型返回后回填校准",
+        },
+        "admission": {
+            "can_run": can_run,
+            "reason": "ok" if can_run else "insufficient_tokens",
+            "required_tokens": estimated_total if billable else 0,
+            "remaining_tokens": int(billing.get("remaining_tokens", 0)),
+        },
+        "route_plan": {
+            "selected_pool": route_plan.get("selected_pool"),
+            "pool": route_plan.get("pool"),
+            "context_budget": route_plan.get("context_budget"),
+            "token_accounting": route_plan.get("token_accounting"),
+        },
+        "billing": billing,
+    }
+
+
+def _process_simple_job(job: dict[str, Any]) -> dict[str, Any]:
+    payload = job.get("payload") if isinstance(job.get("payload"), dict) else {}
+    prompt = str(payload.get("prompt", "") or "")
+    improvement = str(payload.get("improvement", "") or "")
+    preview = _build_simple_preview(prompt, improvement)
+    return {
+        "schema": "product_job_result.v1",
+        "preview": preview,
+        "model_source": str(payload.get("model_source", "local")),
+        "provider": str(payload.get("provider", DEFAULT_PRODUCTION_PROVIDER)),
+        "model": str(payload.get("model", "")),
+        "token_estimate": payload.get("token_estimate", {}),
+        "package_api": "/api/simple-package",
+    }
 
 
 CSS = """
@@ -1792,13 +2317,13 @@ def _build_simple_preview(prompt: str, improvement: str = "") -> dict[str, Any]:
         for name, desc in sections
     )
     improve_html = (
-        f"<div class='note'><strong>Improvement</strong><br>{escaped_improvement}</div>"
+        f"<div class='note'><strong>改进要求</strong><br>{escaped_improvement}</div>"
         if improvement
         else ""
     )
-    html = f"""<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{html_lib.escape(title)}</title><style>
-*{{box-sizing:border-box}}body{{margin:0;background:{theme['bg']};font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1f2329}}.page{{min-height:100vh;padding:34px}}.hero{{background:#fff;border:1px solid #e5e6eb;border-radius:26px;padding:36px;box-shadow:0 18px 50px rgba(31,35,41,.08)}}.tag{{display:inline-flex;padding:7px 11px;border-radius:999px;background:{theme['soft']};color:{theme['main']};font-weight:850;font-size:13px}}h1{{margin:18px 0 10px;font-size:36px;letter-spacing:-.045em}}p{{color:#646a73;line-height:1.72}}.actions{{display:flex;gap:12px;margin-top:24px}}button{{border:0;border-radius:13px;padding:12px 16px;font-weight:850;cursor:pointer}}.primary{{background:{theme['main']};color:#fff}}.ghost{{background:#f6f7fb;color:#1f2329}}.grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}}.card,.note{{background:#fff;border:1px solid #e5e6eb;border-radius:18px;padding:18px}}.card strong{{display:block;margin-bottom:8px}}.note{{margin-top:18px;background:#fafbfc;font-size:13px;color:#646a73}}@media(max-width:760px){{.page{{padding:16px}}.grid{{grid-template-columns:1fr}}h1{{font-size:27px}}}}
-</style></head><body><main class='page'><section class='hero'><span class='tag'>Runnable preview</span><h1>{html_lib.escape(title)}</h1><p>A clean product shell generated from your prompt. Use the package export to get an offline runnable app skeleton with docs and API contract.</p><div class='actions'><button class='primary'>Primary action</button><button class='ghost'>Secondary</button></div></section><section class='grid'>{section_html}</section><div class='note'><strong>Prompt</strong><br>{escaped_prompt}</div>{improve_html}</main></body></html>"""
+    html = f"""<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{html_lib.escape(title)}</title><style>
+*{{box-sizing:border-box}}body{{margin:0;background:{theme['bg']};font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:#1f2329}}.page{{min-height:100vh;padding:32px}}.hero{{background:#fff;border:1px solid #e5e6eb;border-radius:26px;padding:34px;box-shadow:0 18px 50px rgba(31,35,41,.08)}}.tag{{display:inline-flex;padding:7px 11px;border-radius:999px;background:{theme['soft']};color:{theme['main']};font-weight:850;font-size:13px}}h1{{margin:18px 0 10px;font-size:34px;letter-spacing:-.045em}}p{{color:#646a73;line-height:1.72}}.actions{{display:flex;gap:12px;margin-top:22px}}button{{border:0;border-radius:13px;padding:12px 16px;font-weight:850;cursor:pointer}}.primary{{background:{theme['main']};color:#fff}}.ghost{{background:#f6f7fb;color:#1f2329}}.grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}}.card,.note{{background:#fff;border:1px solid #e5e6eb;border-radius:18px;padding:18px}}.card strong{{display:block;margin-bottom:8px}}.note{{margin-top:18px;background:#fafbfc;font-size:13px;color:#646a73}}@media(max-width:760px){{.page{{padding:16px}}.grid{{grid-template-columns:1fr}}h1{{font-size:27px}}}}
+</style></head><body><main class='page'><section class='hero'><span class='tag'>可运行预览</span><h1>{html_lib.escape(title)}</h1><p>这是根据需求生成的产品壳。满意后可以导出 ZIP，里面会带上预览页、产品说明和接口契约。</p><div class='actions'><button class='primary'>主要操作</button><button class='ghost'>查看详情</button></div></section><section class='grid'>{section_html}</section><div class='note'><strong>原始需求</strong><br>{escaped_prompt}</div>{improve_html}</main></body></html>"""
     return {
         "preview_id": preview_id,
         "title": title,
@@ -1811,19 +2336,19 @@ def _build_simple_preview(prompt: str, improvement: str = "") -> dict[str, Any]:
 def _simple_title(prompt: str) -> str:
     text = re.sub(r"\s+", " ", prompt.strip())
     if not text:
-        return "Software Preview"
+        return "软件预览"
     cleaned = re.sub(r"^(build|create|make|generate|write)\s+(a|an|the)?\s*", "", text, flags=re.IGNORECASE)
-    cleaned = cleaned.strip(" .") or text
-    return cleaned if len(cleaned) <= 42 else cleaned[:42].rstrip(" -,.;") + "..."
+    cleaned = re.sub(r"^(做一个|创建一个|生成一个|帮我做一个|我要一个)", "", cleaned).strip(" 。.") or text
+    return cleaned if len(cleaned) <= 36 else cleaned[:36].rstrip(" ，,.;；。") + "..."
 
 
 def _simple_theme(text: str) -> dict[str, str]:
     lower = text.lower()
-    if any(key in lower for key in ("library", "book", "reader", "borrow", "return")):
+    if any(key in lower for key in ("library", "book", "reader", "borrow", "return", "图书", "读者", "借阅", "归还")):
         return {"main": "#1664ff", "soft": "#eef4ff", "bg": "#f7f9ff"}
-    if any(key in lower for key in ("pay", "recharge", "account", "balance", "wallet")):
+    if any(key in lower for key in ("pay", "recharge", "account", "balance", "wallet", "充值", "账户", "余额", "个人中心")):
         return {"main": "#00a870", "soft": "#e8f8f2", "bg": "#f5fbf8"}
-    if any(key in lower for key in ("approval", "workflow", "audit", "risk")):
+    if any(key in lower for key in ("approval", "workflow", "audit", "risk", "审批", "流程", "审计")):
         return {"main": "#f59a23", "soft": "#fff7e8", "bg": "#fffaf2"}
     return {"main": "#1664ff", "soft": "#eef4ff", "bg": "#f6f7fb"}
 
@@ -1831,27 +2356,27 @@ def _simple_theme(text: str) -> dict[str, str]:
 def _simple_sections(text: str) -> list[tuple[str, str]]:
     lower = text.lower()
     sections = [
-        ("Core data", "Entity list, status fields and searchable table layout."),
-        ("Operations", "Create, update, delete, export and detail workflows."),
-        ("Delivery", "Offline preview, README, API contract and package manifest."),
+        ("核心数据", "实体、状态字段和可检索列表布局。"),
+        ("业务操作", "新增、编辑、删除、导出和详情流程。"),
+        ("交付内容", "离线预览、README、接口契约和打包清单。"),
     ]
-    if any(key in lower for key in ("library", "book", "reader", "borrow")):
+    if any(key in lower for key in ("library", "book", "reader", "borrow", "图书", "读者", "借阅")):
         return [
-            ("Books & readers", "Book catalog, reader profiles, cards and borrow limits."),
-            ("Circulation", "Borrow, return, renew, reservation, overdue and fine flows."),
-            ("Admin dashboard", "Inventory alerts, audit log, reports and role permissions."),
+            ("Books & readers / 图书与读者", "图书目录、读者档案、借阅证和借阅上限。"),
+            ("流通流程", "借阅、归还、续借、预约、逾期和罚款。"),
+            ("管理看板", "库存预警、审计日志、统计报表和角色权限。"),
         ]
-    if any(key in lower for key in ("account", "recharge", "balance", "wallet")):
+    if any(key in lower for key in ("account", "recharge", "balance", "wallet", "账户", "充值", "余额", "个人中心")):
         return [
-            ("Balance", "Current balance, plan cards and payment status feedback."),
-            ("Recharge", "Idempotent order creation, pending state and reconciliation."),
-            ("Records", "Usage records, invoice hints and failed payment recovery."),
+            ("余额", "当前余额、套餐卡片和支付状态反馈。"),
+            ("充值", "订单创建、待支付状态、幂等校验和对账。"),
+            ("记录", "消费记录、发票提示和失败支付恢复。"),
         ]
-    if any(key in lower for key in ("approval", "workflow", "audit")):
+    if any(key in lower for key in ("approval", "workflow", "audit", "审批", "流程", "审计")):
         return [
-            ("Queue", "Todo list, priority, owner and SLA fields."),
-            ("State machine", "Draft, pending, approved, rejected and cancelled transitions."),
-            ("Trace", "Approver comments, audit log and rollback-friendly history."),
+            ("待办队列", "待办列表、优先级、负责人和 SLA 字段。"),
+            ("状态机", "草稿、待审、通过、驳回和撤销流转。"),
+            ("审批轨迹", "审批意见、操作日志和可回滚历史。"),
         ]
     return sections
 
@@ -1889,46 +2414,48 @@ def _build_simple_package_response(prompt: str, improvement: str, html: str, tit
     manifest = _simple_package_manifest(package_title, prompt, improvement)
     readme = f"""# {package_title}
 
-This package was exported from Software Studio.
+这个软件包由软件工坊导出。
 
-## Run
+> Software Studio compatibility note: this ZIP can be opened without后端服务。
 
-Open `frontend/index.html` directly in a browser, or serve it with any static file server.
+## 怎么运行
 
-## Included
+直接用浏览器打开 `frontend/index.html`，或者用任意静态服务器托管该目录。
 
-- Offline frontend preview
-- Product spec
-- OpenAPI-style API contract
-- Delivery checklist
-- Reusable solution manifest
+## 包含内容
 
-## Prompt
+- 离线前端预览
+- 产品说明
+- OpenAPI 风格接口契约
+- 交付检查清单
+- 可复用方案 manifest
+
+## 原始需求
 
 {prompt}
 
-## Improvement
+## 改进要求
 
-{improvement or 'None'}
+{improvement or '无'}
 """
-    product_spec = f"""# Product Spec: {package_title}
+    product_spec = f"""# 产品说明：{package_title}
 
-## Goal
+## 目标
 {prompt}
 
-## Core modules
-- Dashboard
-- List and detail management
-- Create/update workflow
-- Search and filter
-- Export/download handoff
-- Role-aware operation notes
+## 核心模块
+- 数据看板
+- 列表与详情管理
+- 新增/编辑流程
+- 搜索与筛选
+- 导出/下载交付
+- 角色感知的操作提示
 
-## Acceptance
-- The preview opens without external services.
-- Main entities and flows are visible.
-- Future backend APIs can follow `docs/API_CONTRACT.yaml`.
-- The package contains no local account secrets or internal `.agent_*` files.
+## 验收标准
+- 预览页无需外部服务即可打开。
+- 主要实体和流程在页面中可见。
+- 后续后端接口可以沿用 `docs/API_CONTRACT.yaml`。
+- 软件包不包含本地账号密钥或 `.agent_*` 内部文件。
 """
     api_contract = f"""openapi: 3.0.3
 info:
@@ -1963,14 +2490,14 @@ paths:
         '204':
           description: Deleted
 """
-    checklist = """# Delivery Checklist
+    checklist = """# 交付检查清单
 
-- [ ] Preview page reviewed
-- [ ] API contract reviewed
-- [ ] Data model reviewed
-- [ ] Auth and permission rules added when backend is implemented
-- [ ] Idempotency keys added for payment/external side effects
-- [ ] Package downloaded and opened locally
+- [ ] 已检查预览页
+- [ ] 已检查接口契约
+- [ ] 已检查数据模型
+- [ ] 后端实现时补齐登录、权限和安全校验
+- [ ] 涉及支付/外部系统时加入幂等键
+- [ ] 已下载 ZIP 并本地打开验证
 """
     buffer = BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -2016,7 +2543,7 @@ def _curated_solution_catalog() -> list[dict[str, Any]]:
                 "id": "library_management_system",
                 "title": "Library Management System",
                 "summary": "Books, readers, borrowing, returns, overdue fines, reports and audit-ready admin dashboard.",
-                "prompt": "Build a clean library management system with books, readers, borrowing, returns, overdue fines, role permissions and dashboard.",
+                "prompt": "做一个图书管理系统，包含图书、读者、借阅、归还、逾期罚款、权限和数据看板。",
                 "tags": ["library", "crud", "rbac", "circulation", "dashboard"],
                 "quality_score": 9.0,
                 "path": "",
@@ -2049,7 +2576,7 @@ def _normalise_mode(value: str) -> str:
 
 
 def _normalise_provider(value: str) -> str:
-    provider = (value or "openai").strip().lower()
+    provider = normalise_provider(value or "openai")
     return provider if provider in ALLOWED_PROVIDERS else "openai"
 
 
@@ -2252,6 +2779,9 @@ def _selected_model(provider: str, model: str, custom_model: str) -> str:
 
 def _selected_runtime(mode: str, provider: str, model: str, custom_model: str) -> tuple[str, str]:
     if mode == "local_production":
+        provider_name = normalise_provider(provider)
+        if str(provider or "").strip() and provider_name in ALLOWED_PROVIDERS:
+            return provider_name, _selected_model(provider_name, model, custom_model)
         return _default_production_runtime()
     provider_name = _normalise_provider(provider)
     return provider_name, _selected_model(provider_name, model, custom_model)
@@ -2703,6 +3233,7 @@ def create_app(
     app.secret_key = os.environ.get("AGENT_UI_SECRET_KEY", "").strip() or secrets.token_hex(32)
     auth_store = LocalAuthStore(root / ".agent_users.json")
     admission_controller = PoolAdmissionController()
+    job_queue = ProductTaskQueue(_process_simple_job)
     root.mkdir(parents=True, exist_ok=True)
 
     def _auth_store() -> LocalAuthStore:
@@ -2825,6 +3356,121 @@ def create_app(
             current_user=_current_user(),
         )
 
+    @app.get("/api/billing")
+    @login_required(_auth_store)
+    def api_billing() -> Response:
+        return jsonify(_billing_snapshot(root, _current_user()))
+
+    @app.post("/api/token-plan")
+    @login_required(_auth_store)
+    def api_token_plan() -> Response:
+        payload = _request_payload()
+        prompt = str(payload.get("prompt", "") or "").strip()
+        improvement = str(payload.get("improvement", "") or "").strip()
+        if not prompt:
+            return jsonify({"error": "bad_request", "message": "prompt is required"}), 400
+        return jsonify(
+            _build_product_token_plan(
+                root,
+                _current_user(),
+                prompt=prompt,
+                improvement=improvement,
+                model_source=str(payload.get("model_source", "local") or "local"),
+                provider=str(payload.get("provider", DEFAULT_PRODUCTION_PROVIDER) or DEFAULT_PRODUCTION_PROVIDER),
+                model=str(payload.get("model", "") or ""),
+            )
+        )
+
+    @app.post("/api/payment/orders")
+    @login_required(_auth_store)
+    def api_payment_order() -> Response:
+        payload = _request_payload()
+        amount = payload.get("amount_yuan", payload.get("amount", 0))
+        try:
+            amount_yuan = int(amount)
+        except (TypeError, ValueError):
+            amount_yuan = 0
+        if amount_yuan <= 0:
+            return jsonify({"error": "bad_request", "message": "amount_yuan must be positive"}), 400
+        return jsonify(_create_payment_order(root, _current_user(), amount_yuan))
+
+    @app.post("/api/payment/orders/<order_id>/confirm")
+    @login_required(_auth_store)
+    def api_payment_confirm(order_id: str) -> Response:
+        result = _confirm_payment_order(root, _current_user(), order_id)
+        return jsonify(result), 200 if bool(result.get("ok")) else 404
+
+    @app.get("/api/simple-jobs")
+    @login_required(_auth_store)
+    def api_simple_jobs() -> Response:
+        return jsonify(job_queue.snapshot())
+
+    @app.post("/api/simple-jobs")
+    @login_required(_auth_store)
+    def api_simple_job_submit() -> Response:
+        user = _current_user()
+        require_permission(user, "run:create")
+        payload = _request_payload()
+        prompt = str(payload.get("prompt", "") or "").strip()
+        improvement = str(payload.get("improvement", "") or "").strip()
+        if not prompt:
+            return jsonify({"error": "bad_request", "message": "prompt is required"}), 400
+        token_plan = _build_product_token_plan(
+            root,
+            user,
+            prompt=prompt,
+            improvement=improvement,
+            model_source=str(payload.get("model_source", "local") or "local"),
+            provider=str(payload.get("provider", DEFAULT_PRODUCTION_PROVIDER) or DEFAULT_PRODUCTION_PROVIDER),
+            model=str(payload.get("model", "") or ""),
+        )
+        if not bool(token_plan["admission"]["can_run"]):
+            return jsonify(token_plan), 402
+        if token_plan["billing_policy"]["billable"]:
+            consumed = _consume_tokens(
+                root,
+                user,
+                int(token_plan["estimate"]["estimated_total_tokens"]),
+                reason="product_preview_job_estimate",
+                metadata={
+                    "provider": token_plan["provider"],
+                    "model": token_plan["model"],
+                    "mode": "api",
+                },
+            )
+            if not bool(consumed.get("ok")):
+                return jsonify(consumed), 402
+            token_plan["billing"] = consumed["billing"]
+            token_plan["billing_event"] = consumed.get("event")
+        job = job_queue.submit(
+            {
+                **payload,
+                "prompt": prompt,
+                "improvement": improvement,
+                "model_source": token_plan["model_source"],
+                "provider": token_plan["provider"],
+                "model": token_plan["model"],
+                "token_estimate": token_plan["estimate"],
+                "token_plan": token_plan,
+            }
+        )
+        return jsonify(
+            {
+                "schema": "product_job_submission.v1",
+                "job": job,
+                "token_plan": token_plan,
+                "notification": "已加入任务队列",
+            }
+        ), 202
+
+    @app.get("/api/simple-jobs/<job_id>")
+    @login_required(_auth_store)
+    def api_simple_job_status(job_id: str) -> Response:
+        job = job_queue.get(job_id)
+        if not job:
+            return jsonify({"error": "not_found", "message": "job not found"}), 404
+        return jsonify(job)
+
     @app.post("/api/simple-preview")
     @login_required(_auth_store)
     def api_simple_preview() -> Response:
@@ -2833,7 +3479,17 @@ def create_app(
         improvement = str(payload.get("improvement", "") or "").strip()
         if not prompt:
             return jsonify({"error": "bad_request", "message": "prompt is required"}), 400
-        return jsonify(_build_simple_preview(prompt, improvement))
+        preview = _build_simple_preview(prompt, improvement)
+        preview["token_plan"] = _build_product_token_plan(
+            root,
+            _current_user(),
+            prompt=prompt,
+            improvement=improvement,
+            model_source=str(payload.get("model_source", "local") or "local"),
+            provider=str(payload.get("provider", DEFAULT_PRODUCTION_PROVIDER) or DEFAULT_PRODUCTION_PROVIDER),
+            model=str(payload.get("model", "") or ""),
+        )
+        return jsonify(preview)
 
     @app.get("/api/simple-solutions")
     @login_required(_auth_store)

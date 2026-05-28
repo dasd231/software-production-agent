@@ -250,3 +250,29 @@ transparent logistic baseline
 ```
 
 但标签、特征、hard gate、质量报告不变。这就是本地模型模块的价值：它不是玩具训练，而是服务器训练前的控制面。
+
+### 6.6 新增：服务器微调前的 SFT 导出
+
+本地训练不直接烧 GPU，但会把稳定后的样本导出成服务器可用的 chat SFT JSONL：
+
+```bash
+python -m agent.local_training.cli export-sft \
+  --training-dir local_training_runs/demo \
+  --output-dir local_training_runs/demo_sft
+```
+
+输出：
+
+```text
+middle_model_sft.jsonl          中间层规则加速小模型 SFT 数据
+github_evaluator_sft.jsonl      GitHub 语料评价小模型 SFT 数据
+finetune_export_manifest.json   后续 DeepSeek/Qwen LoRA 训练建议
+```
+
+关键原则：
+
+```text
+本地 baseline 负责稳定标签、特征和 hard gate；
+服务器 LoRA/SFT 只学习表达能力、泛化和复杂语义判断；
+license、安全、must_have 覆盖率等 hard gate 仍由规则系统执行，不能交给模型覆盖。
+```

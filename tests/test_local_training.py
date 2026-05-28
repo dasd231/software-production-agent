@@ -162,3 +162,30 @@ def test_local_training_inference_applies_hard_gates(tmp_path: Path) -> None:
     )
     assert github_prediction["decision"] == "observe_or_quarantine"
     assert github_prediction["hard_gate_triggered"] is True
+
+
+def test_local_training_exports_server_finetune_sft_bundle(tmp_path: Path) -> None:
+    from agent.local_training import export_server_finetune_bundle, write_demo_local_training_data
+
+    data_paths = write_demo_local_training_data(tmp_path / "demo")
+    run_local_training(
+        target="both",
+        output_dir=tmp_path / "trained",
+        middle_trace_paths=(Path(data_paths["middle_trace_path"]),),
+        github_ranking_paths=(Path(data_paths["github_ranking_path"]),),
+        epochs=6,
+    )
+
+    manifest = export_server_finetune_bundle(tmp_path / "trained", tmp_path / "sft")
+
+    assert manifest["schema"] == "local_finetune_export.v1"
+    assert manifest["counts"]["total_examples"] > 0
+    assert (tmp_path / "sft" / "middle_model_sft.jsonl").exists()
+    assert (tmp_path / "sft" / "github_evaluator_sft.jsonl").exists()
+    assert (tmp_path / "sft" / "finetune_export_manifest.json").exists()
+    row = json.loads((tmp_path / "sft" / "middle_model_sft.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert row["messages"][0]["role"] == "system"
+    assert row["messages"][1]["role"] == "user"
+    assert row["messages"][2]["role"] == "assistant"
+    assert row["metadata"]["target"] == "middle_model_rule_acceleration"
+    assert manifest["recommended_server_path"]["keep_hard_gates_outside_model"] is True

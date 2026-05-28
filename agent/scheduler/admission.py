@@ -85,6 +85,8 @@ class PoolAdmissionController:
         self._backend = backend or os.environ.get("MODEL_ADMISSION_BACKEND", "local")
         self._leases: dict[str, LeaseRecord] = {}
         self._idempotency: dict[str, str] = {}
+        self._usage_by_pool: dict[str, dict[str, Any]] = {}
+        self._usage_records: list[dict[str, Any]] = []
         self._lock = threading.RLock()
 
     @property
@@ -128,10 +130,88 @@ class PoolAdmissionController:
                 "backend": self._backend,
                 "leases_total": len(self._leases),
                 "pools": pools,
+                "token_usage": {
+                    "by_pool": dict(self._usage_by_pool),
+                    "recent": self._usage_records[-20:],
+                    "reconcile_policy": "estimated tokens are used for admission; actual runtime usage is recorded by lease_id after completion",
+                },
                 "notes": [
                     "local backend is per-process; use Redis or workflow queue for multi-replica hard limits",
                     "expired leases are reclaimed on each admission/status call",
                 ],
+            }
+
+    def record_usage(
+        self,
+        lease_id: str,
+        *,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        total_tokens: int | None = None,
+        metadata: dict[str, Any] | None = None,
+        release: bool = False,
+    ) -> dict[str, Any]:
+        """Record real runtime usage and optionally release the lease.
+
+        Admission happens before model execution, so it necessarily relies on
+        estimates. This method closes the loop with provider-returned usage
+        data so pool sizing, billing and future routing can observe reality.
+        """
+
+        now = self._clock()
+        with self._lock:
+            self._cleanup_locked(now)
+            lease = self._leases.get(str(lease_id or ""))
+            if not lease:
+                return {
+                    "schema": "model_usage_record.v1",
+                    "ok": False,
+                    "reason": "lease_not_found",
+                    "lease_id": str(lease_id or ""),
+                }
+            prompt = max(int(prompt_tokens or 0), 0)
+            completion = max(int(completion_tokens or 0), 0)
+            total = max(int(total_tokens if total_tokens is not None else prompt + completion), 0)
+            bucket = self._usage_by_pool.setdefault(
+                lease.pool,
+                {
+                    "calls": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                    "max_total_tokens": 0,
+                    "last_recorded_at": 0.0,
+                },
+            )
+            bucket["calls"] = int(bucket.get("calls", 0)) + 1
+            bucket["prompt_tokens"] = int(bucket.get("prompt_tokens", 0)) + prompt
+            bucket["completion_tokens"] = int(bucket.get("completion_tokens", 0)) + completion
+            bucket["total_tokens"] = int(bucket.get("total_tokens", 0)) + total
+            bucket["max_total_tokens"] = max(int(bucket.get("max_total_tokens", 0)), total)
+            bucket["last_recorded_at"] = now
+            record = {
+                "lease_id": lease.lease_id,
+                "pool": lease.pool,
+                "queue_key": lease.queue_key,
+                "created_at": now,
+                "prompt_tokens": prompt,
+                "completion_tokens": completion,
+                "total_tokens": total,
+                "estimated_total_tokens": lease.token_estimate.get("total_tokens"),
+                "metadata": dict(metadata or {}),
+            }
+            self._usage_records.append(record)
+            self._usage_records = self._usage_records[-200:]
+            if release:
+                self._leases.pop(lease.lease_id, None)
+                if lease.idempotency_key:
+                    self._idempotency.pop(lease.idempotency_key, None)
+            return {
+                "schema": "model_usage_record.v1",
+                "ok": True,
+                "record": record,
+                "pool_usage": dict(bucket),
+                "released": bool(release),
             }
 
     def acquire(

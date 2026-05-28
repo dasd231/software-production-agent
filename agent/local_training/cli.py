@@ -7,6 +7,7 @@ from typing import Any
 
 from agent.local_training.inference import classify_middle_decision, load_local_model, score_github_repo
 from agent.local_training.sample_data import write_demo_local_training_data
+from agent.local_training.sft_export import export_server_finetune_bundle
 from agent.local_training.trainer import run_local_training
 
 
@@ -36,6 +37,10 @@ def main(argv: list[str] | None = None) -> int:
     pred_git.add_argument("--model", required=True)
     pred_git.add_argument("--row", required=True)
 
+    export = sub.add_parser("export-sft", help="export local examples to server-ready SFT JSONL")
+    export.add_argument("--training-dir", required=True)
+    export.add_argument("--output-dir", required=True)
+
     args = parser.parse_args(argv)
 
     if args.command == "make-demo-data":
@@ -62,6 +67,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "score-github":
         model = load_local_model(Path(args.model), target="github")
         print(json.dumps(score_github_repo(model, _load_json(Path(args.row))), ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "export-sft":
+        manifest = export_server_finetune_bundle(Path(args.training_dir), Path(args.output_dir))
+        print(json.dumps(manifest, ensure_ascii=False, indent=2))
         return 0
 
     return 2

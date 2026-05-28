@@ -147,6 +147,8 @@ DEFAULT_OUTPUT_TOKENS: dict[str, int] = {
     "enterprise_planning": 2_048,
 }
 
+DEFAULT_SYSTEM_RESERVED_TOKENS = 768
+
 
 def estimate_tokens(text: str) -> int:
     """Estimate tokens without a tokenizer dependency.
@@ -319,6 +321,57 @@ def _queue_policy(pool: ModelPoolConfig) -> dict[str, Any]:
     }
 
 
+def _context_budget(
+    pool: ModelPoolConfig,
+    *,
+    prompt_tokens: int,
+    output_tokens: int,
+    business_type: str,
+) -> dict[str, Any]:
+    """Compute the token budget exposed to context slicing / RAG.
+
+    The model route plan is the earliest place that knows the selected pool's
+    prompt window, output reservation and concurrency class.  By returning a
+    budget here, retrieval and PV slice routing can avoid loading 64k worth of
+    evidence into a 12k short-pool request.
+    """
+
+    system_reserved = min(DEFAULT_SYSTEM_RESERVED_TOKENS, max(pool.max_model_len // 16, 128))
+    prompt_window_after_output = max(pool.max_model_len - output_tokens - system_reserved, 0)
+    effective_prompt_budget = min(pool.max_prompt_tokens, prompt_window_after_output)
+    available_context_tokens = max(effective_prompt_budget - prompt_tokens, 0)
+    target_slice_tokens = 2_048 if pool.name in {"long_pool", "training_batch_pool"} else 1_024
+    if pool.name == "short_pool":
+        target_slice_tokens = 768
+    recommended_top_k = max(1, min(12, available_context_tokens // max(target_slice_tokens, 1)))
+    pressure = (prompt_tokens + output_tokens + system_reserved) / max(pool.max_model_len, 1)
+    if available_context_tokens <= 0:
+        strategy = "summarize_before_retrieval"
+    elif business_type in {"long_context_rag", "enterprise_planning", "training_batch"}:
+        strategy = "semantic_pv_slice_budget"
+    elif pressure > 0.72:
+        strategy = "aggressive_rerank_then_slice"
+    else:
+        strategy = "direct_topk_context"
+    return {
+        "schema": "token_context_budget.v1",
+        "pool": pool.name,
+        "system_reserved_tokens": system_reserved,
+        "effective_prompt_budget": effective_prompt_budget,
+        "available_context_tokens": available_context_tokens,
+        "target_slice_tokens": target_slice_tokens,
+        "recommended_route_top_k": recommended_top_k,
+        "context_pressure": round(pressure, 4),
+        "strategy": strategy,
+        "slice_policy": {
+            "must_respect_budget": True,
+            "drop_low_score_slices_first": True,
+            "preserve_critical_slice_when_possible": True,
+            "overflow_action": "summarize_or_second_pass",
+        },
+    }
+
+
 def _output_tokens_for(business_type: str, max_output_tokens: int | None) -> int:
     if max_output_tokens is not None:
         return max(int(max_output_tokens), 1)
@@ -388,6 +441,21 @@ def build_model_route_plan(
         "selected_pool": selected_name,
         "pool": selected.to_dict(),
         "queue_policy": _queue_policy(selected),
+        "context_budget": _context_budget(
+            selected,
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens,
+            business_type=biz_type,
+        ),
+        "token_accounting": {
+            "estimate": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens_reserved": output_tokens,
+                "total_reserved_tokens": prompt_tokens + output_tokens,
+            },
+            "actual_usage": None,
+            "reconcile_policy": "record runtime usage by lease_id; fall back to estimate when provider does not return usage",
+        },
         "admission": {
             "status": status,
             "admitted": admitted,

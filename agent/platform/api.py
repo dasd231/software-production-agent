@@ -26,10 +26,12 @@ from agent.scheduler.routing import build_model_route_plan, list_model_pools
 from agent.workflows.dry_run import dry_run_workflow
 
 try:
-    from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
+    from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
     from pydantic import BaseModel, Field
 except ImportError as exc:  # pragma: no cover - exercised only in missing optional dep envs.
     raise RuntimeError("Production platform API requires fastapi: pip install fastapi uvicorn") from exc
+
+from agent.security.jwt_auth import JWTAuthError, extract_bearer_token, verify_jwt
 
 
 DEFAULT_RUNS_ROOT = Path(os.environ.get("AGENT_RUNS_ROOT", "product_runs"))
@@ -157,12 +159,62 @@ def _prometheus_metrics(app: FastAPI) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _auth_dependency(authorization: str | None = Header(default=None)) -> None:
+def _jwt_allowed_algorithms() -> tuple[str, ...]:
+    raw = os.environ.get("AGENT_PLATFORM_JWT_ALGORITHMS", "HS256")
+    algorithms = tuple(part.strip() for part in raw.split(",") if part.strip())
+    return algorithms or ("HS256",)
+
+
+def _auth_dependency(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any] | None:
+    """Authenticate protected control-plane APIs.
+
+    Backward compatibility:
+    - ``AGENT_PLATFORM_API_TOKEN`` keeps the old opaque Bearer token path.
+
+    Production path:
+    - ``AGENT_PLATFORM_JWT_SECRET`` enables signed JWT verification.
+    - Verified identity is attached to ``request.state.identity``.
+    """
+
+    request.state.identity = None
     expected = os.environ.get("AGENT_PLATFORM_API_TOKEN", "").strip()
-    if not expected:
-        return
-    if authorization != f"Bearer {expected}":
-        raise HTTPException(status_code=401, detail="invalid bearer token")
+    jwt_secret = os.environ.get("AGENT_PLATFORM_JWT_SECRET", "").strip()
+    if not expected and not jwt_secret:
+        return None
+
+    if expected and authorization == f"Bearer {expected}":
+        identity = {
+            "auth_type": "static_bearer",
+            "user_id": "platform-token",
+            "tenant_id": "platform",
+            "role": "admin",
+            "permissions": ["platform:*"],
+        }
+        request.state.identity = identity
+        return identity
+
+    if jwt_secret:
+        try:
+            token = extract_bearer_token(authorization)
+            identity_obj = verify_jwt(
+                token,
+                secret=jwt_secret,
+                issuer=os.environ.get("AGENT_PLATFORM_JWT_ISSUER", "software-production-agent"),
+                audience=os.environ.get("AGENT_PLATFORM_JWT_AUDIENCE", "software-production-agent-platform"),
+                allowed_algorithms=_jwt_allowed_algorithms(),
+                leeway_s=int(os.environ.get("AGENT_PLATFORM_JWT_LEEWAY_S", "30")),
+            )
+        except JWTAuthError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+        identity = identity_obj.to_dict()
+        identity["auth_type"] = "jwt"
+        request.state.identity = identity
+        return identity
+
+    raise HTTPException(status_code=401, detail="invalid bearer token")
 
 
 def create_app(runs_root: Path | None = None) -> FastAPI:
@@ -211,6 +263,14 @@ def create_app(runs_root: Path | None = None) -> FastAPI:
         _: None = Depends(_auth_dependency),
     ) -> dict[str, Any]:
         return discover_resources(_root(app), type_filter=type)
+
+    @app.get("/api/auth/me")
+    def api_auth_me(request: Request, _: dict[str, Any] | None = Depends(_auth_dependency)) -> dict[str, Any]:
+        return {
+            "schema": "platform_identity.v1",
+            "authenticated": bool(getattr(request.state, "identity", None)),
+            "identity": getattr(request.state, "identity", None),
+        }
 
     @app.get("/api/integrations")
     def api_integrations(

@@ -73,6 +73,8 @@ def route_query_to_slices(
     placements: list[SlicePlacement],
     *,
     policy: ContextPVPolicy | None = None,
+    token_budget: int | None = None,
+    route_plan: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     active_policy = (policy or ContextPVPolicy()).normalized()
     desired_label = query_semantic_label(query)
@@ -139,5 +141,45 @@ def route_query_to_slices(
                 "reason": ["fallback_entry_slice"],
             }
         )
-    return routed[: active_policy.route_top_k]
+    limited = routed[: active_policy.route_top_k]
+    budget = token_budget
+    if budget is None and isinstance(route_plan, dict):
+        context_budget = route_plan.get("context_budget") if isinstance(route_plan.get("context_budget"), dict) else {}
+        raw_budget = context_budget.get("available_context_tokens")
+        if isinstance(raw_budget, (int, float)):
+            budget = int(raw_budget)
+    if budget is None:
+        for item in limited:
+            item["budget_decision"] = {"included": True, "reason": "no_budget_limit"}
+        return limited
 
+    max_budget = max(int(budget), 0)
+    selected: list[dict[str, Any]] = []
+    used = 0
+    dropped = 0
+    for item in limited:
+        item_tokens = int(item.get("estimated_tokens", 0) or 0)
+        if item_tokens <= max(max_budget - used, 0):
+            used += item_tokens
+            item["budget_decision"] = {
+                "included": True,
+                "used_tokens_after": used,
+                "budget_tokens": max_budget,
+                "reason": "within_route_budget",
+            }
+            selected.append(item)
+        else:
+            dropped += 1
+    if not selected and limited:
+        fallback = limited[0]
+        fallback["budget_decision"] = {
+            "included": True,
+            "used_tokens_after": int(fallback.get("estimated_tokens", 0) or 0),
+            "budget_tokens": max_budget,
+            "reason": "fallback_best_slice_even_when_over_budget",
+        }
+        selected.append(fallback)
+        dropped = max(0, dropped - 1)
+    for item in selected:
+        item.setdefault("budget_summary", {})["dropped_candidate_slices"] = dropped
+    return selected

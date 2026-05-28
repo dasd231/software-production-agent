@@ -30,6 +30,7 @@
 from __future__ import annotations
 
 import zipfile
+import time
 from io import BytesIO
 from pathlib import Path
 
@@ -480,6 +481,58 @@ def test_simple_frontend_catalog_preview_and_package_download(tmp_path: Path) ->
     assert "solution_manifest.json" in names
     assert ".agent_state.json" not in names
     assert "Software Studio" in readme
+
+
+def test_product_ui_billing_token_plan_payment_and_job_queue(tmp_path: Path) -> None:
+    app = create_app(runs_root=tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    prompt = "做一个图书管理系统，包含图书、读者、借阅、归还和数据看板。"
+    local_plan = client.post("/api/token-plan", json={"prompt": prompt, "model_source": "local"})
+    assert local_plan.status_code == 200
+    local_json = local_plan.get_json()
+    assert local_json["schema"] == "product_token_plan.v1"
+    assert local_json["billing_policy"]["billable"] is False
+    assert local_json["admission"]["required_tokens"] == 0
+    assert local_json["route_plan"]["context_budget"]["schema"] == "token_context_budget.v1"
+
+    billing_before = client.get("/api/billing").get_json()
+    order = client.post("/api/payment/orders", json={"amount_yuan": 19})
+    assert order.status_code == 200
+    order_json = order.get_json()
+    assert order_json["schema"] == "payment_order.v1"
+    confirm = client.post(f"/api/payment/orders/{order_json['order']['order_id']}/confirm")
+    assert confirm.status_code == 200
+    assert confirm.get_json()["ok"] is True
+    billing_after = client.get("/api/billing").get_json()
+    assert billing_after["remaining_tokens"] > billing_before["remaining_tokens"]
+
+    job = client.post(
+        "/api/simple-jobs",
+        json={"prompt": prompt, "model_source": "api", "provider": "deepseek"},
+    )
+    assert job.status_code == 202
+    job_json = job.get_json()
+    assert job_json["schema"] == "product_job_submission.v1"
+    assert job_json["token_plan"]["billing_policy"]["billable"] is True
+    job_id = job_json["job"]["job_id"]
+
+    finished = None
+    for _ in range(20):
+        status = client.get(f"/api/simple-jobs/{job_id}")
+        assert status.status_code == 200
+        body = status.get_json()
+        if body["status"] == "finished":
+            finished = body
+            break
+        time.sleep(0.05)
+
+    assert finished is not None
+    assert finished["result"]["preview"]["preview_id"].startswith("preview_")
+    billing_done = client.get("/api/billing").get_json()
+    assert billing_done["used_tokens"] >= job_json["token_plan"]["estimate"]["estimated_total_tokens"]
+    assert billing_done["token_events"]
 
 
 def test_product_ui_groq_llm_requires_groq_key(tmp_path: Path, monkeypatch) -> None:
