@@ -498,15 +498,29 @@ def test_product_ui_billing_token_plan_payment_and_job_queue(tmp_path: Path) -> 
     assert local_json["route_plan"]["context_budget"]["schema"] == "token_context_budget.v1"
 
     billing_before = client.get("/api/billing").get_json()
-    order = client.post("/api/payment/orders", json={"amount_yuan": 19})
+    order = client.post("/api/payment/orders", json={"amount_yuan": 19, "idempotency_key": "pay-once"})
     assert order.status_code == 200
     order_json = order.get_json()
     assert order_json["schema"] == "payment_order.v1"
-    confirm = client.post(f"/api/payment/orders/{order_json['order']['order_id']}/confirm")
+    replay = client.post("/api/payment/orders", json={"amount_yuan": 19, "idempotency_key": "pay-once"})
+    assert replay.status_code == 200
+    assert replay.get_json()["replayed"] is True
+    assert replay.get_json()["order"]["order_id"] == order_json["order"]["order_id"]
+    status = client.get(f"/api/payment/orders/{order_json['order']['order_id']}")
+    assert status.status_code == 200
+    assert status.get_json()["order"]["status"] == "pending"
+    confirm = client.post(
+        f"/api/payment/orders/{order_json['order']['order_id']}/reconcile",
+        json={"provider_status": "paid"},
+    )
     assert confirm.status_code == 200
     assert confirm.get_json()["ok"] is True
+    second_confirm = client.post(f"/api/payment/orders/{order_json['order']['order_id']}/confirm")
+    assert second_confirm.status_code == 200
+    assert second_confirm.get_json()["order"]["status"] == "paid"
     billing_after = client.get("/api/billing").get_json()
     assert billing_after["remaining_tokens"] > billing_before["remaining_tokens"]
+    assert billing_after["purchased_tokens"] == billing_before["purchased_tokens"] + 19 * 2_000
 
     job = client.post(
         "/api/simple-jobs",
@@ -516,6 +530,10 @@ def test_product_ui_billing_token_plan_payment_and_job_queue(tmp_path: Path) -> 
     job_json = job.get_json()
     assert job_json["schema"] == "product_job_submission.v1"
     assert job_json["token_plan"]["billing_policy"]["billable"] is True
+    queue = client.get("/api/simple-jobs")
+    assert queue.status_code == 200
+    assert queue.get_json()["schema"] == "product_job_queue.v1"
+    assert queue.get_json()["jobs"]
     job_id = job_json["job"]["job_id"]
 
     finished = None
@@ -529,10 +547,27 @@ def test_product_ui_billing_token_plan_payment_and_job_queue(tmp_path: Path) -> 
         time.sleep(0.05)
 
     assert finished is not None
+    assert finished["owner_key"]
+    assert finished["duration_ms"] >= 0
     assert finished["result"]["preview"]["preview_id"].startswith("preview_")
     billing_done = client.get("/api/billing").get_json()
     assert billing_done["used_tokens"] >= job_json["token_plan"]["estimate"]["estimated_total_tokens"]
     assert billing_done["token_events"]
+
+
+def test_product_ui_rate_limits_preview_endpoint(tmp_path: Path) -> None:
+    app = create_app(runs_root=tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    last = None
+    for idx in range(41):
+        last = client.post("/api/simple-preview", json={"prompt": f"做一个轻量页面 {idx}"})
+
+    assert last is not None
+    assert last.status_code == 429
+    assert last.get_json()["error"] == "rate_limited"
+    assert "Retry-After" in last.headers
 
 
 def test_product_ui_groq_llm_requires_groq_key(tmp_path: Path, monkeypatch) -> None:

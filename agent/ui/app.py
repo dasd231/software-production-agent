@@ -422,6 +422,41 @@ class DefaultProductionBrain(AgentBrain):
 _BILLING_LOCK = threading.RLock()
 
 
+class ApiRateLimiter:
+    """Tiny in-process sliding-window limiter for local product APIs.
+
+    It is intentionally lightweight: enough to protect the demo/product UI from
+    accidental refresh storms or simple scraping, while leaving room for Redis
+    or gateway-level rate limits in production.
+    """
+
+    def __init__(self) -> None:
+        self._events: dict[str, list[float]] = {}
+        self._lock = threading.RLock()
+
+    def check(self, key: str, *, limit: int, window_s: float) -> dict[str, Any]:
+        now = time.time()
+        window = max(float(window_s), 1.0)
+        max_events = max(int(limit), 1)
+        with self._lock:
+            events = [ts for ts in self._events.get(key, []) if now - ts <= window]
+            allowed = len(events) < max_events
+            if allowed:
+                events.append(now)
+            self._events[key] = events
+            oldest = min(events) if events else now
+            retry_after = max(round(window - (now - oldest), 3), 0.1) if not allowed else 0.0
+            return {
+                "schema": "api_rate_limit.v1",
+                "allowed": allowed,
+                "key": key,
+                "limit": max_events,
+                "window_s": window,
+                "remaining": max(max_events - len(events), 0),
+                "retry_after_s": retry_after,
+            }
+
+
 class ProductTaskQueue:
     """Small in-process queue for UI jobs.
 
@@ -439,15 +474,19 @@ class ProductTaskQueue:
         self._worker = threading.Thread(target=self._run, name="product-ui-job-worker", daemon=True)
         self._worker.start()
 
-    def submit(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def submit(self, payload: dict[str, Any], *, owner_key: str = "") -> dict[str, Any]:
         job_id = f"job_{secrets.token_hex(8)}"
         now = _now_iso()
         job = {
             "schema": "product_job.v1",
             "job_id": job_id,
+            "owner_key": str(owner_key or ""),
             "status": "queued",
             "created_at": now,
             "updated_at": now,
+            "started_at": "",
+            "finished_at": "",
+            "duration_ms": 0,
             "progress": 0,
             "payload": dict(payload),
             "result": {},
@@ -464,22 +503,28 @@ class ProductTaskQueue:
             job = self._jobs.get(str(job_id or ""))
             return json.loads(json.dumps(job, ensure_ascii=False)) if job else None
 
-    def list(self, *, limit: int = 20) -> list[dict[str, Any]]:
+    def list(self, *, limit: int = 20, owner_key: str = "") -> list[dict[str, Any]]:
         with self._lock:
-            rows = sorted(self._jobs.values(), key=lambda row: str(row.get("created_at", "")), reverse=True)
+            rows = list(self._jobs.values())
+            if owner_key:
+                rows = [row for row in rows if str(row.get("owner_key", "")) == str(owner_key)]
+            rows = sorted(rows, key=lambda row: str(row.get("created_at", "")), reverse=True)
             return json.loads(json.dumps(rows[: max(int(limit), 1)], ensure_ascii=False))
 
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self, *, owner_key: str = "") -> dict[str, Any]:
         with self._lock:
             counts: dict[str, int] = {}
-            for job in self._jobs.values():
+            rows = list(self._jobs.values())
+            if owner_key:
+                rows = [row for row in rows if str(row.get("owner_key", "")) == str(owner_key)]
+            for job in rows:
                 status = str(job.get("status", "unknown"))
                 counts[status] = counts.get(status, 0) + 1
             return {
                 "schema": "product_job_queue.v1",
                 "queued_size": self._queue.qsize(),
                 "counts": counts,
-                "jobs": self.list(limit=20),
+                "jobs": self.list(limit=20, owner_key=owner_key),
             }
 
     def _patch(self, job_id: str, **updates: Any) -> None:
@@ -494,15 +539,25 @@ class ProductTaskQueue:
         while True:
             job_id = self._queue.get()
             try:
-                self._patch(job_id, status="running", progress=25, notifications=["任务开始执行"])
+                started = time.time()
+                self._patch(job_id, status="running", progress=25, started_at=_now_iso(), notifications=["任务开始执行"])
                 job = self.get(job_id) or {}
                 result = self._processor(job)
-                self._patch(job_id, status="finished", progress=100, result=result, notifications=["任务已完成"])
+                self._patch(
+                    job_id,
+                    status="finished",
+                    progress=100,
+                    result=result,
+                    finished_at=_now_iso(),
+                    duration_ms=round((time.time() - started) * 1000.0, 2),
+                    notifications=["任务已完成"],
+                )
             except Exception as exc:  # pragma: no cover - defensive worker boundary
                 self._patch(
                     job_id,
                     status="failed",
                     progress=100,
+                    finished_at=_now_iso(),
                     error=f"{type(exc).__name__}: {exc}",
                     notifications=["任务失败，请调整需求后重试"],
                 )
@@ -576,6 +631,7 @@ def _billing_snapshot(root: Path, user: Any | None) -> dict[str, Any]:
     with _BILLING_LOCK:
         data = _load_billing(root)
         account = _ensure_billing_account(data, user)
+        _expire_stale_payment_orders(account)
         _save_billing(root, data)
         total = int(account.get("free_quota", 0)) + int(account.get("purchased_tokens", 0))
         used = int(account.get("used_tokens", 0))
@@ -592,6 +648,45 @@ def _billing_snapshot(root: Path, user: Any | None) -> dict[str, Any]:
             "orders": list(account.get("orders", []))[-20:],
             "token_events": list(account.get("token_events", []))[-20:],
         }
+
+
+def _payment_order_by_id(account: dict[str, Any], order_id: str) -> dict[str, Any] | None:
+    for order in account.setdefault("orders", []):
+        if str(order.get("order_id", "")) == str(order_id):
+            return order
+    return None
+
+
+def _payment_order_by_idempotency(account: dict[str, Any], idempotency_key: str) -> dict[str, Any] | None:
+    if not idempotency_key:
+        return None
+    for order in reversed(account.setdefault("orders", [])):
+        if str(order.get("idempotency_key", "")) == str(idempotency_key):
+            return order
+    return None
+
+
+def _append_order_status(order: dict[str, Any], status: str, *, note: str = "") -> None:
+    order["status"] = status
+    order.setdefault("status_history", []).append({"status": status, "at": _now_iso(), "note": note})
+
+
+def _expire_stale_payment_orders(account: dict[str, Any], *, max_age_s: int = 1800) -> None:
+    now = time.time()
+    for order in account.setdefault("orders", []):
+        if str(order.get("status", "")) != "pending":
+            continue
+        created_ts = order.get("created_ts")
+        if isinstance(created_ts, (int, float)):
+            age_s = now - float(created_ts)
+        else:
+            try:
+                created_dt = datetime.fromisoformat(str(order.get("created_at", "")).replace("Z", ""))
+                age_s = (datetime.utcnow() - created_dt).total_seconds()
+            except ValueError:
+                age_s = 0.0
+        if age_s > max_age_s:
+            _append_order_status(order, "expired", note="pending order exceeded reconciliation window")
 
 
 def _consume_tokens(
@@ -638,38 +733,70 @@ def _consume_tokens(
     }
 
 
-def _create_payment_order(root: Path, user: Any | None, amount_yuan: int) -> dict[str, Any]:
+def _create_payment_order(
+    root: Path,
+    user: Any | None,
+    amount_yuan: int,
+    *,
+    idempotency_key: str = "",
+) -> dict[str, Any]:
     amount_yuan = max(int(amount_yuan), 1)
-    order = {
-        "order_id": f"pay_{secrets.token_hex(8)}",
-        "created_at": _now_iso(),
-        "amount_yuan": amount_yuan,
-        "tokens": amount_yuan * TOKEN_PER_YUAN,
-        "status": "pending",
-        "channel": "demo_wallet",
-        "idempotency_key": f"{_account_key(user)}:{amount_yuan}:{int(time.time())}",
-    }
     with _BILLING_LOCK:
         data = _load_billing(root)
         account = _ensure_billing_account(data, user)
+        _expire_stale_payment_orders(account)
+        existing = _payment_order_by_idempotency(account, idempotency_key)
+        if existing and int(existing.get("amount_yuan", 0) or 0) == amount_yuan:
+            _save_billing(root, data)
+            return {
+                "schema": "payment_order.v1",
+                "order": existing,
+                "replayed": True,
+                "billing": _billing_snapshot(root, user),
+                "recovery_hint": "同一个 idempotency_key 已存在订单，可直接查询或继续确认。",
+            }
+        order = {
+            "order_id": f"pay_{secrets.token_hex(8)}",
+            "created_at": _now_iso(),
+            "created_ts": time.time(),
+            "amount_yuan": amount_yuan,
+            "tokens": amount_yuan * TOKEN_PER_YUAN,
+            "status": "pending",
+            "status_history": [],
+            "channel": "demo_wallet",
+            "idempotency_key": idempotency_key or f"{_account_key(user)}:{amount_yuan}:{int(time.time())}",
+        }
+        _append_order_status(order, "pending", note="order created")
         account.setdefault("orders", []).append(order)
         _save_billing(root, data)
-    return {"schema": "payment_order.v1", "order": order, "billing": _billing_snapshot(root, user)}
+    return {
+        "schema": "payment_order.v1",
+        "order": order,
+        "replayed": False,
+        "billing": _billing_snapshot(root, user),
+        "recovery_hint": "如果支付页断线，使用 order_id 查询订单状态；不要重复创建新订单。",
+    }
 
 
 def _confirm_payment_order(root: Path, user: Any | None, order_id: str) -> dict[str, Any]:
     with _BILLING_LOCK:
         data = _load_billing(root)
         account = _ensure_billing_account(data, user)
-        target = None
-        for order in account.setdefault("orders", []):
-            if str(order.get("order_id", "")) == str(order_id):
-                target = order
-                break
+        _expire_stale_payment_orders(account)
+        target = _payment_order_by_id(account, order_id)
         if not target:
             return {"schema": "payment_confirm.v1", "ok": False, "reason": "order_not_found"}
+        if target.get("status") in {"expired", "cancelled", "failed"}:
+            _save_billing(root, data)
+            return {
+                "schema": "payment_confirm.v1",
+                "ok": False,
+                "reason": f"order_{target.get('status')}",
+                "order": target,
+                "billing": _billing_snapshot(root, user),
+            }
         if target.get("status") != "paid":
-            target["status"] = "paid"
+            _append_order_status(target, "paid", note="payment confirmed")
             target["paid_at"] = _now_iso()
             account["purchased_tokens"] = int(account.get("purchased_tokens", 0)) + int(target.get("tokens", 0))
         _save_billing(root, data)
@@ -680,6 +807,45 @@ def _confirm_payment_order(root: Path, user: Any | None, order_id: str) -> dict[
         "billing": _billing_snapshot(root, user),
         "notification": f"支付成功，到账 {target.get('tokens', 0)} tokens",
     }
+
+
+def _get_payment_order(root: Path, user: Any | None, order_id: str) -> dict[str, Any]:
+    with _BILLING_LOCK:
+        data = _load_billing(root)
+        account = _ensure_billing_account(data, user)
+        _expire_stale_payment_orders(account)
+        target = _payment_order_by_id(account, order_id)
+        _save_billing(root, data)
+    if not target:
+        return {"schema": "payment_order_status.v1", "ok": False, "reason": "order_not_found"}
+    return {"schema": "payment_order_status.v1", "ok": True, "order": target, "billing": _billing_snapshot(root, user)}
+
+
+def _reconcile_payment_order(
+    root: Path,
+    user: Any | None,
+    order_id: str,
+    *,
+    provider_status: str,
+) -> dict[str, Any]:
+    normalized = str(provider_status or "").strip().lower()
+    if normalized in {"paid", "success", "succeeded"}:
+        return _confirm_payment_order(root, user, order_id)
+    if normalized not in {"failed", "cancelled", "expired"}:
+        normalized = "pending"
+    with _BILLING_LOCK:
+        data = _load_billing(root)
+        account = _ensure_billing_account(data, user)
+        target = _payment_order_by_id(account, order_id)
+        if not target:
+            return {"schema": "payment_reconcile.v1", "ok": False, "reason": "order_not_found"}
+        if target.get("status") == "paid":
+            _save_billing(root, data)
+            return {"schema": "payment_reconcile.v1", "ok": True, "order": target, "billing": _billing_snapshot(root, user)}
+        if normalized != "pending":
+            _append_order_status(target, normalized, note="provider reconciliation")
+        _save_billing(root, data)
+    return {"schema": "payment_reconcile.v1", "ok": True, "order": target, "billing": _billing_snapshot(root, user)}
 
 
 def _model_source(value: Any) -> str:
@@ -3234,6 +3400,7 @@ def create_app(
     auth_store = LocalAuthStore(root / ".agent_users.json")
     admission_controller = PoolAdmissionController()
     job_queue = ProductTaskQueue(_process_simple_job)
+    rate_limiter = ApiRateLimiter()
     root.mkdir(parents=True, exist_ok=True)
 
     def _auth_store() -> LocalAuthStore:
@@ -3253,6 +3420,23 @@ def create_app(
         if isinstance(data, dict):
             return data
         return dict(request.form.items())
+
+    def _rate_limit(scope: str, *, limit: int, window_s: float) -> Response | None:
+        user = _current_user()
+        key = f"{scope}:{_account_key(user)}:{request.remote_addr or 'local'}"
+        decision = rate_limiter.check(key, limit=limit, window_s=window_s)
+        if decision["allowed"]:
+            return None
+        response = jsonify(
+            {
+                "error": "rate_limited",
+                "message": "操作太频繁，请稍后再试",
+                "rate_limit": decision,
+            }
+        )
+        response.status_code = 429
+        response.headers["Retry-After"] = str(int(max(float(decision["retry_after_s"]), 1)))
+        return response
 
     def _payload_roots(payload: dict[str, Any]) -> tuple[Path, ...]:
         roots = payload.get("roots", ())
@@ -3364,6 +3548,9 @@ def create_app(
     @app.post("/api/token-plan")
     @login_required(_auth_store)
     def api_token_plan() -> Response:
+        limited = _rate_limit("token_plan", limit=90, window_s=60)
+        if limited:
+            return limited
         payload = _request_payload()
         prompt = str(payload.get("prompt", "") or "").strip()
         improvement = str(payload.get("improvement", "") or "").strip()
@@ -3384,6 +3571,9 @@ def create_app(
     @app.post("/api/payment/orders")
     @login_required(_auth_store)
     def api_payment_order() -> Response:
+        limited = _rate_limit("payment_order", limit=20, window_s=60)
+        if limited:
+            return limited
         payload = _request_payload()
         amount = payload.get("amount_yuan", payload.get("amount", 0))
         try:
@@ -3392,22 +3582,53 @@ def create_app(
             amount_yuan = 0
         if amount_yuan <= 0:
             return jsonify({"error": "bad_request", "message": "amount_yuan must be positive"}), 400
-        return jsonify(_create_payment_order(root, _current_user(), amount_yuan))
+        return jsonify(
+            _create_payment_order(
+                root,
+                _current_user(),
+                amount_yuan,
+                idempotency_key=str(payload.get("idempotency_key", "") or ""),
+            )
+        )
+
+    @app.get("/api/payment/orders/<order_id>")
+    @login_required(_auth_store)
+    def api_payment_order_status(order_id: str) -> Response:
+        result = _get_payment_order(root, _current_user(), order_id)
+        return jsonify(result), 200 if bool(result.get("ok")) else 404
 
     @app.post("/api/payment/orders/<order_id>/confirm")
     @login_required(_auth_store)
     def api_payment_confirm(order_id: str) -> Response:
+        limited = _rate_limit("payment_confirm", limit=30, window_s=60)
+        if limited:
+            return limited
         result = _confirm_payment_order(root, _current_user(), order_id)
+        return jsonify(result), 200 if bool(result.get("ok")) else 404
+
+    @app.post("/api/payment/orders/<order_id>/reconcile")
+    @login_required(_auth_store)
+    def api_payment_reconcile(order_id: str) -> Response:
+        payload = _request_payload()
+        result = _reconcile_payment_order(
+            root,
+            _current_user(),
+            order_id,
+            provider_status=str(payload.get("provider_status", payload.get("status", "pending")) or "pending"),
+        )
         return jsonify(result), 200 if bool(result.get("ok")) else 404
 
     @app.get("/api/simple-jobs")
     @login_required(_auth_store)
     def api_simple_jobs() -> Response:
-        return jsonify(job_queue.snapshot())
+        return jsonify(job_queue.snapshot(owner_key=_account_key(_current_user())))
 
     @app.post("/api/simple-jobs")
     @login_required(_auth_store)
     def api_simple_job_submit() -> Response:
+        limited = _rate_limit("simple_jobs", limit=24, window_s=60)
+        if limited:
+            return limited
         user = _current_user()
         require_permission(user, "run:create")
         payload = _request_payload()
@@ -3452,7 +3673,8 @@ def create_app(
                 "model": token_plan["model"],
                 "token_estimate": token_plan["estimate"],
                 "token_plan": token_plan,
-            }
+            },
+            owner_key=_account_key(user),
         )
         return jsonify(
             {
@@ -3469,11 +3691,16 @@ def create_app(
         job = job_queue.get(job_id)
         if not job:
             return jsonify({"error": "not_found", "message": "job not found"}), 404
+        if str(job.get("owner_key", "")) and str(job.get("owner_key", "")) != _account_key(_current_user()):
+            return jsonify({"error": "not_found", "message": "job not found"}), 404
         return jsonify(job)
 
     @app.post("/api/simple-preview")
     @login_required(_auth_store)
     def api_simple_preview() -> Response:
+        limited = _rate_limit("simple_preview", limit=40, window_s=60)
+        if limited:
+            return limited
         payload = _request_payload()
         prompt = str(payload.get("prompt", "") or "").strip()
         improvement = str(payload.get("improvement", "") or "").strip()
@@ -3499,6 +3726,9 @@ def create_app(
     @app.post("/api/simple-package")
     @login_required(_auth_store)
     def api_simple_package():
+        limited = _rate_limit("simple_package", limit=30, window_s=60)
+        if limited:
+            return limited
         user = _current_user()
         require_permission(user, "run:download")
         payload = _request_payload()

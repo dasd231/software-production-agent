@@ -47,6 +47,7 @@ def test_context_budget_keeps_core_and_drops_low_priority() -> None:
     assert plan["schema"] == "context_budget_plan.v1"
     assert "必须遵守安全约束" in text
     assert "请分析订单模块" in text
+    assert "<!-- BEGIN EVIDENCE" in text
     assert plan["used_tokens"] <= plan["input_budget"]
     assert plan["compressed_segments"] or plan["dropped_segments"]
 
