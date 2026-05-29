@@ -238,9 +238,9 @@ SIMPLE_PRODUCT_TEMPLATE = """
               <p id="previewMeta">还没有生成内容。</p>
             </div>
             <div class="preview-actions">
-              <button id="openBtn" class="btn">新窗口</button>
-              <button id="downloadBtn" class="btn primary">下载 ZIP</button>
-              <button id="saveBtn" class="btn">保存</button>
+              <button id="openBtn" class="btn" disabled>新窗口</button>
+              <button id="downloadBtn" class="btn primary" disabled>下载 ZIP</button>
+              <button id="saveBtn" class="btn" disabled>保存</button>
             </div>
           </div>
           <div class="delivery-grid" id="deliveryGrid">
@@ -249,7 +249,7 @@ SIMPLE_PRODUCT_TEMPLATE = """
             <div><span>交付文件</span><strong>-</strong></div>
             <div><span>下一步</span><strong>生成预览</strong></div>
           </div>
-          <iframe id="frame" sandbox="allow-scripts"></iframe>
+          <iframe id="frame" title="沙盒预览" sandbox="allow-scripts"></iframe>
         </div>
       </div>
     </section>
@@ -293,6 +293,8 @@ function show(p){$$('.tab').forEach(x=>x.classList.toggle('active',x.dataset.pag
 $$('.tab[data-page]').forEach(x=>x.onclick=()=>show(x.dataset.page));
 function selectedSource(){return document.querySelector('input[name="model_source_ui"]:checked')?.value||'local'}
 function payload(extra={}){return {prompt:$('#prompt').value.trim(),improvement:$('#improve').value.trim(),model_source:selectedSource(),provider:$('#provider').value,model:$('#model').value.trim(),...extra}}
+function setPreviewActions(on){['#openBtn','#downloadBtn','#saveBtn'].forEach(s=>$(s).disabled=!on)}
+const emptyPreview=`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#fff;color:#1f2329}.box{min-height:520px;display:grid;place-items:center;padding:32px}.card{max-width:520px;border:1px dashed #d8dee8;border-radius:24px;padding:34px;text-align:center;background:#fbfcff}h1{font-size:24px;margin:0 0 10px}p{color:#646a73;line-height:1.7;margin:0}</style></head><body><main class="box"><section class="card"><h1>等待生成预览</h1><p>左侧输入一句需求，系统会生成可点击样机。满意后可以下载 ZIP，不满意可以继续改。</p></section></main></body></html>`;
 function saveDraft(){localStorage.setItem('spa_draft',JSON.stringify({p:$('#prompt').value,i:$('#improve').value,source:selectedSource(),provider:$('#provider').value,model:$('#model').value}))}
 function loadDraft(){try{const d=JSON.parse(localStorage.getItem('spa_draft')||'{}');if(d.p)$('#prompt').value=d.p;if(d.i)$('#improve').value=d.i;if(d.source){const r=document.querySelector(`input[name="model_source_ui"][value="${d.source}"]`);if(r)r.checked=true}if(d.provider)$('#provider').value=d.provider;if(d.model)$('#model').value=d.model}catch{}}
 function refreshRuntime(){const api=selectedSource()==='api';$('#apiOptions').hidden=!api;$('#tokenHint').textContent=api?'API 模式会先检查额度':'本地模式不扣真实 token';saveDraft();updateTokenPlan()}
@@ -303,7 +305,7 @@ let planTimer=null;function debouncedPlan(){clearTimeout(planTimer);planTimer=se
 async function postJson(url, body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let d={};try{d=await r.json()}catch{};if(!r.ok)throw Object.assign(new Error(d.message||d.error||'请求失败'),{body:d,status:r.status});return d}
 async function updateTokenPlan(){const p=$('#prompt').value.trim();if(!p)return;try{const d=await postJson('/api/token-plan',payload());$('#inputTokens').textContent=d.estimate.input_tokens.toLocaleString();$('#totalTokens').textContent=d.estimate.estimated_total_tokens.toLocaleString();$('#remainTokens').textContent=d.billing.remaining_tokens.toLocaleString();$('#queuePill').textContent=d.model_source==='api'?'API 调用 · 额度校验':'本地部署 · 路由切片'}catch(e){}}
 function setDelivery(d){const q=d.quality||{},fs=d.features||[],ds=d.deliverables||[];$('#deliveryGrid').innerHTML=`<div><span>成熟度</span><strong>${esc(q.score? q.score+'%':'可演示')}</strong></div><div><span>可交互模块</span><strong>${fs.length||3}</strong></div><div><span>交付文件</span><strong>${ds.length||4}</strong></div><div><span>下一步</span><strong>下载/继续改</strong></div>`}
-function setPreview(d){current=d;$('#previewTitle').textContent=d.title||'沙盒预览';$('#previewMeta').textContent=d.preview_id?`已生成 · ${d.preview_id}`:'已生成';$('#frame').srcdoc=d.html||'';setDelivery(d);if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(new Blob([d.html||''],{type:'text/html'}));show('create')}
+function setPreview(d){current=d;$('#previewTitle').textContent=d.title||'沙盒预览';$('#previewMeta').textContent=d.preview_id?`已生成 · ${d.preview_id}`:'已生成';$('#frame').srcdoc=d.html||'';setDelivery(d);setPreviewActions(true);if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(new Blob([d.html||''],{type:'text/html'}));show('create')}
 async function submitJob(){const p=$('#prompt').value.trim();if(!p)return toast('先输入需求');$('#genBtn').disabled=true;try{const d=await postJson('/api/simple-jobs',payload());activeJob=d.job.job_id;toast(d.notification||'已加入队列');pollJob(activeJob)}catch(e){if(e.status===402)toast('额度不足，请先充值');else toast(e.message)}finally{$('#genBtn').disabled=false;loadBilling()}}
 function stageText(d){const p=Number(d.progress||0);if(d.status==='queued')return'排队中 · 等待 worker 接收';if(d.status==='running'&&p<45)return'正在理解需求 · 抽取模块/权限/数据边界';if(d.status==='running'&&p<80)return'正在生成样机 · 组装页面和交付文件';if(d.status==='running')return'正在质量检查 · 打包预览和下载包';if(d.status==='dead_letter')return'失败已隔离 · 可重新提交';return `${d.status||'-'} · ${d.notifications?.[0]||''}`}
 async function pollJob(id){if(!id)return;try{const r=await fetch('/api/simple-jobs/'+encodeURIComponent(id));const d=await r.json();$('#jobStatus').textContent=stageText(d);$('#jobMini').innerHTML=`<span>任务：${esc(d.job_id||id)}</span><span>尝试：${Number(d.attempts||0)}/${Number(d.max_attempts||1)}</span><span>进度：${Number(d.progress||0)}%</span>`;$('#jobBar').style.width=Math.max(Number(d.progress||0),3)+'%';if(d.status==='finished'){setPreview(d.result.preview);toast('预览已生成');loadBilling();return}if(d.status==='failed'||d.status==='dead_letter'){toast(d.error||'任务失败');return}setTimeout(()=>pollJob(id),650)}catch(e){toast('任务状态获取失败')}};
@@ -321,7 +323,7 @@ window.previewCurated=i=>{const x=curatedSolutions[i];if(!x)return;$('#prompt').
 window.useCurated=i=>{const x=curatedSolutions[i];if(!x)return;$('#prompt').value=x.prompt||x.summary||x.title;$('#improve').value='';saveDraft();updateTokenPlan();submitJob()};
 async function loadBilling(){try{const r=await fetch('/api/billing');const d=await r.json();$('#balance').textContent=(d.remaining_tokens||0).toLocaleString();$('#quotaText').textContent=`免费 ${Number(d.free_quota||0).toLocaleString()} · 已购 ${Number(d.purchased_tokens||0).toLocaleString()} · 已用 ${Number(d.used_tokens||0).toLocaleString()}`;const orders=(d.orders||[]).slice().reverse(),events=(d.token_events||[]).slice().reverse();const orderHtml=orders.map(x=>`<div class="record"><span>${esc(x.created_at)} · ${esc(x.status)}</span><strong>¥${esc(x.amount_yuan)} / ${Number(x.tokens||0).toLocaleString()} tokens</strong></div>`).join('');const eventHtml=events.map(x=>`<div class="record"><span>${esc(x.created_at)} · ${esc(x.reason)}</span><strong>-${Number(x.amount||0).toLocaleString()}</strong></div>`).join('');$('#records').innerHTML=orderHtml+eventHtml||'<div class="empty">暂无订单和消耗记录。</div>'}catch(e){}}
 $$('.plan').forEach(x=>x.onclick=async()=>{const amount=Number(x.dataset.amount||0);try{const order=await postJson('/api/payment/orders',{amount_yuan:amount});const paid=await postJson('/api/payment/orders/'+order.order.order_id+'/confirm',{});toast(paid.notification||'充值成功');loadBilling();updateTokenPlan()}catch(e){toast(e.message)}});
-loadDraft();refreshRuntime();if(!$('#prompt').value)$('#prompt').value='做一个图书管理系统，包含图书、读者、借阅、归还、续借、预约、逾期罚款、权限和数据看板。';renderHistory();loadBilling();loadSolutions();updateTokenPlan();
+loadDraft();refreshRuntime();if(!$('#prompt').value)$('#prompt').value='做一个图书管理系统，包含图书、读者、借阅、归还、续借、预约、逾期罚款、权限和数据看板。';$('#frame').srcdoc=emptyPreview;setPreviewActions(false);renderHistory();loadBilling();loadSolutions();updateTokenPlan();
 </script>
 </body>
 </html>
