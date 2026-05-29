@@ -38,7 +38,7 @@ import pytest
 
 pytest.importorskip("flask")
 
-from agent.ui.app import create_app
+from agent.ui.app import ProductTaskQueue, create_app
 
 
 def _login(client, username: str = "admin", password: str = "adminpass123") -> None:
@@ -568,6 +568,86 @@ def test_product_ui_rate_limits_preview_endpoint(tmp_path: Path) -> None:
     assert last.status_code == 429
     assert last.get_json()["error"] == "rate_limited"
     assert "Retry-After" in last.headers
+
+
+def test_product_task_queue_retries_then_finishes() -> None:
+    attempts = {"count": 0}
+
+    def flaky(job: dict) -> dict:
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise RuntimeError("temporary failure")
+        return {"ok": True, "attempt": attempts["count"], "job_id": job["job_id"]}
+
+    queue = ProductTaskQueue(flaky, max_attempts=3, retry_delay_s=0.01)
+    job = queue.submit({"demo": True}, owner_key="u1")
+
+    finished = None
+    for _ in range(50):
+        row = queue.get(job["job_id"])
+        if row and row["status"] == "finished":
+            finished = row
+            break
+        time.sleep(0.02)
+
+    assert finished is not None
+    assert finished["attempts"] == 2
+    assert finished["errors"][0]["attempt"] == 1
+    assert finished["result"]["ok"] is True
+    assert queue.snapshot(owner_key="u1")["counts"]["finished"] == 1
+
+
+def test_product_task_queue_dead_letters_after_retries() -> None:
+    def broken(_: dict) -> dict:
+        raise RuntimeError("always broken")
+
+    queue = ProductTaskQueue(broken, max_attempts=2, retry_delay_s=0.01)
+    job = queue.submit({"demo": True}, owner_key="u2")
+
+    dead = None
+    for _ in range(50):
+        row = queue.get(job["job_id"])
+        if row and row["status"] == "dead_letter":
+            dead = row
+            break
+        time.sleep(0.02)
+
+    snapshot = queue.snapshot(owner_key="u2")
+    assert dead is not None
+    assert dead["dead_letter"] is True
+    assert dead["attempts"] == 2
+    assert len(dead["errors"]) == 2
+    assert snapshot["counts"]["dead_letter"] == 1
+    assert snapshot["dead_letters"][0]["job_id"] == job["job_id"]
+
+
+def test_product_ui_audit_and_ops_snapshot(tmp_path: Path) -> None:
+    app = create_app(runs_root=tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    order = client.post("/api/payment/orders", json={"amount_yuan": 19, "idempotency_key": "audit-pay"})
+    assert order.status_code == 200
+    order_id = order.get_json()["order"]["order_id"]
+    confirm = client.post(f"/api/payment/orders/{order_id}/confirm")
+    assert confirm.status_code == 200
+
+    job = client.post("/api/simple-jobs", json={"prompt": "做一个审计演示页面", "model_source": "local"})
+    assert job.status_code == 202
+
+    audit = client.get("/api/audit/events?limit=20")
+    ops = client.get("/api/ops/snapshot")
+
+    assert audit.status_code == 200
+    events = audit.get_json()["events"]
+    types = {event["event_type"] for event in events}
+    assert {"payment_order_created", "payment_order_confirmed", "simple_job_submitted"} <= types
+    assert ops.status_code == 200
+    ops_json = ops.get_json()
+    assert ops_json["schema"] == "product_ops_snapshot.v1"
+    assert ops_json["queue"]["schema"] == "product_job_queue.v1"
+    assert ops_json["rate_limiter"]["schema"] == "api_rate_limiter_snapshot.v1"
+    assert ops_json["audit_tail"]
 
 
 def test_product_ui_groq_llm_requires_groq_key(tmp_path: Path, monkeypatch) -> None:

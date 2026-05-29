@@ -456,6 +456,26 @@ class ApiRateLimiter:
                 "retry_after_s": retry_after,
             }
 
+    def snapshot(self) -> dict[str, Any]:
+        now = time.time()
+        with self._lock:
+            active_keys = 0
+            scopes: dict[str, int] = {}
+            for key, events in list(self._events.items()):
+                fresh = [ts for ts in events if now - ts <= 3600]
+                if fresh:
+                    self._events[key] = fresh
+                    active_keys += 1
+                    scope = key.split(":", 1)[0]
+                    scopes[scope] = scopes.get(scope, 0) + len(fresh)
+                else:
+                    self._events.pop(key, None)
+            return {
+                "schema": "api_rate_limiter_snapshot.v1",
+                "active_keys": active_keys,
+                "events_by_scope": scopes,
+            }
+
 
 class ProductTaskQueue:
     """Small in-process queue for UI jobs.
@@ -466,8 +486,10 @@ class ProductTaskQueue:
     shape stable.
     """
 
-    def __init__(self, processor) -> None:
+    def __init__(self, processor, *, max_attempts: int = 2, retry_delay_s: float = 0.05) -> None:
         self._processor = processor
+        self._max_attempts = max(int(max_attempts), 1)
+        self._retry_delay_s = max(float(retry_delay_s), 0.0)
         self._jobs: dict[str, dict[str, Any]] = {}
         self._queue: queue_lib.Queue[str] = queue_lib.Queue()
         self._lock = threading.RLock()
@@ -487,10 +509,14 @@ class ProductTaskQueue:
             "started_at": "",
             "finished_at": "",
             "duration_ms": 0,
+            "attempts": 0,
+            "max_attempts": self._max_attempts,
             "progress": 0,
             "payload": dict(payload),
             "result": {},
             "error": "",
+            "errors": [],
+            "dead_letter": False,
             "notifications": ["任务已进入队列"],
         }
         with self._lock:
@@ -524,6 +550,11 @@ class ProductTaskQueue:
                 "schema": "product_job_queue.v1",
                 "queued_size": self._queue.qsize(),
                 "counts": counts,
+                "dead_letters": [
+                    row
+                    for row in self.list(limit=50, owner_key=owner_key)
+                    if bool(row.get("dead_letter"))
+                ][:20],
                 "jobs": self.list(limit=20, owner_key=owner_key),
             }
 
@@ -538,9 +569,18 @@ class ProductTaskQueue:
     def _run(self) -> None:
         while True:
             job_id = self._queue.get()
+            started = time.time()
             try:
-                started = time.time()
-                self._patch(job_id, status="running", progress=25, started_at=_now_iso(), notifications=["任务开始执行"])
+                job = self.get(job_id) or {}
+                attempts = int(job.get("attempts", 0) or 0) + 1
+                self._patch(
+                    job_id,
+                    status="running",
+                    progress=25,
+                    attempts=attempts,
+                    started_at=job.get("started_at") or _now_iso(),
+                    notifications=[f"任务开始执行（第 {attempts} 次）"],
+                )
                 job = self.get(job_id) or {}
                 result = self._processor(job)
                 self._patch(
@@ -553,14 +593,35 @@ class ProductTaskQueue:
                     notifications=["任务已完成"],
                 )
             except Exception as exc:  # pragma: no cover - defensive worker boundary
-                self._patch(
-                    job_id,
-                    status="failed",
-                    progress=100,
-                    finished_at=_now_iso(),
-                    error=f"{type(exc).__name__}: {exc}",
-                    notifications=["任务失败，请调整需求后重试"],
-                )
+                job = self.get(job_id) or {}
+                attempts = int(job.get("attempts", 1) or 1)
+                error = f"{type(exc).__name__}: {exc}"
+                errors = list(job.get("errors", [])) if isinstance(job.get("errors"), list) else []
+                errors.append({"attempt": attempts, "at": _now_iso(), "error": error})
+                if attempts < int(job.get("max_attempts", self._max_attempts) or self._max_attempts):
+                    self._patch(
+                        job_id,
+                        status="queued",
+                        progress=10,
+                        error=error,
+                        errors=errors,
+                        notifications=[f"任务失败，准备重试（{attempts}/{self._max_attempts}）"],
+                    )
+                    if self._retry_delay_s:
+                        time.sleep(self._retry_delay_s)
+                    self._queue.put(job_id)
+                else:
+                    self._patch(
+                        job_id,
+                        status="dead_letter",
+                        progress=100,
+                        finished_at=_now_iso(),
+                        duration_ms=round((time.time() - started) * 1000.0, 2),
+                        error=error,
+                        errors=errors,
+                        dead_letter=True,
+                        notifications=["任务多次失败，已进入死信队列"],
+                    )
             finally:
                 self._queue.task_done()
 
@@ -579,6 +640,65 @@ def _estimate_tokens(*texts: str, output_tokens: int = 0) -> int:
 
 def _billing_path(root: Path) -> Path:
     return root / ".agent_billing.json"
+
+
+def _audit_path(root: Path) -> Path:
+    return root / ".agent_audit.jsonl"
+
+
+def _write_audit_event(
+    root: Path,
+    user: Any | None,
+    event_type: str,
+    *,
+    metadata: dict[str, Any] | None = None,
+    request_meta: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    event = {
+        "schema": "product_audit_event.v1",
+        "event_id": f"evt_{secrets.token_hex(8)}",
+        "created_at": _now_iso(),
+        "event_type": str(event_type or "unknown"),
+        "actor": {
+            "user_id": _account_key(user),
+            "username": str(getattr(user, "username", "") or "anonymous"),
+            "role": str(getattr(user, "role", "") or ""),
+        },
+        "metadata": dict(metadata or {}),
+        "request": dict(request_meta or {}),
+    }
+    path = _audit_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+    return event
+
+
+def _read_audit_events(
+    root: Path,
+    user: Any | None,
+    *,
+    limit: int = 100,
+    include_all: bool = False,
+) -> list[dict[str, Any]]:
+    path = _audit_path(root)
+    if not path.exists():
+        return []
+    actor_id = _account_key(user)
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(item, dict):
+            continue
+        event_actor = item.get("actor") if isinstance(item.get("actor"), dict) else {}
+        if include_all or str(event_actor.get("user_id", "")) == actor_id:
+            rows.append(item)
+    return rows[-max(int(limit), 1) :]
 
 
 def _load_billing(root: Path) -> dict[str, Any]:
@@ -3421,12 +3541,30 @@ def create_app(
             return data
         return dict(request.form.items())
 
+    def _request_meta() -> dict[str, Any]:
+        return {
+            "method": request.method,
+            "path": request.path,
+            "remote_addr": request.remote_addr or "",
+            "user_agent": (request.headers.get("User-Agent", "") or "")[:180],
+        }
+
+    def _audit(event_type: str, **metadata: Any) -> dict[str, Any]:
+        return _write_audit_event(
+            root,
+            _current_user(),
+            event_type,
+            metadata=metadata,
+            request_meta=_request_meta(),
+        )
+
     def _rate_limit(scope: str, *, limit: int, window_s: float) -> Response | None:
         user = _current_user()
         key = f"{scope}:{_account_key(user)}:{request.remote_addr or 'local'}"
         decision = rate_limiter.check(key, limit=limit, window_s=window_s)
         if decision["allowed"]:
             return None
+        _audit("rate_limited", scope=scope, decision=decision)
         response = jsonify(
             {
                 "error": "rate_limited",
@@ -3545,6 +3683,49 @@ def create_app(
     def api_billing() -> Response:
         return jsonify(_billing_snapshot(root, _current_user()))
 
+    @app.get("/api/audit/events")
+    @login_required(_auth_store)
+    def api_audit_events() -> Response:
+        user = _current_user()
+        try:
+            limit = int(request.args.get("limit", "100") or 100)
+        except ValueError:
+            limit = 100
+        include_all = bool(user and user.role == "admin" and str(request.args.get("all", "")).lower() in {"1", "true", "yes"})
+        return jsonify(
+            {
+                "schema": "product_audit_log.v1",
+                "events": _read_audit_events(root, user, limit=min(max(limit, 1), 500), include_all=include_all),
+            }
+        )
+
+    @app.get("/api/ops/snapshot")
+    @login_required(_auth_store)
+    def api_ops_snapshot() -> Response:
+        user = _current_user()
+        queue = job_queue.snapshot(owner_key=_account_key(user))
+        billing = _billing_snapshot(root, user)
+        audit_tail = _read_audit_events(root, user, limit=10, include_all=bool(user and user.role == "admin"))
+        return jsonify(
+            {
+                "schema": "product_ops_snapshot.v1",
+                "service": "software-production-agent-ui",
+                "runs_root": str(root),
+                "queue": queue,
+                "billing": {
+                    "remaining_tokens": billing["remaining_tokens"],
+                    "used_tokens": billing["used_tokens"],
+                    "low_quota": billing["low_quota"],
+                },
+                "rate_limiter": rate_limiter.snapshot(),
+                "audit_tail": audit_tail,
+                "notes": [
+                    "in-process queue/rate limiter are for local deployment; production can replace them with Redis/Gateway",
+                    "audit log is append-only JSONL under runs_root",
+                ],
+            }
+        )
+
     @app.post("/api/token-plan")
     @login_required(_auth_store)
     def api_token_plan() -> Response:
@@ -3582,14 +3763,14 @@ def create_app(
             amount_yuan = 0
         if amount_yuan <= 0:
             return jsonify({"error": "bad_request", "message": "amount_yuan must be positive"}), 400
-        return jsonify(
-            _create_payment_order(
-                root,
-                _current_user(),
-                amount_yuan,
-                idempotency_key=str(payload.get("idempotency_key", "") or ""),
-            )
+        result = _create_payment_order(
+            root,
+            _current_user(),
+            amount_yuan,
+            idempotency_key=str(payload.get("idempotency_key", "") or ""),
         )
+        _audit("payment_order_created", order_id=result["order"]["order_id"], amount_yuan=amount_yuan, replayed=result.get("replayed", False))
+        return jsonify(result)
 
     @app.get("/api/payment/orders/<order_id>")
     @login_required(_auth_store)
@@ -3604,6 +3785,7 @@ def create_app(
         if limited:
             return limited
         result = _confirm_payment_order(root, _current_user(), order_id)
+        _audit("payment_order_confirmed", order_id=order_id, ok=bool(result.get("ok")), reason=result.get("reason", ""))
         return jsonify(result), 200 if bool(result.get("ok")) else 404
 
     @app.post("/api/payment/orders/<order_id>/reconcile")
@@ -3616,6 +3798,7 @@ def create_app(
             order_id,
             provider_status=str(payload.get("provider_status", payload.get("status", "pending")) or "pending"),
         )
+        _audit("payment_order_reconciled", order_id=order_id, ok=bool(result.get("ok")), provider_status=str(payload.get("provider_status", payload.get("status", "pending")) or "pending"))
         return jsonify(result), 200 if bool(result.get("ok")) else 404
 
     @app.get("/api/simple-jobs")
@@ -3676,6 +3859,7 @@ def create_app(
             },
             owner_key=_account_key(user),
         )
+        _audit("simple_job_submitted", job_id=job["job_id"], model_source=token_plan["model_source"], provider=token_plan["provider"])
         return jsonify(
             {
                 "schema": "product_job_submission.v1",
@@ -3738,6 +3922,7 @@ def create_app(
         html = str(payload.get("html", "") or "")
         if not prompt:
             return jsonify({"error": "bad_request", "message": "prompt is required"}), 400
+        _audit("simple_package_downloaded", title=title or _simple_title(prompt), prompt_tokens=_estimate_tokens(prompt, improvement))
         return _build_simple_package_response(prompt, improvement, html, title)
 
     @app.get("/resources")
