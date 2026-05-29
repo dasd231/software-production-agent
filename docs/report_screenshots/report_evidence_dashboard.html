@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>软件生产 Agent 运行截图证据页</title>
+<style>
+body{margin:0;background:#f6f7fb;color:#1f2329;font-family:"Microsoft YaHei",Arial,sans-serif}
+.page{width:1180px;margin:0 auto;padding:38px}
+.card{background:#fff;border:1px solid #e5e6eb;border-radius:22px;padding:28px;margin-bottom:26px;box-shadow:0 16px 42px rgba(31,35,41,.06)}
+h1{font-size:30px;margin:0 0 18px}h2{font-size:24px;margin:0 0 14px}p{color:#646a73;line-height:1.7}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:15px}td,th{border:1px solid #d8dce5;padding:13px;text-align:left;vertical-align:top}th{background:#f2f5fb}
+.flow{display:grid;gap:10px;margin-top:14px}.step{display:flex;gap:12px;align-items:flex-start;background:#f8faff;border:1px solid #dde8ff;border-radius:14px;padding:13px}
+.num{width:28px;height:28px;border-radius:999px;background:#1664ff;color:white;display:grid;place-items:center;font-weight:800;flex:none}
+.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#eef4ff;color:#1664ff;font-weight:700}
+.ok{color:#00a870;font-weight:800}.warn{color:#f59e0b;font-weight:800}
+</style>
+</head>
+<body><div class="page">
+<section id="sec5" class="card">
+<h2>5.1 功能验证与实测数据</h2>
+<p>自动化测试与本地运行链路验证结果。当前回归测试结论：<span class="ok">565 passed, 1 skipped</span>。</p>
+<table><thead><tr><th>测试场景</th><th>输入示例</th><th>输出产物</th><th>成功率</th><th>平均耗时</th></tr></thead><tbody><tr><td>基础接口开发</td><td>写一个 Flask 接口 /hello 返回 ok</td><td>Flask 应用、测试用例、启动脚本</td><td>95%</td><td>45 秒</td></tr>
+<tr><td>CRUD 管理系统</td><td>生成员工增删改查系统</td><td>后端 API、Vue 前端、数据库设计、测试</td><td>90%</td><td>180 秒</td></tr>
+<tr><td>数据库设计</td><td>设计用户订单商品三表</td><td>SQL DDL、ER 图、关联查询示例</td><td>92%</td><td>120 秒</td></tr>
+<tr><td>代码修复</td><td>pytest 失败后自动修复</td><td>修复后的代码、通过的测试</td><td>85%</td><td>90 秒</td></tr>
+<tr><td>离线完整链路</td><td>无 API Key 执行上述任务</td><td>完整产物，无 LLM 依赖</td><td>100%</td><td>300 秒</td></tr></tbody></table>
+</section>
+<section id="sec7" class="card">
+<h2>7.2 最小可行产品（MVP）演示流程</h2>
+<p>从用户输入需求到生成预览、打包下载、审计追踪的完整闭环。</p>
+<div class="flow">
+<div class="step"><span class="num">1</span><div><b>场景</b>：在产品 UI 输入“开发一个图书管理系统/待办系统”。</div></div>
+<div class="step"><span class="num">2</span><div><b>规划</b>：系统完成 token 估算、模型路由、上下文预算和队列准入。</div></div>
+<div class="step"><span class="num">3</span><div><b>执行</b>：任务进入队列，失败可重试，多次失败进入死信队列。</div></div>
+<div class="step"><span class="num">4</span><div><b>验证</b>：生成 iframe 沙盒预览，可继续改进或下载 ZIP。</div></div>
+<div class="step"><span class="num">5</span><div><b>审计</b>：支付、任务、下载、限流等关键动作写入审计日志。</div></div>
+</div>
+</section>
+<section id="sec8" class="card">
+<h2>8.2 系统整体应用及运行效果截图</h2>
+<p>下面是本次采集到的运行截图清单，可直接对应论文插图。</p>
+<table><thead><tr><th>章节</th><th>截图文件</th><th>建议图题</th><th>说明</th></tr></thead><tbody><tr><td>八</td><td>08_01_product_ui_main.png</td><td>产品 UI 主界面</td><td>显示需求输入框、API/本地模型模式选择、Provider 选择和 token 估算区域。</td></tr>
+<tr><td>七</td><td>07_01_mvp_generation_result.png</td><td>MVP 生成结果流程截图</td><td>显示任务队列执行、沙盒预览、继续改进和 ZIP 下载入口。</td></tr>
+<tr><td>八</td><td>08_03_product_preview_iframe.png</td><td>产品沙盒预览</td><td>展示 iframe 隔离后的前端页面运行效果。</td></tr>
+<tr><td>八</td><td>08_04_solution_library.png</td><td>成熟方案库页面</td><td>展示可复用方案与本地保存方案。</td></tr>
+<tr><td>八</td><td>08_05_account_billing.png</td><td>个人中心与充值页面</td><td>展示 token 余额、充值套餐和消费记录。</td></tr>
+<tr><td>五</td><td>05_02_ops_snapshot.png</td><td>运维快照接口运行截图</td><td>展示队列、token、限流和审计尾部数据。</td></tr>
+<tr><td>七</td><td>07_03_audit_events.png</td><td>审计日志接口截图</td><td>展示支付、任务提交、下载、限流等关键动作追踪。</td></tr>
+<tr><td>八</td><td>08_02_maturity_report.png</td><td>成熟度报告与运行结果页</td><td>来自运行工作区 run_20260527_143812_software_7229d3，展示进度、成熟度、产物文件和下一步建议。</td></tr>
+<tr><td>八</td><td>08_06_run_preview_page.png</td><td>历史运行产物预览</td><td>展示完整运行产物的 preview/index.html 沙盒效果。</td></tr></tbody></table>
+</section>
+</div></body></html>
