@@ -115,8 +115,9 @@ TOKEN_PER_YUAN = 2_000
 
 
 SIMPLE_PRODUCT_CSS = """
-:root{color-scheme:light;--bg:#f7f8fb;--card:#fff;--text:#1f2329;--muted:#646a73;--line:#e5e6eb;--blue:#1664ff;--blue2:#4080ff;--soft:#eef4ff;--red:#f54a45;--green:#00a870;--shadow:0 18px 48px rgba(31,35,41,.07);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#fafcff 0,#f4f6fb 48%,#f7f8fb 100%);color:var(--text)}button,input,textarea{font:inherit}.shell{min-height:100vh;display:grid;grid-template-columns:208px minmax(0,1fr)}.nav{background:rgba(255,255,255,.96);border-right:1px solid var(--line);padding:20px 16px;position:sticky;top:0;height:100vh}.brand{display:flex;gap:11px;align-items:center;padding:2px 4px 18px;margin-bottom:18px;border-bottom:1px solid var(--line)}.mark{width:40px;height:40px;border-radius:14px;background:linear-gradient(135deg,var(--blue),#7aa2ff);color:#fff;display:grid;place-items:center;font-weight:900;box-shadow:0 10px 26px rgba(22,100,255,.23)}h1,h2,h3,p{margin:0}h1{font-size:17px;letter-spacing:-.02em}.brand p,.head p,.muted{color:var(--muted);font-size:13px;margin-top:4px}.tab{width:100%;border:0;background:transparent;text-align:left;padding:11px 12px;border-radius:12px;color:var(--muted);font-weight:760;cursor:pointer;transition:.15s}.tab.active,.tab:hover{background:var(--soft);color:var(--blue)}.tab.link{display:block;text-decoration:none}.main{padding:28px;max-width:1520px}.page{display:none}.page.active{display:block}.head{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:18px}.head h2{font-size:27px;letter-spacing:-.04em}.pill{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;color:var(--muted);font-size:13px;white-space:nowrap}.grid{display:grid;grid-template-columns:minmax(340px,.72fr) minmax(560px,1.28fr);gap:18px;align-items:stretch}.card{background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:20px;padding:19px;box-shadow:var(--shadow)}.field{display:grid;gap:8px;margin-bottom:14px}.field span{font-size:13px;font-weight:800;color:#30343b}textarea{width:100%;border:1px solid var(--line);border-radius:14px;padding:13px 14px;line-height:1.58;resize:vertical;outline:none;background:#fff;color:var(--text)}textarea:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(22,100,255,.10)}.chips{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 14px}.chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:999px;padding:8px 11px;cursor:pointer;font-weight:720}.chip:hover{background:var(--soft);color:var(--blue);border-color:#bacefd}.btn{border:1px solid var(--line);background:#fff;border-radius:13px;padding:10px 14px;font-weight:850;cursor:pointer;transition:.15s;color:var(--text)}.btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(31,35,41,.08)}.btn.primary{background:linear-gradient(135deg,var(--blue),var(--blue2));border-color:var(--blue);color:#fff}.btn.danger{color:var(--red)}.btn.block{width:100%}.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}.preview-card{min-height:680px;display:grid;grid-template-rows:auto 1fr;gap:13px}.preview-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.preview-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}iframe{width:100%;min-height:604px;border:1px solid var(--line);border-radius:16px;background:#fff}.solution-list,.history{display:grid;gap:12px}.item{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}.item p{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.5}.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.tag{border:1px solid #dfe5f6;background:#f7f9ff;color:#456094;border-radius:999px;padding:4px 8px;font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.empty{background:#fff;border:1px dashed var(--line);border-radius:16px;padding:18px;color:var(--muted)}.account{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px}.balance span{color:var(--muted);font-size:13px}.balance strong{display:block;font-size:42px;margin:10px 0;letter-spacing:-.04em}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.plan{text-align:left;border:1px solid var(--line);background:#fff;border-radius:16px;padding:18px;cursor:pointer}.plan:hover{background:var(--soft);border-color:#bacefd}.plan strong{display:block;font-size:24px}.records{grid-column:1/-1}.record{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:11px 0;color:var(--muted)}.toast{position:fixed;right:18px;bottom:18px;background:#1f2329;color:#fff;padding:11px 13px;border-radius:12px;font-size:13px;box-shadow:0 12px 30px rgba(31,35,41,.25);z-index:50}.legacy-compat{display:none!important}@media(max-width:1080px){.shell{grid-template-columns:1fr}.nav{height:auto;position:static;display:flex;gap:8px;align-items:center;overflow:auto;padding:14px}.brand{border:0;margin:0;padding:0;min-width:150px}.tab{width:auto;white-space:nowrap}.main{padding:16px}.grid,.account{grid-template-columns:1fr}.plans{grid-template-columns:1fr}iframe{min-height:520px}.preview-card{min-height:590px}}
+:root{color-scheme:light;--bg:#f7f8fb;--card:#fff;--text:#1f2329;--muted:#646a73;--line:#e5e6eb;--blue:#1664ff;--blue2:#4080ff;--soft:#eef4ff;--red:#f54a45;--green:#00a870;--shadow:0 18px 48px rgba(31,35,41,.07);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#fafcff 0,#f4f6fb 48%,#f7f8fb 100%);color:var(--text)}button,input,textarea{font:inherit}.shell{min-height:100vh;display:grid;grid-template-columns:208px minmax(0,1fr)}.nav{background:rgba(255,255,255,.96);border-right:1px solid var(--line);padding:20px 16px;position:sticky;top:0;height:100vh}.brand{display:flex;gap:11px;align-items:center;padding:2px 4px 18px;margin-bottom:18px;border-bottom:1px solid var(--line)}.mark{width:40px;height:40px;border-radius:14px;background:linear-gradient(135deg,var(--blue),#7aa2ff);color:#fff;display:grid;place-items:center;font-weight:900;box-shadow:0 10px 26px rgba(22,100,255,.23)}h1,h2,h3,p{margin:0}h1{font-size:17px;letter-spacing:-.02em}.brand p,.head p,.muted{color:var(--muted);font-size:13px;margin-top:4px}.tab{width:100%;border:0;background:transparent;text-align:left;padding:11px 12px;border-radius:12px;color:var(--muted);font-weight:760;cursor:pointer;transition:.15s}.tab.active,.tab:hover{background:var(--soft);color:var(--blue)}.tab.link{display:block;text-decoration:none}.main{padding:28px;max-width:1520px}.page{display:none}.page.active{display:block}.head{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:18px}.head h2{font-size:27px;letter-spacing:-.04em}.pill{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;color:var(--muted);font-size:13px;white-space:nowrap}.grid{display:grid;grid-template-columns:minmax(340px,.72fr) minmax(560px,1.28fr);gap:18px;align-items:stretch}.card{background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:20px;padding:19px;box-shadow:var(--shadow)}.field{display:grid;gap:8px;margin-bottom:14px}.field span{font-size:13px;font-weight:800;color:#30343b}textarea{width:100%;border:1px solid var(--line);border-radius:14px;padding:13px 14px;line-height:1.58;resize:vertical;outline:none;background:#fff;color:var(--text)}textarea:focus{border-color:var(--blue);box-shadow:0 0 0 4px rgba(22,100,255,.10)}.chips{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 14px}.chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:999px;padding:8px 11px;cursor:pointer;font-weight:720}.chip:hover{background:var(--soft);color:var(--blue);border-color:#bacefd}.btn{border:1px solid var(--line);background:#fff;border-radius:13px;padding:10px 14px;font-weight:850;cursor:pointer;transition:.15s;color:var(--text)}.btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(31,35,41,.08)}.btn.primary{background:linear-gradient(135deg,var(--blue),var(--blue2));border-color:var(--blue);color:#fff}.btn.danger{color:var(--red)}.btn.block{width:100%}.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}.preview-card{min-height:680px;display:grid;grid-template-rows:auto auto 1fr;gap:13px}.preview-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.preview-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}iframe{width:100%;min-height:604px;border:1px solid var(--line);border-radius:16px;background:#fff}.solution-list,.history{display:grid;gap:12px}.item{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}.item p{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.5}.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.tag{border:1px solid #dfe5f6;background:#f7f9ff;color:#456094;border-radius:999px;padding:4px 8px;font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.empty{background:#fff;border:1px dashed var(--line);border-radius:16px;padding:18px;color:var(--muted)}.account{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px}.balance span{color:var(--muted);font-size:13px}.balance strong{display:block;font-size:42px;margin:10px 0;letter-spacing:-.04em}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.plan{text-align:left;border:1px solid var(--line);background:#fff;border-radius:16px;padding:18px;cursor:pointer}.plan:hover{background:var(--soft);border-color:#bacefd}.plan strong{display:block;font-size:24px}.records{grid-column:1/-1}.record{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:11px 0;color:var(--muted)}.toast{position:fixed;right:18px;bottom:18px;background:#1f2329;color:#fff;padding:11px 13px;border-radius:12px;font-size:13px;box-shadow:0 12px 30px rgba(31,35,41,.25);z-index:50}.legacy-compat{display:none!important}@media(max-width:1080px){.shell{grid-template-columns:1fr}.nav{height:auto;position:static;display:flex;gap:8px;align-items:center;overflow:auto;padding:14px}.brand{border:0;margin:0;padding:0;min-width:150px}.tab{width:auto;white-space:nowrap}.main{padding:16px}.grid,.account{grid-template-columns:1fr}.plans{grid-template-columns:1fr}iframe{min-height:520px}.preview-card{min-height:590px}}
 .runtime-box{display:grid;gap:10px;border:1px solid var(--line);border-radius:16px;background:#fbfcff;padding:13px;margin:6px 0 14px}.runtime-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.runtime-head span{font-size:12px;color:var(--muted)}.radio-card{display:flex;gap:8px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:13px;padding:10px 11px;font-weight:800;cursor:pointer}.radio-card em{font-style:normal;color:var(--muted);font-size:12px;margin-left:auto;font-weight:650}.api-options{display:grid;grid-template-columns:1fr 1fr;gap:10px}.api-options label{display:grid;gap:6px;color:var(--muted);font-size:12px;font-weight:760}.api-options select,.api-options input{height:38px;border:1px solid var(--line);border-radius:11px;padding:0 10px;background:#fff;color:var(--text);outline:none}.token-card{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 14px}.token-card div{border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px}.token-card span{display:block;color:var(--muted);font-size:12px}.token-card strong{display:block;margin-top:5px;font-size:18px}.job-box{margin-top:14px;border:1px solid var(--line);border-radius:15px;background:#fff;padding:12px}.job-box p{color:var(--muted);font-size:13px;margin-top:6px}.bar{height:8px;background:#eef1f7;border-radius:999px;overflow:hidden;margin-top:10px}.bar span{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--blue),#65b5ff);transition:width .25s}.record strong{color:var(--text)}@media(max-width:1080px){.api-options,.token-card{grid-template-columns:1fr}}
+.demo-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 14px}.step{border:1px solid var(--line);background:#fff;border-radius:14px;padding:10px;color:var(--muted);font-size:12px}.step strong{display:block;color:var(--text);font-size:13px;margin-bottom:4px}.step.active{border-color:#bacefd;background:var(--soft);color:#456094}.delivery-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 12px}.delivery-grid div{border:1px solid var(--line);border-radius:14px;background:#fbfcff;padding:10px}.delivery-grid span{display:block;color:var(--muted);font-size:12px}.delivery-grid strong{display:block;margin-top:5px;font-size:17px}.solution-score{min-width:66px;text-align:center;border:1px solid #dfe5f6;background:#f7f9ff;border-radius:15px;padding:10px}.solution-score strong{display:block;font-size:22px;color:var(--blue)}.solution-score span{display:block;color:var(--muted);font-size:12px}.queue-mini{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.queue-mini span{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:5px 8px;color:var(--muted);background:#fff}@media(max-width:1080px){.demo-steps,.delivery-grid{grid-template-columns:1fr 1fr}}
 
 """
 
@@ -209,6 +210,12 @@ SIMPLE_PRODUCT_TEMPLATE = """
           </div>
 
           <button id="genBtn" class="btn primary block">加入队列并生成预览</button>
+          <div class="demo-steps">
+            <div class="step active"><strong>1 理解需求</strong>抽取模块和边界</div>
+            <div class="step"><strong>2 生成样机</strong>输出可点击预览</div>
+            <div class="step"><strong>3 质量检查</strong>接口/文档/下载包</div>
+            <div class="step"><strong>4 继续迭代</strong>保存方案或下载</div>
+          </div>
 
           <label class="field" style="margin-top:18px">
             <span>继续改进</span>
@@ -219,6 +226,7 @@ SIMPLE_PRODUCT_TEMPLATE = """
           <div class="job-box">
             <strong>任务状态</strong>
             <p id="jobStatus">暂无任务。</p>
+            <div class="queue-mini" id="jobMini"><span>队列：空闲</span><span>失败重试：开启</span><span>死信：自动隔离</span></div>
             <div class="bar"><span id="jobBar"></span></div>
           </div>
         </div>
@@ -234,6 +242,12 @@ SIMPLE_PRODUCT_TEMPLATE = """
               <button id="downloadBtn" class="btn primary">下载 ZIP</button>
               <button id="saveBtn" class="btn">保存</button>
             </div>
+          </div>
+          <div class="delivery-grid" id="deliveryGrid">
+            <div><span>成熟度</span><strong>-</strong></div>
+            <div><span>可交互模块</span><strong>-</strong></div>
+            <div><span>交付文件</span><strong>-</strong></div>
+            <div><span>下一步</span><strong>生成预览</strong></div>
           </div>
           <iframe id="frame" sandbox="allow-scripts"></iframe>
         </div>
@@ -288,9 +302,11 @@ $('#prompt').oninput=()=>{saveDraft();debouncedPlan()};$('#improve').oninput=()=
 let planTimer=null;function debouncedPlan(){clearTimeout(planTimer);planTimer=setTimeout(updateTokenPlan,350)}
 async function postJson(url, body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let d={};try{d=await r.json()}catch{};if(!r.ok)throw Object.assign(new Error(d.message||d.error||'请求失败'),{body:d,status:r.status});return d}
 async function updateTokenPlan(){const p=$('#prompt').value.trim();if(!p)return;try{const d=await postJson('/api/token-plan',payload());$('#inputTokens').textContent=d.estimate.input_tokens.toLocaleString();$('#totalTokens').textContent=d.estimate.estimated_total_tokens.toLocaleString();$('#remainTokens').textContent=d.billing.remaining_tokens.toLocaleString();$('#queuePill').textContent=d.model_source==='api'?'API 调用 · 额度校验':'本地部署 · 路由切片'}catch(e){}}
-function setPreview(d){current=d;$('#previewTitle').textContent=d.title||'沙盒预览';$('#previewMeta').textContent=d.preview_id?`已生成 · ${d.preview_id}`:'已生成';$('#frame').srcdoc=d.html||'';if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(new Blob([d.html||''],{type:'text/html'}));show('create')}
+function setDelivery(d){const q=d.quality||{},fs=d.features||[],ds=d.deliverables||[];$('#deliveryGrid').innerHTML=`<div><span>成熟度</span><strong>${esc(q.score? q.score+'%':'可演示')}</strong></div><div><span>可交互模块</span><strong>${fs.length||3}</strong></div><div><span>交付文件</span><strong>${ds.length||4}</strong></div><div><span>下一步</span><strong>下载/继续改</strong></div>`}
+function setPreview(d){current=d;$('#previewTitle').textContent=d.title||'沙盒预览';$('#previewMeta').textContent=d.preview_id?`已生成 · ${d.preview_id}`:'已生成';$('#frame').srcdoc=d.html||'';setDelivery(d);if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(new Blob([d.html||''],{type:'text/html'}));show('create')}
 async function submitJob(){const p=$('#prompt').value.trim();if(!p)return toast('先输入需求');$('#genBtn').disabled=true;try{const d=await postJson('/api/simple-jobs',payload());activeJob=d.job.job_id;toast(d.notification||'已加入队列');pollJob(activeJob)}catch(e){if(e.status===402)toast('额度不足，请先充值');else toast(e.message)}finally{$('#genBtn').disabled=false;loadBilling()}}
-async function pollJob(id){if(!id)return;try{const r=await fetch('/api/simple-jobs/'+encodeURIComponent(id));const d=await r.json();$('#jobStatus').textContent=`${d.status||'-'} · ${d.notifications?.[0]||''}`;$('#jobBar').style.width=Math.max(Number(d.progress||0),3)+'%';if(d.status==='finished'){setPreview(d.result.preview);toast('预览已生成');loadBilling();return}if(d.status==='failed'){toast(d.error||'任务失败');return}setTimeout(()=>pollJob(id),650)}catch(e){toast('任务状态获取失败')}};
+function stageText(d){const p=Number(d.progress||0);if(d.status==='queued')return'排队中 · 等待 worker 接收';if(d.status==='running'&&p<45)return'正在理解需求 · 抽取模块/权限/数据边界';if(d.status==='running'&&p<80)return'正在生成样机 · 组装页面和交付文件';if(d.status==='running')return'正在质量检查 · 打包预览和下载包';if(d.status==='dead_letter')return'失败已隔离 · 可重新提交';return `${d.status||'-'} · ${d.notifications?.[0]||''}`}
+async function pollJob(id){if(!id)return;try{const r=await fetch('/api/simple-jobs/'+encodeURIComponent(id));const d=await r.json();$('#jobStatus').textContent=stageText(d);$('#jobMini').innerHTML=`<span>任务：${esc(d.job_id||id)}</span><span>尝试：${Number(d.attempts||0)}/${Number(d.max_attempts||1)}</span><span>进度：${Number(d.progress||0)}%</span>`;$('#jobBar').style.width=Math.max(Number(d.progress||0),3)+'%';if(d.status==='finished'){setPreview(d.result.preview);toast('预览已生成');loadBilling();return}if(d.status==='failed'||d.status==='dead_letter'){toast(d.error||'任务失败');return}setTimeout(()=>pollJob(id),650)}catch(e){toast('任务状态获取失败')}};
 $('#genBtn').onclick=submitJob;$('#improveBtn').onclick=submitJob;
 $('#openBtn').onclick=()=>previewUrl?window.open(previewUrl,'_blank','noopener,noreferrer'):toast('先生成预览');
 $('#downloadBtn').onclick=async()=>{if(!current)return toast('先生成预览');$('#downloadBtn').disabled=true;try{const r=await fetch('/api/simple-package',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:current.title,prompt:$('#prompt').value,improvement:$('#improve').value,html:current.html})});if(!r.ok)throw new Error('下载失败');const blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(current.title||'software').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g,'-').replace(/^-|-$/g,'')+'.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('ZIP 已下载')}catch(e){toast(e.message)}finally{$('#downloadBtn').disabled=false}};
@@ -299,8 +315,10 @@ function renderHistory(){const r=rows();$('#historyList').innerHTML=r.length?r.m
 $('#saveBtn').onclick=()=>{if(!current)return toast('先生成预览');const r=rows();r.unshift({id:current.preview_id||Date.now().toString(),title:current.title||'沙盒预览',prompt:$('#prompt').value,improve:$('#improve').value,html:current.html,time:new Date().toLocaleString('zh-CN')});localStorage.setItem('spa_solutions',JSON.stringify(r.slice(0,24)));renderHistory();toast('已保存')};
 window.loadSol=id=>{const x=rows().find(v=>v.id===id);if(!x)return;$('#prompt').value=x.prompt||'';$('#improve').value=x.improve||'';setPreview({preview_id:x.id,title:x.title,html:x.html});saveDraft();updateTokenPlan()};
 window.delSol=id=>{localStorage.setItem('spa_solutions',JSON.stringify(rows().filter(x=>x.id!==id)));renderHistory()};$('#clearHistory').onclick=()=>{localStorage.removeItem('spa_solutions');renderHistory();toast('已清空')};
-async function loadSolutions(){try{const r=await fetch('/api/simple-solutions');const d=await r.json();const list=d.solutions||[];$('#solutionList').innerHTML=list.length?list.map(x=>`<div class="item"><div><strong>${esc(x.title)}</strong><p>${esc(x.summary)}</p><div class="tags">${(x.tags||[]).slice(0,6).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></div><div class="actions"><button class="btn" onclick='useCurated(${JSON.stringify(x).replace(/'/g,"&#39;")})'>使用</button></div></div>`).join(''):'<div class="empty">还没有成熟方案。</div>'}catch(e){$('#solutionList').innerHTML='<div class="empty">方案加载失败。</div>'}}
-window.useCurated=x=>{$('#prompt').value=x.prompt||x.summary||x.title;$('#improve').value='';saveDraft();updateTokenPlan();submitJob()};
+let curatedSolutions=[];
+async function loadSolutions(){try{const r=await fetch('/api/simple-solutions');const d=await r.json();curatedSolutions=d.solutions||[];$('#solutionList').innerHTML=curatedSolutions.length?curatedSolutions.map((x,i)=>`<div class="item"><div><strong>${esc(x.display_title||x.title)}</strong><p>${esc(x.display_summary||x.summary)}</p><div class="tags">${(x.tags||[]).slice(0,7).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></div><div class="actions"><div class="solution-score"><strong>${esc(x.quality_score||'-')}</strong><span>成熟度</span></div><button class="btn" onclick="previewCurated(${i})">预览</button><button class="btn primary" onclick="useCurated(${i})">基于它生成</button></div></div>`).join(''):'<div class="empty">还没有成熟方案。</div>';renderHistory()}catch(e){$('#solutionList').innerHTML='<div class="empty">方案加载失败。</div>'}}
+window.previewCurated=i=>{const x=curatedSolutions[i];if(!x)return;$('#prompt').value=x.prompt||x.summary||x.title;$('#improve').value='';setPreview({preview_id:x.id,title:x.display_title||x.title,html:x.preview_html||'',quality:{score:x.quality_score||92},features:x.tags||[],deliverables:x.artifact_hints||[]});saveDraft();updateTokenPlan()};
+window.useCurated=i=>{const x=curatedSolutions[i];if(!x)return;$('#prompt').value=x.prompt||x.summary||x.title;$('#improve').value='';saveDraft();updateTokenPlan();submitJob()};
 async function loadBilling(){try{const r=await fetch('/api/billing');const d=await r.json();$('#balance').textContent=(d.remaining_tokens||0).toLocaleString();$('#quotaText').textContent=`免费 ${Number(d.free_quota||0).toLocaleString()} · 已购 ${Number(d.purchased_tokens||0).toLocaleString()} · 已用 ${Number(d.used_tokens||0).toLocaleString()}`;const orders=(d.orders||[]).slice().reverse(),events=(d.token_events||[]).slice().reverse();const orderHtml=orders.map(x=>`<div class="record"><span>${esc(x.created_at)} · ${esc(x.status)}</span><strong>¥${esc(x.amount_yuan)} / ${Number(x.tokens||0).toLocaleString()} tokens</strong></div>`).join('');const eventHtml=events.map(x=>`<div class="record"><span>${esc(x.created_at)} · ${esc(x.reason)}</span><strong>-${Number(x.amount||0).toLocaleString()}</strong></div>`).join('');$('#records').innerHTML=orderHtml+eventHtml||'<div class="empty">暂无订单和消耗记录。</div>'}catch(e){}}
 $$('.plan').forEach(x=>x.onclick=async()=>{const amount=Number(x.dataset.amount||0);try{const order=await postJson('/api/payment/orders',{amount_yuan:amount});const paid=await postJson('/api/payment/orders/'+order.order.order_id+'/confirm',{});toast(paid.notification||'充值成功');loadBilling();updateTokenPlan()}catch(e){toast(e.message)}});
 loadDraft();refreshRuntime();if(!$('#prompt').value)$('#prompt').value='做一个图书管理系统，包含图书、读者、借阅、归还、续借、预约、逾期罚款、权限和数据看板。';renderHistory();loadBilling();loadSolutions();updateTokenPlan();
@@ -2592,30 +2610,196 @@ RESULT_TEMPLATE = """
 
 
 def _build_simple_preview(prompt: str, improvement: str = "") -> dict[str, Any]:
+    """Build a self-contained, clickable product preview for the lightweight demo UI.
+
+    The earlier preview looked like a product poster. For live demos we need the
+    audience to immediately see concrete screens, entities, operations and a
+    believable delivery boundary. The preview therefore renders a small static
+    application with tabs, sample data, KPIs and acceptance notes; it is still
+    quota-free and safe because it ships as isolated HTML.
+    """
+
     preview_id = f"preview_{secrets.token_hex(4)}"
+    source_text = f"{prompt} {improvement}".strip()
     title = _simple_title(prompt)
-    theme = _simple_theme(prompt + " " + improvement)
-    sections = _simple_sections(prompt + " " + improvement)
+    theme = _simple_theme(source_text)
+    profile = _simple_product_profile(source_text)
     escaped_prompt = html_lib.escape(prompt)
     escaped_improvement = html_lib.escape(improvement)
-    section_html = "".join(
-        f"<article class='card'><strong>{html_lib.escape(name)}</strong><p>{html_lib.escape(desc)}</p></article>"
-        for name, desc in sections
+    nav_html = "".join(
+        f"<button class='nav-btn {'active' if idx == 0 else ''}' data-tab='{idx}'>{html_lib.escape(tab['name'])}</button>"
+        for idx, tab in enumerate(profile["tabs"])
+    )
+    panel_html = "".join(
+        f"<section class='panel {'active' if idx == 0 else ''}' data-panel='{idx}'><div class='panel-head'><div><h2>{html_lib.escape(tab['title'])}</h2><p>{html_lib.escape(tab['desc'])}</p></div><button class='primary mini'>{html_lib.escape(tab['action'])}</button></div>{tab['body']}</section>"
+        for idx, tab in enumerate(profile["tabs"])
+    )
+    kpi_html = "".join(
+        f"<div class='kpi'><span>{html_lib.escape(k['label'])}</span><strong>{html_lib.escape(k['value'])}</strong><em>{html_lib.escape(k['hint'])}</em></div>"
+        for k in profile["kpis"]
+    )
+    feature_html = "".join(
+        f"<article class='feature'><strong>{html_lib.escape(name)}</strong><p>{html_lib.escape(desc)}</p></article>"
+        for name, desc in _simple_sections(source_text)
     )
     improve_html = (
-        f"<div class='note'><strong>改进要求</strong><br>{escaped_improvement}</div>"
+        f"<div class='note'><strong>本轮改进</strong><p>{escaped_improvement}</p></div>"
         if improvement
         else ""
     )
     html = f"""<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{html_lib.escape(title)}</title><style>
-*{{box-sizing:border-box}}body{{margin:0;background:{theme['bg']};font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:#1f2329}}.page{{min-height:100vh;padding:32px}}.hero{{background:#fff;border:1px solid #e5e6eb;border-radius:26px;padding:34px;box-shadow:0 18px 50px rgba(31,35,41,.08)}}.tag{{display:inline-flex;padding:7px 11px;border-radius:999px;background:{theme['soft']};color:{theme['main']};font-weight:850;font-size:13px}}h1{{margin:18px 0 10px;font-size:34px;letter-spacing:-.045em}}p{{color:#646a73;line-height:1.72}}.actions{{display:flex;gap:12px;margin-top:22px}}button{{border:0;border-radius:13px;padding:12px 16px;font-weight:850;cursor:pointer}}.primary{{background:{theme['main']};color:#fff}}.ghost{{background:#f6f7fb;color:#1f2329}}.grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}}.card,.note{{background:#fff;border:1px solid #e5e6eb;border-radius:18px;padding:18px}}.card strong{{display:block;margin-bottom:8px}}.note{{margin-top:18px;background:#fafbfc;font-size:13px;color:#646a73}}@media(max-width:760px){{.page{{padding:16px}}.grid{{grid-template-columns:1fr}}h1{{font-size:27px}}}}
-</style></head><body><main class='page'><section class='hero'><span class='tag'>可运行预览</span><h1>{html_lib.escape(title)}</h1><p>这是根据需求生成的产品壳。满意后可以导出 ZIP，里面会带上预览页、产品说明和接口契约。</p><div class='actions'><button class='primary'>主要操作</button><button class='ghost'>查看详情</button></div></section><section class='grid'>{section_html}</section><div class='note'><strong>原始需求</strong><br>{escaped_prompt}</div>{improve_html}</main></body></html>"""
+*{{box-sizing:border-box}}body{{margin:0;background:{theme['bg']};font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:#1f2329}}button,input,select{{font:inherit}}.app{{min-height:100vh;display:grid;grid-template-columns:230px minmax(0,1fr)}}.side{{background:#0f1b16;color:#fff;padding:24px;display:flex;flex-direction:column;gap:20px}}.logo{{font-weight:900;font-size:22px;letter-spacing:-.04em}}.logo span{{display:block;color:#a7b3ad;font-size:12px;font-weight:600;margin-top:5px}}.nav-btn{{width:100%;border:0;text-align:left;border-radius:14px;background:rgba(255,255,255,.07);color:#dce5e0;padding:12px 14px;margin:4px 0;cursor:pointer;font-weight:800}}.nav-btn.active,.nav-btn:hover{{background:#e9fff4;color:#10251b}}.main{{padding:26px;overflow:auto}}.hero{{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;background:#fff;border:1px solid #e5e6eb;border-radius:24px;padding:26px;box-shadow:0 18px 50px rgba(31,35,41,.08)}}.tag{{display:inline-flex;padding:7px 11px;border-radius:999px;background:{theme['soft']};color:{theme['main']};font-weight:900;font-size:13px}}h1{{margin:14px 0 8px;font-size:31px;letter-spacing:-.045em}}h2{{margin:0;font-size:22px;letter-spacing:-.03em}}p{{color:#646a73;line-height:1.72;margin:0}}.hero-actions{{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}}button.primary{{border:0;border-radius:13px;background:{theme['main']};color:#fff;padding:11px 15px;font-weight:900;cursor:pointer}}button.ghost{{border:0;border-radius:13px;background:#f4f6fa;color:#1f2329;padding:11px 15px;font-weight:850;cursor:pointer}}.kpis{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}}.kpi{{background:#fff;border:1px solid #e5e6eb;border-radius:18px;padding:16px}}.kpi span,.kpi em{{display:block;color:#646a73;font-size:12px}}.kpi strong{{display:block;font-size:28px;margin:6px 0;letter-spacing:-.04em}}.panel{{display:none;background:#fff;border:1px solid #e5e6eb;border-radius:22px;padding:22px;box-shadow:0 14px 42px rgba(31,35,41,.06)}}.panel.active{{display:block}}.panel-head{{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px}}.mini{{padding:8px 12px!important;font-size:13px}}.toolbar{{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}}.toolbar input,.toolbar select{{height:38px;border:1px solid #e5e6eb;border-radius:12px;padding:0 12px;background:#fff}}table{{width:100%;border-collapse:collapse;background:#fff}}th,td{{border-bottom:1px solid #edf0f4;padding:12px;text-align:left;font-size:14px}}th{{color:#646a73;font-size:12px;background:#fafbff}}.badge{{display:inline-flex;border-radius:999px;padding:4px 8px;background:{theme['soft']};color:{theme['main']};font-size:12px;font-weight:850}}.cards{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}.flow-card,.feature,.note{{background:#fff;border:1px solid #e5e6eb;border-radius:18px;padding:17px}}.flow-card strong,.feature strong{{display:block;margin-bottom:8px}}.features{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}}.note{{margin-top:16px;background:#fbfcff}}.footer{{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}}@media(max-width:900px){{.app{{grid-template-columns:1fr}}.side{{position:sticky;top:0;z-index:2;padding:14px;display:block}}.nav-btn{{width:auto;display:inline-flex;margin-right:6px}}.hero,.panel-head{{display:block}}.kpis,.cards,.features,.footer{{grid-template-columns:1fr}}}}
+</style></head><body><div class='app'><aside class='side'><div class='logo'>{html_lib.escape(profile['short_name'])}<span>可运行沙盒预览</span></div><nav>{nav_html}</nav></aside><main class='main'><section class='hero'><div><span class='tag'>MVP Preview</span><h1>{html_lib.escape(title)}</h1><p>{html_lib.escape(profile['summary'])}</p></div><div class='hero-actions'><button class='primary'>新增记录</button><button class='ghost'>导出报表</button><button class='ghost'>权限设置</button></div></section><section class='kpis'>{kpi_html}</section>{panel_html}<section class='features'>{feature_html}</section><div class='footer'><div class='note'><strong>原始需求</strong><p>{escaped_prompt}</p></div><div class='note'><strong>交付边界</strong><p>当前包可离线预览，下载 ZIP 后包含前端页面、产品说明、接口契约和交付清单；真实生产接入数据库、登录权限和审计。</p></div></div>{improve_html}</main></div><script>
+document.querySelectorAll('.nav-btn').forEach(btn=>btn.onclick=()=>{{document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.querySelector(`[data-panel="${{btn.dataset.tab}}"]`)?.classList.add('active');}});
+document.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{{if(btn.className.includes('nav-btn'))return;btn.textContent=btn.textContent.includes('已')?btn.textContent:'已'+btn.textContent;setTimeout(()=>btn.textContent=btn.textContent.replace(/^已/,''),900);}}));
+</script></body></html>"""
     return {
         "preview_id": preview_id,
         "title": title,
         "prompt": prompt,
         "improvement": improvement,
         "html": html,
+        "domain": profile["domain"],
+        "features": [name for name, _ in _simple_sections(source_text)],
+        "quality": {"score": profile["score"], "grade": profile["grade"]},
+        "deliverables": profile["deliverables"],
+    }
+
+
+def _simple_product_profile(text: str) -> dict[str, Any]:
+    lower = text.lower()
+    if any(key in lower for key in ("library", "book", "reader", "borrow", "return", "图书", "读者", "借阅", "归还")):
+        return _library_preview_profile()
+    if any(key in lower for key in ("account", "recharge", "balance", "wallet", "账户", "充值", "余额", "个人中心")):
+        return _account_preview_profile()
+    if any(key in lower for key in ("approval", "workflow", "audit", "risk", "审批", "流程", "审计")):
+        return _approval_preview_profile()
+    return _generic_preview_profile()
+
+
+def _table(headers: list[str], rows: list[list[str]]) -> str:
+    head = "".join(f"<th>{html_lib.escape(h)}</th>" for h in headers)
+    body = "".join(
+        "<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>"
+        for row in rows
+    )
+    return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+
+
+def _library_preview_profile() -> dict[str, Any]:
+    tabs = [
+        {
+            "name": "图书与读者",
+            "title": "图书与读者档案",
+            "desc": "支持图书检索、馆藏状态、读者借阅证和借阅上限管理。",
+            "action": "新增图书",
+            "body": "<div class='toolbar'><input placeholder='搜索书名 / ISBN'><select><option>全部分类</option><option>计算机</option><option>文学</option></select><select><option>全部状态</option><option>可借</option><option>已借出</option></select></div>" + _table(
+                ["书名", "作者", "库存", "状态", "操作"],
+                [
+                    ["《深入理解计算机系统》", "R. Bryant", "5/8", "<span class='badge'>可借</span>", "借出 / 编辑"],
+                    ["《机器学习》", "周志华", "2/3", "<span class='badge'>热门</span>", "预约 / 编辑"],
+                    ["《软件工程导论》", "张海藩", "0/4", "<span class='badge'>待归还</span>", "催还 / 续借"],
+                ],
+            ),
+        },
+        {
+            "name": "借阅流通",
+            "title": "借阅、归还、续借与预约",
+            "desc": "把借阅状态机做成可追踪流程，避免超限借阅和重复预约。",
+            "action": "办理借阅",
+            "body": "<div class='cards'><div class='flow-card'><strong>借阅</strong><p>校验读者状态、库存、借阅上限，生成 BorrowRecord。</p></div><div class='flow-card'><strong>归还</strong><p>计算逾期天数和罚款，恢复库存并写入审计。</p></div><div class='flow-card'><strong>预约</strong><p>库存不足时进入预约队列，到书后通知读者。</p></div></div>",
+        },
+        {
+            "name": "权限与看板",
+            "title": "角色权限、审计日志与数据看板",
+            "desc": "管理员、馆员、读者分权操作，关键动作都可追溯。",
+            "action": "查看审计",
+            "body": _table(
+                ["指标", "当前值", "说明"],
+                [["在借图书", "128", "实时流通状态"], ["逾期记录", "7", "自动提醒和罚款"], ["今日操作", "46", "审计日志可导出"]],
+            ),
+        },
+    ]
+    return {
+        "domain": "library",
+        "short_name": "图书系统",
+        "summary": "一个可演示的图书管理 MVP，覆盖图书、读者、借阅、归还、续借、预约、逾期罚款、RBAC 和看板。",
+        "kpis": [
+            {"label": "图书总量", "value": "12,480", "hint": "馆藏数据"},
+            {"label": "活跃读者", "value": "1,936", "hint": "近 30 天"},
+            {"label": "在借记录", "value": "128", "hint": "含续借"},
+            {"label": "逾期风险", "value": "7", "hint": "需提醒"},
+        ],
+        "tabs": tabs,
+        "score": 92,
+        "grade": "A",
+        "deliverables": ["可点击预览", "README", "接口契约", "交付清单"],
+    }
+
+
+def _account_preview_profile() -> dict[str, Any]:
+    return {
+        "domain": "account",
+        "short_name": "个人中心",
+        "summary": "面向商业化演示的账户中心，突出余额、充值套餐、订单状态、消费记录和幂等支付。",
+        "kpis": [
+            {"label": "可用额度", "value": "80,000", "hint": "免费 token"},
+            {"label": "本月消耗", "value": "12,840", "hint": "API 模式"},
+            {"label": "订单成功", "value": "99.9%", "hint": "幂等确认"},
+            {"label": "待对账", "value": "0", "hint": "异常恢复"},
+        ],
+        "tabs": [
+            {"name": "余额", "title": "余额与额度", "desc": "免费额度、购买额度和消耗记录统一展示。", "action": "刷新余额", "body": _table(["类型", "数量", "状态"], [["免费额度", "80,000", "<span class='badge'>可用</span>"], ["充值额度", "98,000", "<span class='badge'>已到账</span>"], ["API 消耗", "12,840", "<span class='badge'>已统计</span>"]])},
+            {"name": "充值", "title": "充值套餐", "desc": "订单先 pending，再 confirm / reconcile，避免重复扣费。", "action": "创建订单", "body": "<div class='cards'><div class='flow-card'><strong>¥19</strong><p>38,000 tokens</p></div><div class='flow-card'><strong>¥49</strong><p>98,000 tokens</p></div><div class='flow-card'><strong>¥99</strong><p>198,000 tokens</p></div></div>"},
+            {"name": "记录", "title": "消费与订单记录", "desc": "每次 API 生成都有 token 估算和真实 usage 回写边界。", "action": "导出记录", "body": _table(["时间", "动作", "金额/Token"], [["刚刚", "生成图书系统", "-1,441"], ["今天", "充值确认", "+98,000"], ["昨天", "生成审批流", "-1,260"]])},
+        ],
+        "score": 89,
+        "grade": "A-",
+        "deliverables": ["余额页", "充值页", "订单记录", "幂等说明"],
+    }
+
+
+def _approval_preview_profile() -> dict[str, Any]:
+    return {
+        "domain": "approval",
+        "short_name": "审批流",
+        "summary": "覆盖待办队列、状态流转、审批轨迹、异常退回和审计日志的审批流程系统。",
+        "kpis": [
+            {"label": "待办", "value": "24", "hint": "按 SLA 排序"},
+            {"label": "今日通过", "value": "18", "hint": "自动归档"},
+            {"label": "退回", "value": "3", "hint": "需补充材料"},
+            {"label": "平均耗时", "value": "2.1h", "hint": "流程指标"},
+        ],
+        "tabs": [
+            {"name": "待办", "title": "审批待办队列", "desc": "按优先级、负责人和 SLA 展示当前任务。", "action": "处理待办", "body": _table(["单号", "申请人", "状态", "SLA", "操作"], [["WF-1024", "林夏", "<span class='badge'>待审批</span>", "1h", "通过 / 退回"], ["WF-1025", "周澄", "<span class='badge'>补充材料</span>", "4h", "查看"], ["WF-1026", "许诺", "<span class='badge'>复核</span>", "2h", "复核"]])},
+            {"name": "状态机", "title": "状态流转规则", "desc": "草稿、待审、通过、驳回、撤销均受规则约束。", "action": "配置规则", "body": "<div class='cards'><div class='flow-card'><strong>草稿 → 待审</strong><p>提交前校验字段完整性。</p></div><div class='flow-card'><strong>待审 → 通过</strong><p>写入审批意见和审计日志。</p></div><div class='flow-card'><strong>待审 → 驳回</strong><p>必须填写驳回原因。</p></div></div>"},
+            {"name": "轨迹", "title": "审批轨迹与审计", "desc": "每个节点保留处理人、意见、时间和变更前后状态。", "action": "导出轨迹", "body": _table(["节点", "处理人", "结果", "时间"], [["提交", "申请人", "已提交", "09:10"], ["主管审批", "王主管", "通过", "10:02"], ["财务复核", "财务", "待处理", "--"]])},
+        ],
+        "score": 90,
+        "grade": "A",
+        "deliverables": ["待办页", "状态机", "审计轨迹", "异常退回"],
+    }
+
+
+def _generic_preview_profile() -> dict[str, Any]:
+    return {
+        "domain": "generic",
+        "short_name": "业务系统",
+        "summary": "把自然语言需求转成可演示的软件样机，包含数据列表、操作区、交付文档和下载包。",
+        "kpis": [
+            {"label": "核心模块", "value": "3", "hint": "自动拆分"},
+            {"label": "交付文件", "value": "6", "hint": "ZIP 包"},
+            {"label": "成熟度", "value": "86%", "hint": "MVP 可演示"},
+            {"label": "预计耗时", "value": "45s", "hint": "本地模式"},
+        ],
+        "tabs": [
+            {"name": "总览", "title": "业务总览", "desc": "展示核心实体、列表和操作入口。", "action": "新增", "body": _table(["名称", "负责人", "状态", "操作"], [["核心对象 A", "林夏", "<span class='badge'>正常</span>", "查看 / 编辑"], ["核心对象 B", "周澄", "<span class='badge'>待处理</span>", "处理"], ["核心对象 C", "许诺", "<span class='badge'>完成</span>", "归档"]])},
+            {"name": "流程", "title": "业务流程", "desc": "将需求拆成状态、动作和校验点。", "action": "运行流程", "body": "<div class='cards'><div class='flow-card'><strong>创建</strong><p>录入并校验必填字段。</p></div><div class='flow-card'><strong>处理</strong><p>按角色执行业务动作。</p></div><div class='flow-card'><strong>归档</strong><p>输出结果并写入审计。</p></div></div>"},
+            {"name": "交付", "title": "交付清单", "desc": "下载包包含预览页、说明、接口契约和检查清单。", "action": "下载 ZIP", "body": _table(["文件", "用途", "状态"], [["frontend/index.html", "离线预览", "<span class='badge'>已生成</span>"], ["docs/API_CONTRACT.yaml", "接口契约", "<span class='badge'>已生成</span>"], ["docs/DELIVERY_CHECKLIST.md", "验收清单", "<span class='badge'>已生成</span>"]])},
+        ],
+        "score": 86,
+        "grade": "B+",
+        "deliverables": ["业务总览", "流程卡片", "接口契约", "下载包"],
     }
 
 
@@ -2641,11 +2825,6 @@ def _simple_theme(text: str) -> dict[str, str]:
 
 def _simple_sections(text: str) -> list[tuple[str, str]]:
     lower = text.lower()
-    sections = [
-        ("核心数据", "实体、状态字段和可检索列表布局。"),
-        ("业务操作", "新增、编辑、删除、导出和详情流程。"),
-        ("交付内容", "离线预览、README、接口契约和打包清单。"),
-    ]
     if any(key in lower for key in ("library", "book", "reader", "borrow", "图书", "读者", "借阅")):
         return [
             ("Books & readers / 图书与读者", "图书目录、读者档案、借阅证和借阅上限。"),
@@ -2664,7 +2843,11 @@ def _simple_sections(text: str) -> list[tuple[str, str]]:
             ("状态机", "草稿、待审、通过、驳回和撤销流转。"),
             ("审批轨迹", "审批意见、操作日志和可回滚历史。"),
         ]
-    return sections
+    return [
+        ("核心数据", "实体、状态字段和可检索列表布局。"),
+        ("业务操作", "新增、编辑、删除、导出和详情流程。"),
+        ("交付内容", "离线预览、README、接口契约和打包清单。"),
+    ]
 
 
 def _safe_package_name(value: str) -> str:
@@ -2812,14 +2995,27 @@ def _curated_solution_catalog() -> list[dict[str, Any]]:
             continue
         title = str(raw.get("template") or raw.get("title") or path.parent.name)
         tags = raw.get("retrieval_tags") if isinstance(raw.get("retrieval_tags"), list) else []
+        hints = raw.get("artifact_hints") if isinstance(raw.get("artifact_hints"), list) else []
+        preview_html = ""
+        preview_path = path.parent / "preview" / "index.html"
+        if preview_path.exists():
+            try:
+                preview_html = preview_path.read_text(encoding="utf-8")
+            except OSError:
+                preview_html = ""
         out.append(
             {
                 "id": path.parent.name,
                 "title": title,
+                "display_title": "成熟图书管理系统",
                 "summary": str(raw.get("goal") or "Reusable curated software solution."),
+                "display_summary": "覆盖图书、读者、借阅、归还、续借、预约、逾期罚款、RBAC、数据看板和审计日志，适合实机演示与二次改造。",
                 "prompt": str(raw.get("demo_prompt") or raw.get("goal") or title),
                 "tags": [str(tag) for tag in tags[:10]],
                 "quality_score": raw.get("quality_score", 0),
+                "stack": str(raw.get("stack") or ""),
+                "artifact_hints": [str(item) for item in hints[:8]],
+                "preview_html": preview_html,
                 "path": str(path),
             }
         )
@@ -2832,6 +3028,11 @@ def _curated_solution_catalog() -> list[dict[str, Any]]:
                 "prompt": "做一个图书管理系统，包含图书、读者、借阅、归还、逾期罚款、权限和数据看板。",
                 "tags": ["library", "crud", "rbac", "circulation", "dashboard"],
                 "quality_score": 9.0,
+                "stack": "Spring Boot + Vue + MySQL + Static Preview",
+                "artifact_hints": ["README.md", "frontend/index.html", "docs/API_CONTRACT.yaml", "solution_manifest.json"],
+                "preview_html": _build_simple_preview(
+                    "做一个图书管理系统，包含图书、读者、借阅、归还、逾期罚款、权限和数据看板。"
+                )["html"],
                 "path": "",
             }
         )
