@@ -199,6 +199,7 @@ python -m agent.local_training.cli train \
 
 ```text
 local_training_manifest.json       总清单 + 质量门禁
+local_training_scorecard.json      训练质量得分卡 + 晋级门禁
 middle_model_local.json            中间层模型权重
 middle_model_examples.jsonl        中间层训练样本
 github_evaluator_local.json        GitHub 质量模型权重
@@ -276,3 +277,30 @@ finetune_export_manifest.json   后续 DeepSeek/Qwen LoRA 训练建议
 服务器 LoRA/SFT 只学习表达能力、泛化和复杂语义判断；
 license、安全、must_have 覆盖率等 hard gate 仍由规则系统执行，不能交给模型覆盖。
 ```
+
+### 6.7 训练质量得分卡
+
+每次训练会额外写出：
+
+```text
+local_training_scorecard.json
+```
+
+它回答三个问题：
+
+```text
+1. 模型是否只是“训练成功”，还是具备 shadow/canary 资格？
+2. 中间层小模型有没有 false_shortcut 风险？
+3. GitHub 评价模型有没有 bad_repo_leak 风险？
+```
+
+关键指标：
+
+```text
+validation_gap          训练集和验证集精度差距
+false_shortcut_rate     中间层把“必须跑规则”的任务误判成 shortcut 的比例
+bad_repo_leak_rate      GitHub 模型把坏仓库放入训练池的比例
+promotion_gate          blocked / shadow_only / candidate_for_shadow_or_canary
+```
+
+这保证训练不是“跑通就吹”，而是能被面试官追问数据质量、逃逸风险和上线门禁。

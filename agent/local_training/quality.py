@@ -111,3 +111,97 @@ def evaluate_training_quality(manifest: Mapping[str, Any], thresholds: Mapping[s
         if not overall_ok
         else ["eligible for shadow inference", "prepare rollback artifact", "compare against previous model"],
     }
+
+
+def _rate(numerator: float, denominator: float) -> float:
+    return round(float(numerator) / max(float(denominator), 1.0), 4)
+
+
+def build_training_scorecard(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    """Build an interview/audit-friendly scorecard for local small-model runs.
+
+    The scorecard intentionally separates "trained" from "promotable". A small
+    model can train successfully while still being blocked by sample size,
+    validation gap, false-shortcut risk, or governance leakage.
+    """
+
+    results = manifest.get("results", {}) if isinstance(manifest.get("results"), Mapping) else {}
+    quality = manifest.get("quality_evaluation", {}) if isinstance(manifest.get("quality_evaluation"), Mapping) else {}
+    rows: list[dict[str, Any]] = []
+    for key, target in (
+        ("middle_model", "middle_model_rule_acceleration"),
+        ("github_evaluator", "github_corpus_quality_evaluator"),
+    ):
+        model = results.get(key, {}) if isinstance(results.get(key), Mapping) else {}
+        metrics = model.get("metrics", {}) if isinstance(model.get("metrics"), Mapping) else {}
+        validation = (
+            model.get("validation_metrics", {})
+            if isinstance(model.get("validation_metrics"), Mapping)
+            else {}
+        )
+        confusion = metrics.get("confusion", {}) if isinstance(metrics.get("confusion"), Mapping) else {}
+        validation_confusion = (
+            validation.get("confusion", {})
+            if isinstance(validation.get("confusion"), Mapping)
+            else {}
+        )
+        accuracy = float(metrics.get("accuracy", 0) or 0)
+        validation_accuracy = float(validation.get("accuracy", 0) or 0)
+        validation_gap = round(max(accuracy - validation_accuracy, 0.0), 4)
+        if key == "middle_model":
+            # label 1 = must run expensive rules; FN means model would shortcut
+            # when deterministic rules were actually required.
+            critical_error_rate = _rate(confusion.get("fn", 0), sum(confusion.values()))
+            critical_name = "false_shortcut_rate"
+        else:
+            # label 1 = can train/distill; FP means a bad repo leaks into train.
+            critical_error_rate = _rate(confusion.get("fp", 0), sum(confusion.values()))
+            critical_name = "bad_repo_leak_rate"
+        quality_row = (
+            quality.get("evaluations", {}).get(key, {})
+            if isinstance(quality.get("evaluations"), Mapping)
+            else {}
+        )
+        blocked_reasons = list(quality_row.get("reasons", [])) if isinstance(quality_row.get("reasons"), list) else []
+        if validation_gap > 0.15:
+            blocked_reasons.append(f"validation_gap {validation_gap:.3f} > 0.150")
+        if key == "middle_model" and critical_error_rate > 0.05:
+            blocked_reasons.append(f"{critical_name} {critical_error_rate:.3f} > 0.050")
+        if key == "github_evaluator" and critical_error_rate > 0.03:
+            blocked_reasons.append(f"{critical_name} {critical_error_rate:.3f} > 0.030")
+
+        rows.append(
+            {
+                "model_key": key,
+                "target": target,
+                "status": model.get("status", "missing"),
+                "training_examples": int(model.get("training_examples", metrics.get("example_count", 0)) or 0),
+                "train_accuracy": accuracy,
+                "validation_accuracy": validation_accuracy,
+                "validation_gap": validation_gap,
+                critical_name: critical_error_rate,
+                "train_confusion": dict(confusion),
+                "validation_confusion": dict(validation_confusion),
+                "promotion_gate": "shadow_only" if blocked_reasons else "candidate_for_shadow_or_canary",
+                "blocked_reasons": blocked_reasons,
+            }
+        )
+
+    overall_blocked = [reason for row in rows for reason in row["blocked_reasons"]]
+    return {
+        "schema": "local_training_scorecard.v1",
+        "overall_gate": "blocked" if overall_blocked else "candidate",
+        "models": rows,
+        "server_training_readiness": {
+            "sft_export_allowed": True,
+            "server_lora_allowed": not overall_blocked,
+            "hard_gates_remain_rule_based": True,
+            "required_before_promotion": [
+                "holdout_by_domain",
+                "recent_time_slice",
+                "shadow_inference_log",
+                "rollback_artifact",
+                "human_spot_check",
+            ],
+        },
+    }

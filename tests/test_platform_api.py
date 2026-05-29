@@ -106,6 +106,18 @@ def test_platform_api_enterprise_and_maturity(tmp_path: Path) -> None:
     assert renew.json()["schema"] == "model_admission_renewal.v1"
     assert renew.json()["renewed"] is True
     assert renew.json()["lease_id"] == admission.json()["lease"]["lease_id"]
+    usage = client.post(
+        "/api/model-admission/usage",
+        json={
+            "lease_id": admission.json()["lease"]["lease_id"],
+            "prompt_tokens": 100,
+            "completion_tokens": 40,
+            "metadata": {"provider": "main_deepseek"},
+        },
+    )
+    assert usage.status_code == 200
+    assert usage.json()["schema"] == "model_usage_record.v1"
+    assert usage.json()["record"]["total_tokens"] == 140
     release = client.post(
         "/api/model-admission/release",
         json={"lease_id": admission.json()["lease"]["lease_id"]},

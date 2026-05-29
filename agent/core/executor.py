@@ -566,6 +566,17 @@ def run_action(workspace: Path, action_obj: dict[str, Any], limits: ExecutionLim
         )
         return {"ok": bool(result.get("renewed")), "action": name, "renewal": result}
 
+    if name == "model_admission_record_usage":
+        result = get_global_admission_controller().record_usage(
+            str(_require(args, "lease_id")),
+            prompt_tokens=int(args.get("prompt_tokens", 0) or 0),
+            completion_tokens=int(args.get("completion_tokens", 0) or 0),
+            total_tokens=int(args["total_tokens"]) if "total_tokens" in args else None,
+            metadata=args.get("metadata") if isinstance(args.get("metadata"), dict) else {},
+            release=bool(args.get("release", False)),
+        )
+        return {"ok": bool(result.get("ok")), "action": name, "usage": result}
+
     if name == "model_route_plan":
         plan = build_model_route_plan(
             str(_require(args, "goal")),

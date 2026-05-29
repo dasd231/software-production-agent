@@ -61,6 +61,7 @@ ALLOWED_ACTIONS: frozenset[str] = frozenset(
         "model_admission_acquire",
         "model_admission_release",
         "model_admission_renew",
+        "model_admission_record_usage",
         "model_route_plan",
         "software_middle_model_plan",
         "software_middle_model_decide",
@@ -339,6 +340,18 @@ class ActionDTO(BaseModel):
                 raise ValueError("model_admission_renew requires string lease_id")
             if "lease_ttl_s" in ar:
                 _validate_timeout(ar["lease_ttl_s"], label="model_admission_renew lease_ttl_s")
+        elif a == "model_admission_record_usage":
+            if "lease_id" not in ar or not isinstance(ar.get("lease_id"), str):
+                raise ValueError("model_admission_record_usage requires string lease_id")
+            for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                if key in ar:
+                    value = ar.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                        raise ValueError(f"model_admission_record_usage {key} must be non-negative integer")
+            if "release" in ar and not isinstance(ar.get("release"), bool):
+                raise ValueError("model_admission_record_usage release must be boolean")
+            if "metadata" in ar and not isinstance(ar.get("metadata"), dict):
+                raise ValueError("model_admission_record_usage metadata must be object")
         elif a == "enterprise_stack_plan":
             if "goal" not in ar or not isinstance(ar.get("goal"), str):
                 raise ValueError("enterprise_stack_plan requires string goal")

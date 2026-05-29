@@ -105,6 +105,28 @@ def test_admission_controller_acquire_saturate_release() -> None:
     assert third["admitted"] is True
 
 
+def test_admission_controller_records_actual_usage_and_releases() -> None:
+    controller = PoolAdmissionController(limit_overrides={"short_pool": 1})
+    admission = controller.acquire("写一个 /healthz 接口", max_output_tokens=128, lease_ttl_s=10)
+
+    usage = controller.record_usage(
+        admission["lease"]["lease_id"],
+        prompt_tokens=120,
+        completion_tokens=32,
+        metadata={"provider": "deepseek", "model": "demo"},
+        release=True,
+    )
+    snapshot = controller.snapshot()
+
+    assert usage["schema"] == "model_usage_record.v1"
+    assert usage["ok"] is True
+    assert usage["record"]["total_tokens"] == 152
+    assert usage["released"] is True
+    assert snapshot["leases_total"] == 0
+    assert snapshot["token_usage"]["by_pool"]["short_pool"]["total_tokens"] == 152
+    assert snapshot["token_usage"]["recent"][-1]["metadata"]["provider"] == "deepseek"
+
+
 def test_admission_controller_idempotency_and_ttl_cleanup() -> None:
     now = {"value": 100.0}
     controller = PoolAdmissionController(clock=lambda: now["value"], limit_overrides={"short_pool": 1})
@@ -171,6 +193,18 @@ def test_model_admission_actions_dispatch(tmp_path: Path) -> None:
         },
     )
     status = run_action(ws, {"type": "action", "action": "model_admission_status", "args": {}})
+    usage = run_action(
+        ws,
+        {
+            "type": "action",
+            "action": "model_admission_record_usage",
+            "args": {
+                "lease_id": acquired["admission"]["lease"]["lease_id"],
+                "prompt_tokens": 42,
+                "completion_tokens": 8,
+            },
+        },
+    )
     released = run_action(
         ws,
         {
@@ -183,4 +217,6 @@ def test_model_admission_actions_dispatch(tmp_path: Path) -> None:
     assert acquired["ok"] is True
     assert acquired["admission"]["schema"] == "model_admission.v1"
     assert status["status"]["schema"] == "model_admission_status.v1"
+    assert usage["ok"] is True
+    assert usage["usage"]["record"]["total_tokens"] == 50
     assert released["release"]["released"] is True

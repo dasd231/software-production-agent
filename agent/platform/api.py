@@ -84,6 +84,15 @@ class ModelLeaseRequest(BaseModel):
     lease_ttl_s: float | None = Field(default=None, gt=0)
 
 
+class ModelUsageRequest(BaseModel):
+    lease_id: str
+    prompt_tokens: int = Field(default=0, ge=0)
+    completion_tokens: int = Field(default=0, ge=0)
+    total_tokens: int | None = Field(default=None, ge=0)
+    release: bool = False
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class IntegrationEmbedRequest(BaseModel):
     integration_id: str
     resource_url: str = ""
@@ -217,6 +226,47 @@ def _auth_dependency(
     raise HTTPException(status_code=401, detail="invalid bearer token")
 
 
+def _permission_granted(identity: dict[str, Any] | None, permission: str) -> bool:
+    # Auth can be disabled for local development. In that mode permission gates
+    # should not surprise the user.
+    if identity is None:
+        return True
+    role = str(identity.get("role", "") or "").lower()
+    if role in {"admin", "owner", "platform_admin"}:
+        return True
+    permissions_raw = identity.get("permissions", ())
+    permissions = (
+        {str(item).strip() for item in permissions_raw if str(item).strip()}
+        if isinstance(permissions_raw, (list, tuple, set))
+        else set()
+    )
+    if "*" in permissions or "platform:*" in permissions:
+        return True
+    if permission in permissions:
+        return True
+    namespace = permission.split(":", 1)[0]
+    if f"{namespace}:*" in permissions:
+        return True
+    if permission.endswith(":read") and (
+        f"{namespace}:write" in permissions or f"{namespace}:admin" in permissions
+    ):
+        return True
+    return False
+
+
+def _require_permission(permission: str):
+    def dependency(
+        request: Request,
+        identity: dict[str, Any] | None = Depends(_auth_dependency),
+    ) -> dict[str, Any] | None:
+        if not _permission_granted(identity, permission):
+            request.state.permission_denied = permission
+            raise HTTPException(status_code=403, detail=f"missing permission: {permission}")
+        return identity
+
+    return dependency
+
+
 def create_app(runs_root: Path | None = None) -> FastAPI:
     app = FastAPI(
         title="Software Production Agent Platform API",
@@ -260,7 +310,7 @@ def create_app(runs_root: Path | None = None) -> FastAPI:
     @app.get("/api/resources")
     def api_resources(
         type: str = Query(default=""),
-        _: None = Depends(_auth_dependency),
+        _: dict[str, Any] | None = Depends(_require_permission("platform:read")),
     ) -> dict[str, Any]:
         return discover_resources(_root(app), type_filter=type)
 
@@ -275,7 +325,7 @@ def create_app(runs_root: Path | None = None) -> FastAPI:
     @app.get("/api/integrations")
     def api_integrations(
         category: str = Query(default=""),
-        _: None = Depends(_auth_dependency),
+        _: dict[str, Any] | None = Depends(_require_permission("platform:read")),
     ) -> dict[str, Any]:
         return list_integration_catalog(category)
 
@@ -283,7 +333,7 @@ def create_app(runs_root: Path | None = None) -> FastAPI:
     def api_integration_embed_plan(
         payload: IntegrationEmbedRequest,
         response: Response,
-        _: None = Depends(_auth_dependency),
+        _: dict[str, Any] | None = Depends(_require_permission("platform:write")),
     ) -> dict[str, Any]:
         plan = build_integration_embed_plan(
             payload.integration_id,
@@ -302,16 +352,19 @@ def create_app(runs_root: Path | None = None) -> FastAPI:
         model: str = Query(default=""),
         probe: bool = Query(default=True),
         timeout: float = Query(default=2.0),
-        _: None = Depends(_auth_dependency),
+        _: dict[str, Any] | None = Depends(_require_permission("platform:read")),
     ) -> dict[str, Any]:
         return model_runtime_status(provider, model or None, probe=probe, timeout=max(float(timeout), 0.1))
 
     @app.get("/api/model-pools")
-    def api_model_pools(_: None = Depends(_auth_dependency)) -> dict[str, Any]:
+    def api_model_pools(_: dict[str, Any] | None = Depends(_require_permission("platform:read"))) -> dict[str, Any]:
         return list_model_pools()
 
     @app.post("/api/model-route-plan")
-    def api_model_route_plan(payload: ModelRouteRequest, _: None = Depends(_auth_dependency)) -> dict[str, Any]:
+    def api_model_route_plan(
+        payload: ModelRouteRequest,
+        _: dict[str, Any] | None = Depends(_require_permission("platform:read")),
+    ) -> dict[str, Any]:
         return build_model_route_plan(
             payload.goal,
             payload.prompt,
@@ -321,14 +374,16 @@ def create_app(runs_root: Path | None = None) -> FastAPI:
         )
 
     @app.get("/api/model-admission/status")
-    def api_model_admission_status(_: None = Depends(_auth_dependency)) -> dict[str, Any]:
+    def api_model_admission_status(
+        _: dict[str, Any] | None = Depends(_require_permission("platform:read")),
+    ) -> dict[str, Any]:
         return app.state.model_admission.snapshot()
 
     @app.post("/api/model-admission/acquire")
     def api_model_admission_acquire(
         payload: ModelAdmissionRequest,
         response: Response,
-        _: None = Depends(_auth_dependency),
+        _: dict[str, Any] | None = Depends(_require_permission("model:admit")),
     ) -> dict[str, Any]:
         admission = app.state.model_admission.acquire(
             payload.goal,
@@ -345,23 +400,52 @@ def create_app(runs_root: Path | None = None) -> FastAPI:
         return admission
 
     @app.post("/api/model-admission/release")
-    def api_model_admission_release(payload: ModelLeaseRequest, _: None = Depends(_auth_dependency)) -> dict[str, Any]:
+    def api_model_admission_release(
+        payload: ModelLeaseRequest,
+        _: dict[str, Any] | None = Depends(_require_permission("model:admit")),
+    ) -> dict[str, Any]:
         return app.state.model_admission.release(payload.lease_id)
 
     @app.post("/api/model-admission/renew")
-    def api_model_admission_renew(payload: ModelLeaseRequest, _: None = Depends(_auth_dependency)) -> dict[str, Any]:
+    def api_model_admission_renew(
+        payload: ModelLeaseRequest,
+        _: dict[str, Any] | None = Depends(_require_permission("model:admit")),
+    ) -> dict[str, Any]:
         return app.state.model_admission.renew(payload.lease_id, lease_ttl_s=payload.lease_ttl_s)
 
+    @app.post("/api/model-admission/usage")
+    def api_model_admission_usage(
+        payload: ModelUsageRequest,
+        _: dict[str, Any] | None = Depends(_require_permission("model:admit")),
+    ) -> dict[str, Any]:
+        return app.state.model_admission.record_usage(
+            payload.lease_id,
+            prompt_tokens=payload.prompt_tokens,
+            completion_tokens=payload.completion_tokens,
+            total_tokens=payload.total_tokens,
+            metadata=payload.metadata,
+            release=payload.release,
+        )
+
     @app.post("/api/intent/compile")
-    def api_intent_compile(payload: IntentRequest, _: None = Depends(_auth_dependency)) -> dict[str, Any]:
+    def api_intent_compile(
+        payload: IntentRequest,
+        _: dict[str, Any] | None = Depends(_require_permission("platform:write")),
+    ) -> dict[str, Any]:
         return compile_intent(payload.goal, _root(app), roots=_paths(payload.roots))
 
     @app.post("/api/workflow/dry-run")
-    def api_workflow_dry_run(payload: WorkflowDryRunRequest, _: None = Depends(_auth_dependency)) -> dict[str, Any]:
+    def api_workflow_dry_run(
+        payload: WorkflowDryRunRequest,
+        _: dict[str, Any] | None = Depends(_require_permission("platform:write")),
+    ) -> dict[str, Any]:
         return dry_run_workflow(payload.spec, _root(app))
 
     @app.post("/api/enterprise-stack")
-    def api_enterprise_stack(payload: EnterpriseStackRequest, _: None = Depends(_auth_dependency)) -> dict[str, Any]:
+    def api_enterprise_stack(
+        payload: EnterpriseStackRequest,
+        _: dict[str, Any] | None = Depends(_require_permission("platform:write")),
+    ) -> dict[str, Any]:
         return build_enterprise_stack_plan(
             payload.goal,
             _root(app),
@@ -373,7 +457,7 @@ def create_app(runs_root: Path | None = None) -> FastAPI:
     @app.post("/api/industrial-maturity")
     def api_industrial_maturity(
         payload: IndustrialMaturityRequest,
-        _: None = Depends(_auth_dependency),
+        _: dict[str, Any] | None = Depends(_require_permission("platform:write")),
     ) -> dict[str, Any]:
         return build_industrial_maturity_plan(
             payload.goal,
@@ -384,11 +468,16 @@ def create_app(runs_root: Path | None = None) -> FastAPI:
         )
 
     @app.get("/api/enterprise-readiness")
-    def api_enterprise_readiness(_: None = Depends(_auth_dependency)) -> dict[str, Any]:
+    def api_enterprise_readiness(
+        _: dict[str, Any] | None = Depends(_require_permission("platform:read")),
+    ) -> dict[str, Any]:
         return build_enterprise_readiness_report(_root(app))
 
     @app.post("/api/evidence-ledger")
-    def api_evidence_ledger(payload: EvidenceLedgerRequest, _: None = Depends(_auth_dependency)) -> dict[str, Any]:
+    def api_evidence_ledger(
+        payload: EvidenceLedgerRequest,
+        _: dict[str, Any] | None = Depends(_require_permission("platform:write")),
+    ) -> dict[str, Any]:
         root = _root(app)
         output = (root / payload.output_path).resolve() if payload.write else None
         if output and not output.is_relative_to(root):

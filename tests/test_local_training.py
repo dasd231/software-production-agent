@@ -118,12 +118,15 @@ def test_local_training_writes_extracted_examples_and_quality_eval(tmp_path: Pat
 
     assert manifest["schema"] == "local_training_manifest.v2"
     assert manifest["quality_evaluation"]["schema"] == "model_training_quality_evaluation.v1"
+    assert manifest["scorecard"]["schema"] == "local_training_scorecard.v1"
     assert (tmp_path / "out2" / "middle_model_examples.jsonl").exists()
     assert (tmp_path / "out2" / "github_evaluator_examples.jsonl").exists()
+    assert (tmp_path / "out2" / "local_training_scorecard.json").exists()
     middle = json.loads((tmp_path / "out2" / "middle_model_local.json").read_text(encoding="utf-8"))
     github = json.loads((tmp_path / "out2" / "github_evaluator_local.json").read_text(encoding="utf-8"))
     assert "must_have_coverage" in middle["feature_names"]
     assert "license_signal" in github["feature_names"]
+    assert manifest["scorecard"]["server_training_readiness"]["hard_gates_remain_rule_based"] is True
 
 
 def test_local_training_inference_applies_hard_gates(tmp_path: Path) -> None:

@@ -14,7 +14,7 @@ from agent.local_training.feature_extraction import (
     extract_middle_label,
     stable_id,
 )
-from agent.local_training.quality import evaluate_training_quality
+from agent.local_training.quality import build_training_scorecard, evaluate_training_quality
 from agent.local_training.schemas import LocalModelArtifact, LocalTrainingExample
 from agent.software_middle_model.traces import load_middle_model_traces
 
@@ -324,5 +324,7 @@ def run_local_training(
         ],
     }
     manifest["quality_evaluation"] = evaluate_training_quality(manifest)
+    manifest["scorecard"] = build_training_scorecard(manifest)
     _write_json(output_dir / "local_training_manifest.json", manifest)
+    _write_json(output_dir / "local_training_scorecard.json", manifest["scorecard"])
     return manifest

@@ -113,3 +113,34 @@ def test_platform_api_accepts_jwt_and_attaches_identity(
     assert body["identity"]["user_id"] == "user-001"
     assert body["identity"]["tenant_id"] == "tenant-a"
     assert body["identity"]["role"] == "admin"
+
+
+def test_platform_api_enforces_jwt_permissions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENT_PLATFORM_JWT_SECRET", "jwt-secret")
+    monkeypatch.delenv("AGENT_PLATFORM_API_TOKEN", raising=False)
+    app = create_app(tmp_path)
+    client = TestClient(app)
+
+    read_only = _jwt(_payload(role="viewer", permissions=["platform:read"]))
+    can_read = client.get("/api/resources", headers={"Authorization": f"Bearer {read_only}"})
+    denied_model_admission = client.post(
+        "/api/model-admission/acquire",
+        json={"goal": "短API请求", "max_output_tokens": 128},
+        headers={"Authorization": f"Bearer {read_only}"},
+    )
+
+    model_admitter = _jwt(_payload(role="operator", permissions=["platform:read", "model:admit"]))
+    allowed_model_admission = client.post(
+        "/api/model-admission/acquire",
+        json={"goal": "短API请求", "max_output_tokens": 128},
+        headers={"Authorization": f"Bearer {model_admitter}"},
+    )
+
+    assert can_read.status_code == 200
+    assert denied_model_admission.status_code == 403
+    assert "model:admit" in denied_model_admission.json()["detail"]
+    assert allowed_model_admission.status_code == 200
+    assert allowed_model_admission.json()["admitted"] is True
