@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from agent.evaluation.rag import evaluate_unified_rag
+from agent.learning.hierarchical_rag import PARENT_CHUNKS_FILE, load_parent_chunks_jsonl
 from agent.learning.rag_qa import answer_question
 from agent.learning.store import LearningStoreError, load_learning_cards
 from agent.learning.vector_store import VectorIndex
@@ -21,7 +22,7 @@ class UnifiedRAGResult:
     summary: dict[str, Any]
 
 
-_LearningCacheValue = tuple[tuple[int, int, int, int], VectorIndex, list[Any]]
+_LearningCacheValue = tuple[tuple[int, int, int, int, int, int], VectorIndex, list[Any], dict[str, Any]]
 _LEARNING_STORE_CACHE: dict[str, _LearningCacheValue] = {}
 
 
@@ -29,34 +30,46 @@ def _round_ms(t0: float) -> float:
     return round((time.perf_counter() - t0) * 1000, 3)
 
 
-def _fingerprint(index_path: Path, cards_path: Path) -> tuple[int, int, int, int]:
+def _fingerprint(index_path: Path, cards_path: Path, parents_path: Path) -> tuple[int, int, int, int, int, int]:
     index_stat = index_path.stat()
     cards_stat = cards_path.stat()
+    if parents_path.exists():
+        parent_mtime = int(parents_path.stat().st_mtime_ns)
+        parent_size = int(parents_path.stat().st_size)
+    else:
+        parent_mtime = 0
+        parent_size = 0
     return (
         int(index_stat.st_mtime_ns),
         int(index_stat.st_size),
         int(cards_stat.st_mtime_ns),
         int(cards_stat.st_size),
+        parent_mtime,
+        parent_size,
     )
 
 
-def _load_learning_store(output_dir: Path) -> tuple[VectorIndex, list[Any]]:
+def _load_learning_store(output_dir: Path) -> tuple[VectorIndex, list[Any], dict[str, Any]]:
     out = output_dir.resolve()
     index_path = out / "vector_index.jsonl"
     cards_path = out / "knowledge_cards.json"
+    parents_path = out / PARENT_CHUNKS_FILE
     if not index_path.exists():
         raise LearningStoreError(f"missing vector_index.jsonl: {index_path}")
     if not cards_path.exists():
         raise LearningStoreError(f"missing knowledge_cards.json: {cards_path}")
-    fp = _fingerprint(index_path, cards_path)
+    fp = _fingerprint(index_path, cards_path, parents_path)
     key = str(out)
     cached = _LEARNING_STORE_CACHE.get(key)
     if cached and cached[0] == fp:
-        return cached[1], cached[2]
+        return cached[1], cached[2], cached[3]
     index = VectorIndex.load_jsonl(index_path)
     cards = load_learning_cards(out)
-    _LEARNING_STORE_CACHE[key] = (fp, index, cards)
-    return index, cards
+    parent_chunks = load_parent_chunks_jsonl(parents_path)
+    if parent_chunks:
+        setattr(index, "parent_chunks", parent_chunks)
+    _LEARNING_STORE_CACHE[key] = (fp, index, cards, parent_chunks)
+    return index, cards, parent_chunks
 
 
 def _source_counts(hints: list[dict[str, Any]]) -> dict[str, int]:
@@ -105,6 +118,11 @@ def _learning_hint_from_evidence(
         "source_dir": str(output_dir),
         "confidence": confidence,
         "retrieval_mode": str(trace.get("mode", "")),
+        "granularity": str(evidence.get("granularity", "")),
+        "parent_id": str(evidence.get("parent_id", "")),
+        "content_type": str(evidence.get("content_type", "")),
+        "source_kind": str(evidence.get("source_kind", "")),
+        "matched_children": evidence.get("matched_children", []),
     }
 
 
@@ -128,7 +146,7 @@ def _retrieve_learning_hints(
             "hits": 0,
         }
         try:
-            index, cards = _load_learning_store(output_dir)
+            index, cards, parent_chunks = _load_learning_store(output_dir)
             answer = answer_question(
                 query,
                 index,
@@ -136,6 +154,7 @@ def _retrieve_learning_hints(
                 top_k=top_k,
                 use_bm25=use_bm25,
                 use_generative=False,
+                parent_chunks=parent_chunks,
             )
             confidence = _safe_score(answer.get("confidence"))
             trace = answer.get("trace") if isinstance(answer.get("trace"), dict) else {}
@@ -156,6 +175,7 @@ def _retrieve_learning_hints(
                     "ok": True,
                     "hits": len(evidence[:top_k]),
                     "records": len(index.records),
+                    "parent_chunks": len(parent_chunks),
                     "cards": len(cards),
                     "mode": str(trace.get("mode", "")),
                     "confidence": confidence,

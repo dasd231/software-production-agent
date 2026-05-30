@@ -45,6 +45,7 @@ from agent.evaluation.slice_quality import review_slices
 from agent.learning.code_slicer import slice_repository
 from agent.learning.filters import filter_repositories
 from agent.learning.github_search import GitHubSearchClient
+from agent.learning.hierarchical_rag import build_hierarchical_vector_index, save_hierarchy_artifacts
 from agent.learning.knowledge_cards import build_knowledge_cards
 from agent.learning.readme_parser import parse_readme
 from agent.learning.repo_downloader import download_repo
@@ -59,7 +60,7 @@ from agent.learning.schemas import (
 )
 from agent.learning.structure_parser import parse_structure
 from agent.learning.training_export import build_training_examples, save_training_examples_jsonl
-from agent.learning.vector_store import VectorIndex, build_vector_index
+from agent.learning.vector_store import VectorIndex
 from agent.learning.web_search import search_web
 
 
@@ -102,6 +103,8 @@ def _write_report(
         f"Repos rejected: {len(artifacts) - len(promoted_artifacts)}",
         f"Knowledge quality: {quality_summary.get('overall_score', 0.0)} ({quality_summary.get('grade', 'n/a')})",
         f"Vector records: {len(vector_index.records)}",
+        f"Parent chunks: {len(getattr(vector_index, 'parent_chunks', {}) or {})}",
+        f"RAG hierarchy: child retrieval -> parent context, parent_lines={config.rag_hierarchy_parent_lines}, overlap={config.rag_hierarchy_parent_overlap_lines}",
         f"Training examples: {training_examples_count}",
         "",
         "## Repositories",
@@ -273,8 +276,11 @@ def run_learning_pipeline(config: LearningPipelineConfig) -> LearningPipelineRes
     )
 
     promoted_slices = [sl for artifact in promoted_artifacts for sl in artifact.slices]
-    vector_index = build_vector_index(
+    vector_index, parent_chunks, hierarchy_meta = build_hierarchical_vector_index(
         promoted_slices,
+        repo_id="learning_run",
+        parent_max_lines=config.rag_hierarchy_parent_lines,
+        parent_overlap_lines=config.rag_hierarchy_parent_overlap_lines,
         dimensions=config.vector_dimensions,
         use_openai=config.vector_use_openai,
         client=None,
@@ -288,8 +294,10 @@ def run_learning_pipeline(config: LearningPipelineConfig) -> LearningPipelineRes
     )
     out_vec = output_dir / "vector_index.jsonl"
     vector_index.save_jsonl(out_vec)
+    save_hierarchy_artifacts(output_dir, parent_chunks, hierarchy_meta)
     meta = vector_index.to_meta_dict()
     meta["st_batch_size"] = int(config.vector_st_batch_size)
+    meta["hierarchical_rag"] = hierarchy_meta
     _save_json(output_dir / "vector_meta.json", meta)
     all_cards = [card for artifact in promoted_artifacts for card in artifact.cards]
     _save_json(output_dir / "knowledge_cards.json", [card.to_dict() for card in all_cards])
@@ -310,6 +318,7 @@ def run_learning_pipeline(config: LearningPipelineConfig) -> LearningPipelineRes
             llm_model=rag_model,
             web_results=web_ctx,
             research=research,
+            parent_chunks=parent_chunks,
         )
         if config.query
         else {}

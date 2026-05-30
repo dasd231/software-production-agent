@@ -84,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         help="建库向量使用 OpenAI embedding（需 OPENAI_API_KEY；与 --vector-st 互斥，优先 OpenAI）",
     )
     parser.add_argument("--vector-openai-model", default="text-embedding-3-small", help="OpenAI embedding 模型名")
+    parser.add_argument("--rag-parent-lines", type=int, default=240, help="small-to-big 父块最大行数")
+    parser.add_argument("--rag-parent-overlap", type=int, default=40, help="small-to-big 父块重叠行数")
     parser.add_argument(
         "--rag-path-prefix",
         action="append",
@@ -161,6 +163,8 @@ def main(argv: list[str] | None = None) -> int:
         rag_research=bool(args.rag_research),
         rag_training_queries=tuple(str(x).strip() for x in args.training_rag_query if str(x).strip()),
         rag_training_query_limit=max(0, int(args.training_rag_query_limit)),
+        rag_hierarchy_parent_lines=max(40, int(args.rag_parent_lines)),
+        rag_hierarchy_parent_overlap_lines=max(0, int(args.rag_parent_overlap)),
     )
     result = run_learning_pipeline(cfg)
     print(f"processed repos: {len(result.repos)}")

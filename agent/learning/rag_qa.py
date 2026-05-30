@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from agent.learning.hierarchical_rag import ParentChunk, expand_evidence_small_to_big
 from agent.learning.rag_eval import aggregate_answer_metrics
 from agent.learning.rag_pipeline import ResearchRAGConfig, retrieve_evidence_unified
 from agent.learning.schemas import KnowledgeCard, VectorRecord
@@ -102,6 +103,13 @@ def _evidence_dict_list(evidence: list[tuple[float, VectorRecord]]) -> list[dict
             "path": record.metadata.get("path", ""),
             "start_line": record.metadata.get("start_line"),
             "end_line": record.metadata.get("end_line"),
+            "granularity": record.metadata.get("granularity", "child"),
+            "parent_id": record.metadata.get("parent_id", ""),
+            "content_type": record.metadata.get("content_type", ""),
+            "source_kind": record.metadata.get("source_kind", ""),
+            "symbol_hints": record.metadata.get("symbol_hints", []),
+            "framework_hints": record.metadata.get("framework_hints", []),
+            "matched_children": record.metadata.get("matched_children", []),
             "preview": record.text.strip()[:360],
         }
         for score, record in evidence
@@ -176,15 +184,37 @@ def answer_question(
     llm_model: str | None = None,
     web_results: list[dict[str, Any]] | None = None,
     research: ResearchRAGConfig | None = None,
+    parent_chunks: dict[str, ParentChunk] | None = None,
     gold_paths: set[str] | frozenset[str] | None = None,
 ) -> dict[str, object]:
+    parent_lookup = parent_chunks
+    if parent_lookup is None:
+        maybe_parent_lookup = getattr(vector_index, "parent_chunks", None)
+        parent_lookup = maybe_parent_lookup if isinstance(maybe_parent_lookup, dict) else None
+    retrieve_top_k = top_k
+    if parent_lookup:
+        multiplier = research.small_to_big_child_multiplier if research else 4
+        retrieve_top_k = max(top_k * max(int(multiplier), 1), top_k)
     evidence, trace = retrieve_evidence_unified(
         question,
         vector_index,
-        top_k=top_k,
+        top_k=retrieve_top_k,
         use_bm25=use_bm25,
         research=research,
     )
+    if parent_lookup:
+        parent_top_k = research.small_to_big_parent_top_k if research and research.small_to_big_parent_top_k else top_k
+        evidence = expand_evidence_small_to_big(evidence, parent_lookup, parent_top_k=parent_top_k)
+        trace = dict(trace)
+        trace["small_to_big"] = {
+            "enabled": True,
+            "child_fetch_k": retrieve_top_k,
+            "parent_top_k": parent_top_k,
+            "parent_chunks_available": len(parent_lookup),
+        }
+    else:
+        trace = dict(trace)
+        trace["small_to_big"] = {"enabled": False}
     if research is not None:
         evidence = _minmax_scores(evidence)
 
@@ -206,7 +236,6 @@ def answer_question(
         answer = _build_extractive_answer(relevant_cards, evidence, web_results=web_results)
 
     confidence = _calculate_confidence(evidence, relevant_cards, total_cards=len(cards))
-    trace = dict(trace)
     if abstain_below is not None and confidence < float(abstain_below):
         answer = (
             "[abstain] 检索置信度低于阈值，以下为检索摘要而非结论性回答。\n\n" + answer

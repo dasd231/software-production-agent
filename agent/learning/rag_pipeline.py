@@ -37,6 +37,9 @@ class ResearchRAGConfig:
     abstain_confidence_below: float | None = None
     path_prefixes: tuple[str, ...] = ()
     languages: tuple[str, ...] = ()
+    small_to_big: bool = False
+    small_to_big_child_multiplier: int = 4
+    small_to_big_parent_top_k: int | None = None
 
     def to_trace_dict(self) -> dict[str, Any]:
         return dict(asdict(self))
@@ -50,6 +53,7 @@ def benchmark_research_config() -> ResearchRAGConfig:
         rrf_k=60,
         cross_encoder_model="cross-encoder/ms-marco-MiniLM-L-6-v2",
         lost_in_middle=True,
+        small_to_big=True,
         abstain_confidence_below=None,
     )
 

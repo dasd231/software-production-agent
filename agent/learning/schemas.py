@@ -179,6 +179,8 @@ class LearningPipelineConfig:
     rag_research: bool = False
     rag_training_queries: tuple[str, ...] = ()
     rag_training_query_limit: int = 1
+    rag_hierarchy_parent_lines: int = 240
+    rag_hierarchy_parent_overlap_lines: int = 40
 
 
 @dataclass(frozen=True)

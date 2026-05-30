@@ -24,6 +24,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from agent.learning.hierarchical_rag import PARENT_CHUNKS_FILE, load_parent_chunks_jsonl
 from agent.learning.rag_pipeline import ResearchRAGConfig
 from agent.learning.rag_qa import answer_question
 from agent.learning.schemas import KnowledgeCard
@@ -87,6 +88,9 @@ def ask_learning_run(
     if not index_path.exists():
         raise LearningStoreError(f"missing vector_index.jsonl: {index_path}")
     index = VectorIndex.load_jsonl(index_path)
+    parent_chunks = load_parent_chunks_jsonl(output_dir / PARENT_CHUNKS_FILE)
+    if parent_chunks:
+        setattr(index, "parent_chunks", parent_chunks)
     cards = load_learning_cards(output_dir)
     web_results: list[dict[str, Any]] | None = None
     web_path = output_dir / "web_results.json"
@@ -108,6 +112,7 @@ def ask_learning_run(
         llm_model=llm_model,
         web_results=web_results,
         research=research,
+        parent_chunks=parent_chunks,
         gold_paths=gold_paths,
     )
     append_answer_jsonl(output_dir, answer)
